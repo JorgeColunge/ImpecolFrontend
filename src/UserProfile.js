@@ -6,15 +6,13 @@ function UserProfile({ userInfo }) {
   const [profilePic, setProfilePic] = useState(userInfo?.photo || '/images/default-profile.png');
   const [selectedFile, setSelectedFile] = useState(null);
 
-  const handleFileChange = (e) => {
-    setSelectedFile(e.target.files[0]);
-  };
+  const handleFileChange = (e) => setSelectedFile(e.target.files[0]);
 
   const handleUpload = async () => {
     if (selectedFile) {
       const formData = new FormData();
-      formData.append('image', selectedFile); // Cambia 'profilePic' a 'image'
-  
+      formData.append('image', selectedFile);
+
       try {
         const response = await axios.post('http://localhost:10000/api/upload', formData);
         setProfilePic(response.data.profilePicURL);
@@ -25,7 +23,6 @@ function UserProfile({ userInfo }) {
       }
     }
   };
-  
 
   return (
     <div className="container mt-5">
@@ -42,7 +39,6 @@ function UserProfile({ userInfo }) {
           <button onClick={handleUpload} className="btn btn-primary mt-2">Actualizar foto</button>
         </div>
       </div>
-
       <div className="mt-5">
         <h2 className="text-center">Información del Usuario</h2>
         <ul className="list-group mt-3">
