@@ -12,7 +12,12 @@ function UserProfile({ userInfo }) {
     if (selectedFile) {
       const formData = new FormData();
       formData.append('image', selectedFile);
-
+      formData.append('userId', "1125230121"); // obtener el id en el momento del login y almacenarlo en el frontend`
+  
+      // Agrega logs para verificar los datos antes de enviarlos
+      console.log("Selected File:", selectedFile);
+      console.log("User ID:", "1125230121");
+  
       try {
         const response = await axios.post('http://localhost:10000/api/upload', formData);
         setProfilePic(response.data.profilePicURL);
@@ -21,8 +26,11 @@ function UserProfile({ userInfo }) {
         console.error("Error uploading file:", error);
         alert("Error al cargar la imagen");
       }
+    } else {
+      console.warn("No file selected for upload");
     }
   };
+  
 
   return (
     <div className="container mt-5">
