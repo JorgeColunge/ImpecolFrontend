@@ -13,15 +13,19 @@ function UserProfile({ userInfo }) {
   const handleUpload = async () => {
     if (selectedFile) {
       const formData = new FormData();
-      formData.append('profilePic', selectedFile);
-
-      // Simulación de la carga de la imagen. Integrar con tu API de backend
-      const response = await axios.post('http://localhost:10000/api/upload', formData);
-      setProfilePic(response.data.profilePicURL);
-
-      alert("Foto actualizada exitosamente!");
+      formData.append('image', selectedFile); // Cambia 'profilePic' a 'image'
+  
+      try {
+        const response = await axios.post('http://localhost:10000/api/upload', formData);
+        setProfilePic(response.data.profilePicURL);
+        alert("Foto actualizada exitosamente!");
+      } catch (error) {
+        console.error("Error uploading file:", error);
+        alert("Error al cargar la imagen");
+      }
     }
   };
+  
 
   return (
     <div className="container mt-5">
