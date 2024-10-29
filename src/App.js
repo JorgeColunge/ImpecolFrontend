@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-d
 import Login from './Login';
 import Register from './Register';
 import UserProfile from './UserProfile';
+import EditProfile from './EditProfile'; // Importar el componente de edición
 
 function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -46,6 +47,11 @@ function App() {
           <Route 
             path="/profile" 
             element={isLoggedIn ? <UserProfile userInfo={userInfo} onLogout={handleLogout} /> : <Navigate to="/login" />} 
+          />
+          {/* Ruta para editar perfil */}
+          <Route 
+            path="/edit-profile" 
+            element={isLoggedIn ? <EditProfile userInfo={userInfo} /> : <Navigate to="/login" />} 
           />
         </Routes>
       </div>
