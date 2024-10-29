@@ -21,3 +21,9 @@
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+# Ignorar archivo .env
+.env
+
+# Ignorar la carpeta node_modules
+node_modules/
