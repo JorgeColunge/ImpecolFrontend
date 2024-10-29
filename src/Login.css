@@ -1,0 +1,25 @@
+/* Login.css */
+.container {
+    max-width: 900px;
+  }
+  
+  .bg-primary {
+    background: linear-gradient(135deg, #6B63FF, #788BFF);
+  }
+  
+  .bg-light {
+    background: #fff;
+  }
+  
+  h2 {
+    font-size: 2rem;
+  }
+  
+  button.btn-primary {
+    background: #6B63FF;
+    border: none;
+  }
+  
+  button.btn-primary:hover {
+    background: #5A53E8;
+  }  
