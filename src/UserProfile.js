@@ -16,7 +16,7 @@ function UserProfile({ userInfo }) {
       formData.append('profilePic', selectedFile);
 
       // Simulación de la carga de la imagen. Integrar con tu API de backend
-      //const response = await axios.post('http://localhost:10000/api/upload', formData);
+      const response = await axios.post('http://localhost:10000/api/upload', formData);
       setProfilePic(response.data.profilePicURL);
 
       alert("Foto actualizada exitosamente!");
