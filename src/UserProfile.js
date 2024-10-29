@@ -1,36 +1,42 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import 'bootstrap/dist/css/bootstrap.min.css';
 
 function UserProfile({ userInfo }) {
-  const [profilePic, setProfilePic] = useState(userInfo?.photo || '/images/default-profile.png');
+  const [profilePic, setProfilePic] = useState(userInfo?.photo ? `http://localhost:10000${userInfo.photo}` : '/images/default-profile.png');
   const [selectedFile, setSelectedFile] = useState(null);
+  const [userId, setUserId] = useState(null);
+
+  useEffect(() => {
+    // Obtener el userId desde localStorage al cargar el componente
+    const storedUserId = localStorage.getItem("user_id");
+    if (storedUserId) setUserId(storedUserId);
+  }, []);
 
   const handleFileChange = (e) => setSelectedFile(e.target.files[0]);
 
   const handleUpload = async () => {
-    if (selectedFile) {
+    if (selectedFile && userId) {
       const formData = new FormData();
       formData.append('image', selectedFile);
-      formData.append('userId', "1125230121"); // obtener el id en el momento del login y almacenarlo en el frontend`
-  
-      // Agrega logs para verificar los datos antes de enviarlos
+      formData.append('userId', userId);
+
       console.log("Selected File:", selectedFile);
-      console.log("User ID:", "1125230121");
-  
+      console.log("User ID:", userId);
+
       try {
         const response = await axios.post('http://localhost:10000/api/upload', formData);
-        setProfilePic(response.data.profilePicURL);
+        const imageUrl = `http://localhost:10000${response.data.profilePicURL}`;
+        setProfilePic(imageUrl);
         alert("Foto actualizada exitosamente!");
       } catch (error) {
         console.error("Error uploading file:", error);
         alert("Error al cargar la imagen");
       }
     } else {
-      console.warn("No file selected for upload");
+      console.warn("No file selected for upload or user ID missing");
     }
   };
-  
 
   return (
     <div className="container mt-5">

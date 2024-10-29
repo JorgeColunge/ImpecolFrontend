@@ -14,8 +14,11 @@ function Login({ onLogin }) {
     e.preventDefault();
     try {
       const response = await axios.post('http://localhost:10000/api/login', { email, password });
-
+  
       if (response.data.success) {
+        const userId = response.data.user.id_usuario; // Obtén el id_usuario del usuario
+        console.log(`El id del usuario es: ${userId}`);
+        localStorage.setItem("user_id", userId); // Almacena el user_id en localStorage
         onLogin(response.data.user); // Pasa los datos del usuario a App.js
         navigate('/profile');
       } else {
@@ -26,6 +29,7 @@ function Login({ onLogin }) {
       setError("Server error or network issue");
     }
   };
+  
 
   return (
     <div className="container d-flex justify-content-center align-items-center vh-100">
