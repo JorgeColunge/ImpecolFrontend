@@ -19,18 +19,27 @@ function EditProfile({ userInfo }) {
     formData.append('lastname', lastname);
     formData.append('email', email);
     formData.append('phone', phone);
+    formData.append('userId', userInfo.id_usuario); // Asegúrate de pasar el ID del usuario
     if (selectedFile) {
       formData.append('image', selectedFile);
     }
-
+  
     try {
       const response = await axios.post('http://localhost:10000/api/updateProfile', formData);
       
-      // Actualiza los datos del usuario en localStorage
+      // Verificar respuesta del servidor
+      if (response.status === 200) {
+        console.log("Perfil actualizado exitosamente:", response.data);
+        alert("Perfil actualizado exitosamente!");
+      } else {
+        console.warn("Error al actualizar el perfil:", response);
+        alert("Error al actualizar el perfil");
+      }
+  
+      // Actualiza el perfil en localStorage
       const updatedUserInfo = { ...userInfo, name, lastname, email, phone, photo: response.data.profilePicURL };
       localStorage.setItem("user_info", JSON.stringify(updatedUserInfo));
-
-      alert("Perfil actualizado exitosamente!");
+  
       navigate('/profile'); // Redirige de vuelta al perfil
     } catch (error) {
       console.error("Error updating profile:", error);
