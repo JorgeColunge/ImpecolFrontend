@@ -1,25 +1,35 @@
 /* Login.css */
-.container {
-    max-width: 900px;
-  }
-  
-  .bg-primary {
-    background: linear-gradient(135deg, #6B63FF, #788BFF);
-  }
-  
-  .bg-light {
-    background: #fff;
-  }
-  
-  h2 {
-    font-size: 2rem;
-  }
-  
-  button.btn-primary {
-    background: #6B63FF;
-    border: none;
-  }
-  
-  button.btn-primary:hover {
-    background: #5A53E8;
-  }  
+body {
+  background-color: #f8f9fa;
+}
+
+.container-fluid {
+  background: linear-gradient(135deg, #6a11cb 0%, #2575fc 100%);
+}
+
+.row {
+  height: 100vh;
+}
+
+.col-lg-6 {
+  padding: 2rem;
+  border-radius: 8px;
+}
+
+form .form-control {
+  border-radius: 0.25rem;
+  box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+form .btn-primary {
+  background-color: #2575fc;
+  border: none;
+}
+
+form .btn-primary:hover {
+  background-color: #1d63d8;
+}
+
+.text-primary {
+  color: #2575fc;
+}

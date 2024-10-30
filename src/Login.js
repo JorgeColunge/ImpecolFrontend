@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import axios from 'axios';
+import { useNavigate } from 'react-router-dom';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import './Login.css';
-import { useNavigate } from 'react-router-dom';
 
 function Login({ onLogin }) {
   const navigate = useNavigate();
@@ -16,20 +16,18 @@ function Login({ onLogin }) {
       const response = await axios.post('http://localhost:10000/api/login', { email, password });
   
       if (response.data.success) {
-        const userId = response.data.user.id_usuario; // Obtén el id_usuario del usuario
-        console.log(`El id del usuario es: ${userId}`);
-        localStorage.setItem("user_id", userId); // Almacena el user_id en localStorage
-        onLogin(response.data.user); // Pasa los datos del usuario a App.js
+        const userData = response.data.user;
+        localStorage.setItem("user_info", JSON.stringify(userData));
+        onLogin(userData);
         navigate('/profile');
       } else {
-        setError(response.data.message || "Invalid credentials");
+        setError(response.data.message || "Credenciales incorrectas");
       }
     } catch (err) {
       console.error("Login error:", err);
-      setError("Server error or network issue");
+      setError("Problema de red o error en el servidor");
     }
   };
-  
 
   return (
     <div className="container d-flex justify-content-center align-items-center vh-100">
@@ -43,7 +41,7 @@ function Login({ onLogin }) {
               <input
                 type="email"
                 className="form-control"
-                placeholder="Email"
+                placeholder="Correo electrónico"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
@@ -53,7 +51,7 @@ function Login({ onLogin }) {
               <input
                 type="password"
                 className="form-control"
-                placeholder="Password"
+                placeholder="Contraseña"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
@@ -62,22 +60,22 @@ function Login({ onLogin }) {
             <div className="d-flex justify-content-between align-items-center mb-3">
               <div className="form-check">
                 <input type="checkbox" className="form-check-input" id="rememberMe" />
-                <label className="form-check-label" htmlFor="rememberMe">Recuerdame</label>
+                <label className="form-check-label" htmlFor="rememberMe">Recuérdame</label>
               </div>
-              <a href="#" className="text-decoration-none">Olvidó su contraseña?</a>
+              <a href="#" className="text-decoration-none">¿Olvidaste tu contraseña?</a>
             </div>
             <button type="submit" className="btn btn-primary w-100 mb-3">Iniciar Sesión</button>
             {error && <p className="text-danger text-center">{error}</p>}
           </form>
           <div className="text-center">
             <p className="mt-3">
-              No tienes una cuenta? <a href="/register" className="text-decoration-none">Click aquí</a>
+              ¿No tienes una cuenta? <a href="/register" className="text-decoration-none">Regístrate aquí</a>
             </p>
           </div>
         </div>
         <div className="col-md-6 d-none d-md-flex align-items-center justify-content-center bg-primary rounded-end">
           <div className="text-center text-white">
-            <h1>Limpieza impecable!</h1>
+            <h1>¡Limpieza impecable!</h1>
             <p>Tu aliado en el aseo.</p>
           </div>
         </div>

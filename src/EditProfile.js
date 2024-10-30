@@ -1,15 +1,39 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import 'bootstrap/dist/css/bootstrap.min.css';
 
-function EditProfile({ userInfo }) {
-  const [name, setName] = useState(userInfo?.name || '');
-  const [lastname, setLastname] = useState(userInfo?.lastname || '');
-  const [email, setEmail] = useState(userInfo?.email || '');
-  const [phone, setPhone] = useState(userInfo?.phone || '');
-  const [selectedFile, setSelectedFile] = useState(null);
+function EditProfile() {
+  const { id } = useParams(); // Obtén el id del usuario desde la URL
   const navigate = useNavigate();
+  const [name, setName] = useState('');
+  const [lastname, setLastname] = useState('');
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [profilePic, setProfilePic] = useState('/images/default-profile.png');
+
+  useEffect(() => {
+    // Llama al backend para obtener la información del usuario por su id
+    const fetchUserInfo = async () => {
+      try {
+        const response = await axios.get(`http://localhost:10000/api/users/${id}`);
+        const userData = response.data;
+        setName(userData.name);
+        setLastname(userData.lastname);
+        setEmail(userData.email);
+        setPhone(userData.phone);
+        if (userData.image) {
+          setProfilePic(`http://localhost:10000${userData.image}`);
+        }
+      } catch (error) {
+        console.error("Error al obtener información del usuario:", error);
+        alert("No se pudo cargar la información del usuario.");
+      }
+    };
+
+    fetchUserInfo();
+  }, [id]);
 
   const handleFileChange = (e) => setSelectedFile(e.target.files[0]);
 
@@ -19,15 +43,14 @@ function EditProfile({ userInfo }) {
     formData.append('lastname', lastname);
     formData.append('email', email);
     formData.append('phone', phone);
-    formData.append('userId', userInfo.id_usuario); // Asegúrate de pasar el ID del usuario
+    formData.append('userId', id); // Usa el ID del usuario de los parámetros de la URL
     if (selectedFile) {
-      formData.append('image', selectedFile); // Usa 'image' como el campo en el formulario
+      formData.append('image', selectedFile); // Agrega el archivo de imagen si se seleccionó uno
     }
 
     try {
       const response = await axios.post('http://localhost:10000/api/updateProfile', formData);
-      
-      // Verificar respuesta del servidor
+
       if (response.status === 200) {
         console.log("Perfil actualizado exitosamente:", response.data);
         alert("Perfil actualizado exitosamente!");
@@ -36,20 +59,7 @@ function EditProfile({ userInfo }) {
         alert("Error al actualizar el perfil");
       }
 
-      // Actualiza el perfil en localStorage
-      const updatedUserInfo = { 
-        ...userInfo, 
-        name, 
-        lastname, 
-        email, 
-        phone, 
-        image: response.data.profilePicURL || userInfo.image // Asegúrate de usar 'image' aquí
-      };
-      localStorage.setItem("user_info", JSON.stringify(updatedUserInfo));
-      console.log(JSON.parse(localStorage.getItem("user_info")));
-
-
-      navigate('/profile'); // Redirige de vuelta al perfil
+      navigate(`/profile/${id}`); // Redirige de vuelta al perfil
     } catch (error) {
       console.error("Error updating profile:", error);
       alert("Error al actualizar el perfil");
@@ -64,7 +74,7 @@ function EditProfile({ userInfo }) {
           <div className="card shadow-sm p-4">
             <div className="mb-3 text-center">
               <img
-                src={userInfo?.image ? `http://localhost:10000${userInfo.image}` : '/images/default-profile.png'}
+                src={profilePic}
                 alt="Profile"
                 className="rounded-circle"
                 width="100"
@@ -118,7 +128,7 @@ function EditProfile({ userInfo }) {
               </div>
               <div className="text-center">
                 <button type="button" onClick={handleSave} className="btn btn-primary me-2">Guardar cambios</button>
-                <button type="button" onClick={() => navigate('/profile')} className="btn btn-secondary">Cancelar</button>
+                <button type="button" onClick={() => navigate(`/profile/${id}`)} className="btn btn-secondary">Cancelar</button>
               </div>
             </form>
           </div>

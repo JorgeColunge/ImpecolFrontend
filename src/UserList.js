@@ -1,19 +1,21 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { Button, Table, InputGroup, FormControl } from 'react-bootstrap';
+import { useNavigate } from 'react-router-dom';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import '@fortawesome/fontawesome-free/css/all.min.css';
 
 function UserList() {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
 
   useEffect(() => {
     // Llama al backend para obtener la lista de usuarios
     const fetchUsers = async () => {
       try {
         const response = await axios.get('http://localhost:10000/api/users');
-        setUsers(response.data); // Supone que la respuesta contiene un array de usuarios
+        setUsers(response.data);
         setLoading(false);
       } catch (error) {
         console.error("Error al obtener usuarios:", error);
@@ -24,8 +26,31 @@ function UserList() {
     fetchUsers();
   }, []);
 
-  if (loading) return <div>Cargando usuarios...</div>;
+  // Función para ver el perfil del usuario
+  const viewProfile = (id) => {
+    navigate(`/profile/${id}`);
+  };
 
+  // Función para editar el usuario
+  const editUser = (id) => {
+    navigate(`/edit-profile/${id}`);
+  };
+
+  // Función para eliminar el usuario
+  const deleteUser = async (id) => {
+    if (window.confirm("¿Estás seguro de que deseas eliminar este usuario?")) {
+      try {
+        await axios.delete(`http://localhost:10000/api/users/${id}`);
+        setUsers(users.filter(user => user.id !== id)); // Actualiza la lista de usuarios localmente
+        alert("Usuario eliminado exitosamente.");
+      } catch (error) {
+        console.error("Error al eliminar usuario:", error);
+        alert("Hubo un error al eliminar el usuario.");
+      }
+    }
+  };
+
+  if (loading) return <div>Cargando usuarios...</div>;
 
   return (
     <div className="container mt-4">
@@ -74,13 +99,13 @@ function UserList() {
               <td>{user.rol}</td>
               <td>{user.lastLogin || "N/A"}</td>
               <td>
-                <Button variant="info" size="sm" className="me-2">
+                <Button variant="info" size="sm" className="me-2" onClick={() => viewProfile(user.id)}>
                   <i className="fas fa-eye"></i>
                 </Button>
-                <Button variant="success" size="sm" className="me-2">
+                <Button variant="success" size="sm" className="me-2" onClick={() => editUser(user.id)}>
                   <i className="fas fa-edit"></i>
                 </Button>
-                <Button variant="danger" size="sm">
+                <Button variant="danger" size="sm" onClick={() => deleteUser(user.id)}>
                   <i className="fas fa-trash"></i>
                 </Button>
               </td>
