@@ -5,6 +5,7 @@ import Register from './Register';
 import UserProfile from './UserProfile';
 import EditProfile from './EditProfile'; // Importar el componente de edición
 import SidebarMenu from './SidebarMenu'; // Importa el componente del menú lateral
+import UserList from './UserList'; // Importa el nuevo componente UserList
 
 function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -60,6 +61,11 @@ function App() {
             <Route 
               path="/edit-profile" 
               element={isLoggedIn ? <EditProfile userInfo={userInfo} onProfileUpdate={handleProfileUpdate} /> : <Navigate to="/login" />} 
+            />
+            {/* Nueva ruta para mostrar la lista de usuarios*/}
+            <Route 
+              path="/settings" 
+              element={isLoggedIn ? <UserList /> : <Navigate to="/login" />} 
             />
           </Routes>
         </div>
