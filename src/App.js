@@ -4,6 +4,7 @@ import Login from './Login';
 import Register from './Register';
 import UserProfile from './UserProfile';
 import EditProfile from './EditProfile'; // Importar el componente de edición
+import SidebarMenu from './SidebarMenu'; // Importa el componente del menú lateral
 
 function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -42,23 +43,26 @@ function App() {
 
   return (
     <Router>
-      <div className="App">
-        <Routes>
-          {/* Redirige a /profile si está logueado, sino redirige a /login */}
-          <Route path="/" element={isLoggedIn ? <Navigate to="/profile" /> : <Navigate to="/login" />} />
-          <Route path="/login" element={<Login onLogin={handleLogin} />} />
-          <Route path="/register" element={<Register />} />
-          {/* Solo muestra UserProfile si está logueado */}
-          <Route 
-            path="/profile" 
-            element={isLoggedIn ? <UserProfile userInfo={userInfo} onLogout={handleLogout} /> : <Navigate to="/login" />} 
-          />
-          {/* Ruta para editar perfil */}
-          <Route 
-            path="/edit-profile" 
-            element={isLoggedIn ? <EditProfile userInfo={userInfo} onProfileUpdate={handleProfileUpdate} /> : <Navigate to="/login" />} 
-          />
-        </Routes>
+      <div className="App d-flex">
+        <SidebarMenu onLogout={handleLogout} /> {/* Pasar handleLogout a SidebarMenu */}
+        <div className="main-content flex-grow-1">
+          <Routes>
+            {/* Redirige a /profile si está logueado, sino redirige a /login */}
+            <Route path="/" element={isLoggedIn ? <Navigate to="/profile" /> : <Navigate to="/login" />} />
+            <Route path="/login" element={isLoggedIn ? <Navigate to="/profile" /> : <Login onLogin={handleLogin} />} /> {/* Redirige a profile si está logueado */}
+            <Route path="/register" element={isLoggedIn ? <Navigate to="/profile" /> : <Register />} /> {/* Redirige a profile si está logueado */}
+            {/* Solo muestra UserProfile si está logueado */}
+            <Route 
+              path="/profile" 
+              element={isLoggedIn ? <UserProfile userInfo={userInfo} onLogout={handleLogout} /> : <Navigate to="/login" />} 
+            />
+            {/* Ruta para editar perfil */}
+            <Route 
+              path="/edit-profile" 
+              element={isLoggedIn ? <EditProfile userInfo={userInfo} onProfileUpdate={handleProfileUpdate} /> : <Navigate to="/login" />} 
+            />
+          </Routes>
+        </div>
       </div>
     </Router>
   );
