@@ -32,6 +32,11 @@ function App() {
     localStorage.removeItem("user_info"); // Borra la información del usuario al cerrar sesión
   };
 
+  const handleProfileUpdate = (updatedUserInfo) => {
+    setUserInfo(updatedUserInfo);
+    localStorage.setItem("user_info", JSON.stringify(updatedUserInfo));
+  };
+
   // Si está en proceso de carga, muestra un mensaje o spinner
   if (loading) return <div>Cargando...</div>;
 
@@ -51,7 +56,7 @@ function App() {
           {/* Ruta para editar perfil */}
           <Route 
             path="/edit-profile" 
-            element={isLoggedIn ? <EditProfile userInfo={userInfo} /> : <Navigate to="/login" />} 
+            element={isLoggedIn ? <EditProfile userInfo={userInfo} onProfileUpdate={handleProfileUpdate} /> : <Navigate to="/login" />} 
           />
         </Routes>
       </div>

@@ -21,9 +21,9 @@ function EditProfile({ userInfo }) {
     formData.append('phone', phone);
     formData.append('userId', userInfo.id_usuario); // Asegúrate de pasar el ID del usuario
     if (selectedFile) {
-      formData.append('image', selectedFile);
+      formData.append('image', selectedFile); // Usa 'image' como el campo en el formulario
     }
-  
+
     try {
       const response = await axios.post('http://localhost:10000/api/updateProfile', formData);
       
@@ -35,11 +35,20 @@ function EditProfile({ userInfo }) {
         console.warn("Error al actualizar el perfil:", response);
         alert("Error al actualizar el perfil");
       }
-  
+
       // Actualiza el perfil en localStorage
-      const updatedUserInfo = { ...userInfo, name, lastname, email, phone, photo: response.data.profilePicURL };
+      const updatedUserInfo = { 
+        ...userInfo, 
+        name, 
+        lastname, 
+        email, 
+        phone, 
+        image: response.data.profilePicURL || userInfo.image // Asegúrate de usar 'image' aquí
+      };
       localStorage.setItem("user_info", JSON.stringify(updatedUserInfo));
-  
+      console.log(JSON.parse(localStorage.getItem("user_info")));
+
+
       navigate('/profile'); // Redirige de vuelta al perfil
     } catch (error) {
       console.error("Error updating profile:", error);
@@ -55,7 +64,7 @@ function EditProfile({ userInfo }) {
           <div className="card shadow-sm p-4">
             <div className="mb-3 text-center">
               <img
-                src={userInfo?.photo ? `http://localhost:10000${userInfo.photo}` : '/images/default-profile.png'}
+                src={userInfo?.image ? `http://localhost:10000${userInfo.image}` : '/images/default-profile.png'}
                 alt="Profile"
                 className="rounded-circle"
                 width="100"
