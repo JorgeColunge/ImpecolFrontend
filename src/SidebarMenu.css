@@ -1,42 +1,95 @@
 .sidebar {
-    width: 60px;
-    background-color: #000;
-    color: #fff;
-    height: 100vh;
-    position: fixed;
-  }
-  
-  .logo-container {
-    width: 100%;
-    text-align: center;
-  }
-  
-  .logo {
-    width: 40px;
-    height: 40px;
-    object-fit: contain;
-  }
-  
-  .icon-list {
-    width: 100%;
-    padding: 0;
-    list-style-type: none;
-  }
-  
-  .icon-list .nav-link {
-    color: #fff;
-    font-size: 1.2em;
-    padding: 15px 0;
-    text-align: center;
-  }
-  
-  .icon-list .nav-link:hover {
-    background-color: #333;
-    color: #fff;
-    text-decoration: none;
-  }
-  
-  .icon-list .nav-item {
-    width: 100%;
-  }
-  
+  width: 60px; /* Ancho cuando el menú está colapsado */
+  height: 100vh;
+  background-color: #000;
+  color: #fff;
+  position: fixed;
+  top: 0;
+  left: 0;
+  transition: width 0.3s ease;
+  z-index: 1000; /* Asegura que el menú esté sobre el contenido */
+  overflow: hidden; /* Evita que el contenido se desborde */
+}
+
+.sidebar.open {
+  width: 240px; /* Ancho cuando el menú está expandido */
+}
+
+.main-content {
+  margin-left: 60px; /* Espacio cuando el menú está colapsado */
+  transition: margin-left 0.3s ease;
+}
+
+.sidebar.open + .main-content {
+  margin-left: 240px; /* Espacio cuando el menú está expandido */
+}
+
+.menu-toggle {
+  font-size: 1.5rem;
+  padding: 10px;
+  cursor: pointer;
+  color: #fff;
+}
+
+.logo-container {
+  text-align: center;
+  padding: 10px 0;
+}
+
+.logo {
+  width: 50px;
+  border-radius: 50%;
+}
+
+.user-info {
+  color: #fff;
+  text-align: center;
+  margin-top: 10px;
+}
+
+.nav {
+  padding-left: 0;
+}
+
+.icon-list .nav-item {
+  padding: 15px 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s ease;
+}
+
+.icon-list .nav-item:hover {
+  background-color: #333;
+}
+
+.nav-link {
+  color: #fff;
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: 15px;
+  transition: background 0.2s ease;
+}
+
+.nav-link:hover {
+  color: #ccc;
+}
+
+.nav-link span {
+  display: none; /* Oculta el texto cuando la barra está colapsada */
+  margin-left: 10px;
+}
+
+.sidebar.open .nav-link span {
+  display: inline; /* Muestra el texto solo cuando la barra está expandida */
+}
+
+/* Ajuste de iconos en el centro */
+.icon-list .nav-item {
+  display: flex;
+  justify-content: center;
+  padding: 10px 0;
+}

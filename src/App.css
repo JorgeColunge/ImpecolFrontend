@@ -37,17 +37,87 @@
   }
 }
 
+/* Estilos para el Sidebar y Main Content */
+
 .sidebar {
-  width: 250px;
+  width: 60px; /* Ancho cuando el menú está colapsado */
   height: 100vh;
+  background-color: #000;
+  color: #fff;
   position: fixed;
   top: 0;
   left: 0;
   z-index: 1000;
+  transition: width 0.3s ease;
   padding-top: 20px;
 }
 
+.sidebar.open {
+  width: 240px; /* Ancho cuando el menú está expandido */
+}
+
 .main-content {
-  margin-left: 250px;
+  margin-left: 60px; /* Margen cuando el menú está colapsado */
   padding: 20px;
+  transition: margin-left 0.3s ease;
+}
+
+.sidebar.open + .main-content {
+  margin-left: 240px; /* Margen cuando el menú está expandido */
+}
+
+/* Opcional: Estilos adicionales para mejorar la estética */
+
+.menu-toggle {
+  font-size: 1.5rem;
+  padding: 10px;
+  cursor: pointer;
+  color: #fff;
+}
+
+.logo-container {
+  text-align: center;
+  padding: 10px 0;
+}
+
+.logo {
+  width: 50px;
+  border-radius: 50%;
+}
+
+.user-info {
+  color: #fff;
+  text-align: center;
+  margin-top: 10px;
+}
+
+.nav {
+  padding-left: 0;
+}
+
+.icon-list .nav-item {
+  padding: 15px 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s ease;
+}
+
+.icon-list .nav-item:hover {
+  background-color: #333;
+}
+
+.nav-link {
+  color: #fff;
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+}
+
+.nav-link span {
+  margin-left: 10px;
+}
+
+.nav-link:hover {
+  color: #ccc;
 }

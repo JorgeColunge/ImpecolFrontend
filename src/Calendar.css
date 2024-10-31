@@ -1,0 +1,24 @@
+/* Calendar.css */
+.calendar-container {
+    margin: 20px;
+  }
+  
+  .fc .fc-button {
+    background-color: #ff69b4; /* Color de los botones */
+    color: #fff;
+    border: none;
+  }
+  
+  .fc .fc-button.fc-button-active {
+    background-color: #000;
+    color: #fff;
+  }
+  
+  .fc-daygrid-day-number {
+    color: #000;
+  }
+  
+  .fc-event {
+    background-color: #ff69b4; /* Color de los eventos */
+    border: 1px solid #ff69b4;
+  }  

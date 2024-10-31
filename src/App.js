@@ -6,10 +6,11 @@ import UserProfile from './UserProfile';
 import EditProfile from './EditProfile';
 import SidebarMenu from './SidebarMenu';
 import UserList from './UserList';
-import ServiceList from './ServiceList';
 import ClientList from './ClientList';
-import ShowProfile from './ShowProfile'; // Importa el componente ShowProfile
+import ShowProfile from './ShowProfile';
+import Calendar from './Calendar'; // Importa el componente Calendar
 import 'bootstrap/dist/css/bootstrap.min.css';
+import './App.css'; // Asegúrate de tener este archivo para los estilos globales
 
 function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -48,7 +49,7 @@ function App() {
     <Router>
       <div className="App d-flex">
         {/* Mostrar SidebarMenu solo si el usuario está logueado */}
-        {isLoggedIn && <SidebarMenu onLogout={handleLogout} />}
+        {isLoggedIn && <SidebarMenu onLogout={handleLogout} userInfo={userInfo} />}
         <div className={`main-content flex-grow-1 ${isLoggedIn ? '' : 'w-100'}`}>
           <Routes>
             <Route path="/" element={isLoggedIn ? <Navigate to="/profile" /> : <Navigate to="/login" />} />
@@ -56,9 +57,10 @@ function App() {
             <Route path="/register" element={isLoggedIn ? <Navigate to="/profile" /> : <Register />} />
             <Route path="/profile" element={isLoggedIn ? <UserProfile userInfo={userInfo} /> : <Navigate to="/login" />} />
             <Route path="/edit-profile/:id" element={isLoggedIn ? <EditProfile userInfo={userInfo} onProfileUpdate={handleProfileUpdate} /> : <Navigate to="/login" />} />
-            <Route path="/settings" element={isLoggedIn ? <UserList /> : <Navigate to="/login" />} />
+            <Route path="/users" element={isLoggedIn ? <UserList /> : <Navigate to="/login" />} />
             <Route path="/clients" element={isLoggedIn ? <ClientList /> : <Navigate to="/login" />} />
             <Route path="/show-profile/:id" element={<ShowProfile />} />
+            <Route path="/calendar" element={isLoggedIn ? <Calendar /> : <Navigate to="/login" />} /> {/* Ruta del calendario */}
           </Routes>
         </div>
       </div>
