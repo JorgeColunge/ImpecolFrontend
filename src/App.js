@@ -6,6 +6,7 @@ import UserProfile from './UserProfile';
 import EditProfile from './EditProfile';
 import SidebarMenu from './SidebarMenu';
 import UserList from './UserList';
+import ServiceList from './ServiceList';
 import ClientList from './ClientList';
 import ShowProfile from './ShowProfile'; // Importa el componente ShowProfile
 import 'bootstrap/dist/css/bootstrap.min.css';
@@ -57,8 +58,7 @@ function App() {
             <Route path="/edit-profile/:id" element={isLoggedIn ? <EditProfile userInfo={userInfo} onProfileUpdate={handleProfileUpdate} /> : <Navigate to="/login" />} />
             <Route path="/settings" element={isLoggedIn ? <UserList /> : <Navigate to="/login" />} />
             <Route path="/clients" element={isLoggedIn ? <ClientList /> : <Navigate to="/login" />} />
-            {/* Proteger ShowProfile para que solo sea accesible cuando el usuario está logueado */}
-            <Route path="/show-profile/:id" element={isLoggedIn ? <ShowProfile /> : <Navigate to="/login" />} />
+            <Route path="/show-profile/:id" element={<ShowProfile />} />
           </Routes>
         </div>
       </div>
