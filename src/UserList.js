@@ -161,7 +161,7 @@ function UserList() {
               <td>{user.rol}</td>
               <td>{user.lastLogin || "N/A"}</td>
               <td>
-                <Button variant="info" size="sm" className="me-2" onClick={() => navigate(`/profile/${user.id}`)}>
+                <Button variant="info" size="sm" className="me-2" onClick={() => navigate(`/show-profile/${user.id}`)}>
                   <i className="fas fa-eye"></i>
                 </Button>
                 <Button variant="success" size="sm" className="me-2" onClick={() => navigate(`/edit-profile/${user.id}`)}>

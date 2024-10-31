@@ -7,6 +7,7 @@ import EditProfile from './EditProfile';
 import SidebarMenu from './SidebarMenu';
 import UserList from './UserList';
 import 'bootstrap/dist/css/bootstrap.min.css';
+import ShowProfile from './ShowProfile'; // Importa el componente ShowProfile
 
 function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -53,6 +54,7 @@ function App() {
             <Route path="/profile" element={isLoggedIn ? <UserProfile userInfo={userInfo} /> : <Navigate to="/login" />} />
             <Route path="/edit-profile/:id" element={isLoggedIn ? <EditProfile userInfo={userInfo} onProfileUpdate={handleProfileUpdate} /> : <Navigate to="/login" />} />
             <Route path="/settings" element={isLoggedIn ? <UserList /> : <Navigate to="/login" />} />
+            <Route path="/show-profile/:id" element={<ShowProfile />} />
           </Routes>
         </div>
       </div>
