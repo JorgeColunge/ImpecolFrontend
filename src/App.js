@@ -6,6 +6,7 @@ import UserProfile from './UserProfile';
 import EditProfile from './EditProfile';
 import SidebarMenu from './SidebarMenu';
 import UserList from './UserList';
+import ClientList from './ClientList';
 import 'bootstrap/dist/css/bootstrap.min.css';
 
 function App() {
@@ -53,6 +54,7 @@ function App() {
             <Route path="/profile" element={isLoggedIn ? <UserProfile userInfo={userInfo} /> : <Navigate to="/login" />} />
             <Route path="/edit-profile/:id" element={isLoggedIn ? <EditProfile userInfo={userInfo} onProfileUpdate={handleProfileUpdate} /> : <Navigate to="/login" />} />
             <Route path="/settings" element={isLoggedIn ? <UserList /> : <Navigate to="/login" />} />
+            <Route path="/clients" element={isLoggedIn ? <ClientList /> : <Navigate to="/login" />} />
           </Routes>
         </div>
       </div>
