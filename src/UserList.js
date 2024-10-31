@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
-import { Button, Table, InputGroup, FormControl } from 'react-bootstrap';
+import { Button, Table, InputGroup, FormControl, Modal, Form } from 'react-bootstrap';
 import { useNavigate } from 'react-router-dom';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import '@fortawesome/fontawesome-free/css/all.min.css';
@@ -8,10 +8,24 @@ import '@fortawesome/fontawesome-free/css/all.min.css';
 function UserList() {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [showModal, setShowModal] = useState(false);
+  const [newUser, setNewUser] = useState({
+    id: '',
+    name: '',
+    lastname: '',
+    phone: '',
+    role: 'técnico',
+    password: '',
+    image: null,
+  });
+
   const navigate = useNavigate();
 
+  // Obtener el rol del usuario actualmente logueado desde localStorage
+  const userInfo = JSON.parse(localStorage.getItem("user_info"));
+  const canAddUser = userInfo?.rol === "Auperadministrador" || userInfo?.rol === "Administrador";
+
   useEffect(() => {
-    // Llama al backend para obtener la lista de usuarios
     const fetchUsers = async () => {
       try {
         const response = await axios.get('http://localhost:10000/api/users');
@@ -22,19 +36,48 @@ function UserList() {
         setLoading(false);
       }
     };
-
     fetchUsers();
   }, []);
 
-  // Función para ver el perfil del usuario
-  const viewProfile = (id) => {
-    navigate(`/profile/${id}`);
+  // Funciones para manejo del modal
+  const handleShowModal = () => setShowModal(true);
+  const handleCloseModal = () => setShowModal(false);
+
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setNewUser({ ...newUser, [name]: value });
   };
 
-  // Función para editar el usuario
-  const editUser = (id) => {
-    navigate(`/edit-profile/${id}`);
+  const handleFileChange = (e) => {
+    setNewUser({ ...newUser, image: e.target.files[0] });
   };
+
+  const handleAddUser = async () => {
+    const formData = new FormData();
+    formData.append('id', newUser.id);
+    formData.append('name', newUser.name);
+    formData.append('lastname', newUser.lastname);
+    formData.append('phone', newUser.phone);
+    formData.append('role', newUser.role);
+    formData.append('password', newUser.password);
+    if (newUser.image) formData.append('image', newUser.image);
+  
+    try {
+      await axios.post('http://localhost:10000/api/register', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+          'user_id': localStorage.getItem("user_id") // Asegúrate de enviar el user_id en el encabezado
+        }
+      });
+      alert("Usuario agregado exitosamente");
+      handleCloseModal();
+      setUsers([...users, { ...newUser, image: URL.createObjectURL(newUser.image) }]);
+    } catch (error) {
+      console.error("Error al agregar usuario:", error);
+      alert("Hubo un error al agregar el usuario.");
+    }
+  };
+  
 
   // Función para eliminar el usuario
   const deleteUser = async (id) => {
@@ -99,10 +142,10 @@ function UserList() {
               <td>{user.rol}</td>
               <td>{user.lastLogin || "N/A"}</td>
               <td>
-                <Button variant="info" size="sm" className="me-2" onClick={() => viewProfile(user.id)}>
+                <Button variant="info" size="sm" className="me-2" onClick={() => navigate(`/profile/${user.id}`)}>
                   <i className="fas fa-eye"></i>
                 </Button>
-                <Button variant="success" size="sm" className="me-2" onClick={() => editUser(user.id)}>
+                <Button variant="success" size="sm" className="me-2" onClick={() => navigate(`/edit-profile/${user.id}`)}>
                   <i className="fas fa-edit"></i>
                 </Button>
                 <Button variant="danger" size="sm" onClick={() => deleteUser(user.id)}>
@@ -114,11 +157,69 @@ function UserList() {
         </tbody>
       </Table>
 
-      <div className="d-flex justify-content-between align-items-center mt-3">
-        <span>Mostrando del 1 al {users.length} de un total de {users.length} registros</span>
-        <Button variant="primary">Agregar Usuario</Button>
-      </div>
+      {/* Botón "Agregar Usuario" visible solo para roles autorizados */}
+      {canAddUser && (
+        <div className="d-flex justify-content-end mt-3">
+          <Button variant="primary" onClick={handleShowModal}>
+            Agregar Usuario
+          </Button>
+        </div>
+      )}
 
+      {/* Modal de registro de usuario */}
+      <Modal show={showModal} onHide={handleCloseModal}>
+        <Modal.Header closeButton>
+          <Modal.Title>Registrar Nuevo Usuario</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <Form>
+            <Form.Group controlId="formUserID" className="mb-3">
+              <Form.Label>Número de Documento</Form.Label>
+              <Form.Control type="text" name="id" value={newUser.id} onChange={handleInputChange} />
+            </Form.Group>
+            <Form.Group controlId="formUserName" className="mb-3">
+              <Form.Label>Nombres</Form.Label>
+              <Form.Control type="text" name="name" value={newUser.name} onChange={handleInputChange} />
+            </Form.Group>
+            <Form.Group controlId="formUserLastName" className="mb-3">
+              <Form.Label>Apellidos</Form.Label>
+              <Form.Control type="text" name="lastname" value={newUser.lastname} onChange={handleInputChange} />
+            </Form.Group>
+            <Form.Group controlId="formUserPhone" className="mb-3">
+              <Form.Label>Teléfono</Form.Label>
+              <Form.Control type="text" name="phone" value={newUser.phone} onChange={handleInputChange} />
+            </Form.Group>
+            <Form.Group controlId="formUserRole" className="mb-3">
+              <Form.Label>Cargo</Form.Label>
+              <Form.Control as="select" name="role" value={newUser.role} onChange={handleInputChange}>
+                <option value="superadministrador">Superadministrador</option>
+                <option value="administrador">Administrador</option>
+                <option value="comercial">Comercial</option>
+                <option value="supervisor técnico">Supervisor Técnico</option>
+                <option value="técnico">Técnico</option>
+              </Form.Control>
+            </Form.Group>
+            <Form.Group controlId="formUserPassword" className="mb-3">
+              <Form.Label>Contraseña</Form.Label>
+              <Form.Control type="password" name="password" value={newUser.password} onChange={handleInputChange} />
+            </Form.Group>
+            <Form.Group controlId="formUserImage" className="mb-3">
+              <Form.Label>Foto de perfil</Form.Label>
+              <Form.Control type="file" onChange={handleFileChange} />
+            </Form.Group>
+          </Form>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={handleCloseModal}>
+            Cancelar
+          </Button>
+          <Button variant="primary" onClick={handleAddUser}>
+            Registrar Usuario
+          </Button>
+        </Modal.Footer>
+      </Modal>
+
+      {/* Paginación */}
       <div className="d-flex justify-content-center mt-3">
         <nav>
           <ul className="pagination">
