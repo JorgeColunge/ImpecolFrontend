@@ -15,8 +15,6 @@ function UserList() {
     lastname: '',
     phone: '',
     rol: 'técnico',
-    email: '', // Agregamos el campo de email
-    role: 'técnico',
     password: '',
     email: '', // Campo agregado para email
     image: null,
@@ -25,7 +23,7 @@ function UserList() {
   const navigate = useNavigate();
 
   const userInfo = JSON.parse(localStorage.getItem("user_info"));
-  const isAuthorized = userInfo?.rol?.toLowerCase() === "superadministrador" || userInfo?.rol?.toLowerCase() === "administrador";
+  const canAddUser = userInfo?.rol === "Auperadministrador" || userInfo?.rol === "Administrador";
 
   useEffect(() => {
     const fetchUsers = async () => {
@@ -65,20 +63,12 @@ function UserList() {
   const handleAddUser = async () => {
     if (!validateUserData()) return;
   
-    // Verificar si el rol del usuario permite agregar usuarios
-    if (!isAuthorized) {
-      alert("No tienes permisos para agregar un usuario.");
-      return;
-    }
-
     const formData = new FormData();
     formData.append('id', newUser.id);
     formData.append('name', newUser.name);
     formData.append('lastname', newUser.lastname);
     formData.append('phone', newUser.phone);
     formData.append('rol', newUser.rol);
-    formData.append('email', newUser.email); // Agregar el email al formData
-    formData.append('role', newUser.role);
     formData.append('password', newUser.password);
     formData.append('email', newUser.email);
   
@@ -86,12 +76,9 @@ function UserList() {
   
     try {
       const response = await axios.post('http://localhost:10000/api/register', formData, {
-      const userId = userInfo?.id_usuario; // Obtener user_id del usuario actual
-      await axios.post('http://localhost:10000/api/register', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
           'user_id': localStorage.getItem("user_id"),
-          'user_id': userId // Incluir el user_id en los encabezados
         }
       });
   
@@ -110,7 +97,6 @@ function UserList() {
     }
   };  
   
-  };
 
   // Función para eliminar el usuario
   const deleteUser = async (id) => {
@@ -190,12 +176,13 @@ function UserList() {
         </tbody>
       </Table>
 
-      {/* Botón "Agregar Usuario" visible para todos, pero solo roles autorizados pueden agregar */}
-      <div className="d-flex justify-content-end mt-3">
-        <Button variant="primary" onClick={handleShowModal}>
-          Agregar Usuario
-        </Button>
-      </div>
+      {canAddUser && (
+        <div className="d-flex justify-content-end mt-3">
+          <Button variant="primary" onClick={handleShowModal}>
+            Agregar Usuario
+          </Button>
+        </div>
+      )}
 
       <Modal show={showModal} onHide={handleCloseModal}>
         <Modal.Header closeButton>
@@ -219,11 +206,7 @@ function UserList() {
               <Form.Label>Teléfono</Form.Label>
               <Form.Control type="text" name="phone" value={newUser.phone} onChange={handleInputChange} />
             </Form.Group>
-            <Form.Group controlId="formUserEmail" className="mb-3">
-              <Form.Label>Correo Electrónico</Form.Label>
-              <Form.Control type="email" name="email" value={newUser.email} onChange={handleInputChange} />
-            </Form.Group>
-            <Form.Group controlId="formUserRole" className="mb-3">
+            <Form.Group controlId="formUserRol" className="mb-3">
               <Form.Label>Cargo</Form.Label>
               <Form.Control as="select" name="rol" value={newUser.rol} onChange={handleInputChange}>
                 <option value="Superadministrador">Superadministrador</option>
