@@ -14,15 +14,16 @@ function UserList() {
     name: '',
     lastname: '',
     phone: '',
+    rol: 'técnico',
     email: '', // Agregamos el campo de email
     role: 'técnico',
     password: '',
+    email: '', // Campo agregado para email
     image: null,
   });
 
   const navigate = useNavigate();
 
-  // Obtener el rol del usuario actualmente logueado desde localStorage
   const userInfo = JSON.parse(localStorage.getItem("user_info"));
   const isAuthorized = userInfo?.rol?.toLowerCase() === "superadministrador" || userInfo?.rol?.toLowerCase() === "administrador";
 
@@ -40,7 +41,6 @@ function UserList() {
     fetchUsers();
   }, []);
 
-  // Funciones para manejo del modal
   const handleShowModal = () => setShowModal(true);
   const handleCloseModal = () => setShowModal(false);
 
@@ -53,7 +53,18 @@ function UserList() {
     setNewUser({ ...newUser, image: e.target.files[0] });
   };
 
+  const validateUserData = () => {
+    const { id, name, lastname, phone, rol, password, email } = newUser;
+    if (!id || !name || !lastname || !phone || !rol || !password || !email) {
+      alert("Todos los campos son obligatorios.");
+      return false;
+    }
+    return true;
+  };
+
   const handleAddUser = async () => {
+    if (!validateUserData()) return;
+  
     // Verificar si el rol del usuario permite agregar usuarios
     if (!isAuthorized) {
       alert("No tienes permisos para agregar un usuario.");
@@ -65,26 +76,40 @@ function UserList() {
     formData.append('name', newUser.name);
     formData.append('lastname', newUser.lastname);
     formData.append('phone', newUser.phone);
+    formData.append('rol', newUser.rol);
     formData.append('email', newUser.email); // Agregar el email al formData
     formData.append('role', newUser.role);
     formData.append('password', newUser.password);
+    formData.append('email', newUser.email);
+  
     if (newUser.image) formData.append('image', newUser.image);
   
     try {
+      const response = await axios.post('http://localhost:10000/api/register', formData, {
       const userId = userInfo?.id_usuario; // Obtener user_id del usuario actual
       await axios.post('http://localhost:10000/api/register', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
+          'user_id': localStorage.getItem("user_id"),
           'user_id': userId // Incluir el user_id en los encabezados
         }
       });
+  
+      // Usa la URL de imagen retornada por el backend
+      const newUserWithImage = {
+        ...newUser,
+        image: response.data.profilePicURL // Usa la URL correcta de la respuesta
+      };
+  
       alert("Usuario agregado exitosamente");
       handleCloseModal();
-      setUsers([...users, { ...newUser, image: URL.createObjectURL(newUser.image) }]);
+      setUsers([...users, newUserWithImage]); // Actualiza el estado con la URL correcta
     } catch (error) {
       console.error("Error al agregar usuario:", error);
-      alert("Hubo un error al agregar el usuario.");
+      alert(error.response?.data?.message || "Hubo un error al agregar el usuario.");
     }
+  };  
+  
   };
 
   // Función para eliminar el usuario
@@ -138,7 +163,7 @@ function UserList() {
             <tr key={user.id}>
               <td>
                 <img 
-                  src={`http://localhost:10000${user.image}`} // Ajusta la URL si es necesario
+                  src={`http://localhost:10000${user.image}`} 
                   alt="Foto de perfil"
                   className="rounded-circle"
                   width="50"
@@ -172,7 +197,6 @@ function UserList() {
         </Button>
       </div>
 
-      {/* Modal de registro de usuario */}
       <Modal show={showModal} onHide={handleCloseModal}>
         <Modal.Header closeButton>
           <Modal.Title>Registrar Nuevo Usuario</Modal.Title>
@@ -201,13 +225,17 @@ function UserList() {
             </Form.Group>
             <Form.Group controlId="formUserRole" className="mb-3">
               <Form.Label>Cargo</Form.Label>
-              <Form.Control as="select" name="role" value={newUser.role} onChange={handleInputChange}>
-                <option value="superadministrador">Superadministrador</option>
-                <option value="administrador">Administrador</option>
-                <option value="comercial">Comercial</option>
-                <option value="supervisor técnico">Supervisor Técnico</option>
-                <option value="técnico">Técnico</option>
+              <Form.Control as="select" name="rol" value={newUser.rol} onChange={handleInputChange}>
+                <option value="Superadministrador">Superadministrador</option>
+                <option value="Administrador">Administrador</option>
+                <option value="Comercial">Comercial</option>
+                <option value="Supervisor Técnico">Supervisor Técnico</option>
+                <option value="Técnico">Técnico</option>
               </Form.Control>
+            </Form.Group>
+            <Form.Group controlId="formUserEmail" className="mb-3">
+              <Form.Label>Correo Electrónico</Form.Label>
+              <Form.Control type="email" name="email" value={newUser.email} onChange={handleInputChange} />
             </Form.Group>
             <Form.Group controlId="formUserPassword" className="mb-3">
               <Form.Label>Contraseña</Form.Label>
@@ -228,23 +256,6 @@ function UserList() {
           </Button>
         </Modal.Footer>
       </Modal>
-
-      {/* Paginación */}
-      <div className="d-flex justify-content-center mt-3">
-        <nav>
-          <ul className="pagination">
-            <li className="page-item disabled">
-              <button className="page-link">Anterior</button>
-            </li>
-            <li className="page-item active">
-              <button className="page-link">1</button>
-            </li>
-            <li className="page-item">
-              <button className="page-link">Siguiente</button>
-            </li>
-          </ul>
-        </nav>
-      </div>
     </div>
   );
 }
