@@ -7,8 +7,8 @@ import EditProfile from './EditProfile';
 import SidebarMenu from './SidebarMenu';
 import UserList from './UserList';
 import ClientList from './ClientList';
-import 'bootstrap/dist/css/bootstrap.min.css';
 import ShowProfile from './ShowProfile'; // Importa el componente ShowProfile
+import 'bootstrap/dist/css/bootstrap.min.css';
 
 function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -46,8 +46,9 @@ function App() {
   return (
     <Router>
       <div className="App d-flex">
-        <SidebarMenu onLogout={handleLogout} />
-        <div className="main-content flex-grow-1">
+        {/* Mostrar SidebarMenu solo si el usuario está logueado */}
+        {isLoggedIn && <SidebarMenu onLogout={handleLogout} />}
+        <div className={`main-content flex-grow-1 ${isLoggedIn ? '' : 'w-100'}`}>
           <Routes>
             <Route path="/" element={isLoggedIn ? <Navigate to="/profile" /> : <Navigate to="/login" />} />
             <Route path="/login" element={isLoggedIn ? <Navigate to="/profile" /> : <Login onLogin={handleLogin} />} />
@@ -56,7 +57,8 @@ function App() {
             <Route path="/edit-profile/:id" element={isLoggedIn ? <EditProfile userInfo={userInfo} onProfileUpdate={handleProfileUpdate} /> : <Navigate to="/login" />} />
             <Route path="/settings" element={isLoggedIn ? <UserList /> : <Navigate to="/login" />} />
             <Route path="/clients" element={isLoggedIn ? <ClientList /> : <Navigate to="/login" />} />
-            <Route path="/show-profile/:id" element={<ShowProfile />} />
+            {/* Proteger ShowProfile para que solo sea accesible cuando el usuario está logueado */}
+            <Route path="/show-profile/:id" element={isLoggedIn ? <ShowProfile /> : <Navigate to="/login" />} />
           </Routes>
         </div>
       </div>
