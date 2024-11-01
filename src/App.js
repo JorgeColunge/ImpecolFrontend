@@ -8,9 +8,9 @@ import SidebarMenu from './SidebarMenu';
 import UserList from './UserList';
 import ClientList from './ClientList';
 import ShowProfile from './ShowProfile';
-import Calendar from './Calendar'; // Importa el componente Calendar
+import Calendar from './Calendar';
 import 'bootstrap/dist/css/bootstrap.min.css';
-import './App.css'; // Asegúrate de tener este archivo para los estilos globales
+import './App.css';
 
 function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -48,7 +48,6 @@ function App() {
   return (
     <Router>
       <div className="App d-flex">
-        {/* Mostrar SidebarMenu solo si el usuario está logueado */}
         {isLoggedIn && <SidebarMenu onLogout={handleLogout} userInfo={userInfo} />}
         <div className={`main-content flex-grow-1 ${isLoggedIn ? '' : 'w-100'}`}>
           <Routes>
@@ -59,8 +58,8 @@ function App() {
             <Route path="/edit-profile/:id" element={isLoggedIn ? <EditProfile userInfo={userInfo} onProfileUpdate={handleProfileUpdate} /> : <Navigate to="/login" />} />
             <Route path="/users" element={isLoggedIn ? <UserList /> : <Navigate to="/login" />} />
             <Route path="/clients" element={isLoggedIn ? <ClientList /> : <Navigate to="/login" />} />
+            <Route path="/calendar" element={<Calendar />} />
             <Route path="/show-profile/:id" element={<ShowProfile />} />
-            <Route path="/calendar" element={isLoggedIn ? <Calendar /> : <Navigate to="/login" />} /> {/* Ruta del calendario */}
           </Routes>
         </div>
       </div>

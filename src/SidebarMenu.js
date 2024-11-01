@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faUser, faUsers, faSignOutAlt, faBars, faCalendar, faFileAlt, faChartBar } from '@fortawesome/free-solid-svg-icons';
+import { faUser, faUsers, faSignOutAlt, faBars, faCalendar, faFileAlt, faChartBar, faClipboardList } from '@fortawesome/free-solid-svg-icons';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import './SidebarMenu.css';
 
@@ -27,8 +27,8 @@ function SidebarMenu({ onLogout, userInfo }) {
         <img src="/path/to/your-logo.png" alt="Logo" className="logo" />
         {isOpen && (
           <div className="user-info">
-            <h5>{userInfo?.name || 'Usuario'}</h5> {/* Muestra el nombre o 'Usuario' si no está disponible */}
-            <span>{userInfo?.rol || 'Cargo'}</span> {/* Muestra el rol o 'Cargo' si no está disponible */}
+            <h5>{userInfo?.name || 'Usuario'}</h5>
+            <span>{userInfo?.rol || 'Cargo'}</span>
           </div>
         )}
       </div>
@@ -52,6 +52,12 @@ function SidebarMenu({ onLogout, userInfo }) {
           </Link>
         </li>
         <li className="nav-item">
+          <Link to="/clients" className="nav-link" title="Clientes">
+            <FontAwesomeIcon icon={faClipboardList} />
+            {isOpen && <span>Clientes</span>}
+          </Link>
+        </li>
+        <li className="nav-item">
           <Link to="/reports" className="nav-link" title="Informes">
             <FontAwesomeIcon icon={faFileAlt} />
             {isOpen && <span>Informes</span>}
@@ -63,7 +69,8 @@ function SidebarMenu({ onLogout, userInfo }) {
             {isOpen && <span>Estadísticas</span>}
           </Link>
         </li>
-        <li className="nav-item">
+        {/* Botón de Cerrar Sesión */}
+        <li className="nav-item logout-item">
           <button className="nav-link btn btn-link" onClick={handleLogout} title="Cerrar Sesión">
             <FontAwesomeIcon icon={faSignOutAlt} />
             {isOpen && <span>Cerrar Sesión</span>}
