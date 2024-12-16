@@ -1316,21 +1316,6 @@ const filteredTechniciansForCompanion = technicians.filter(
 
               {/* Plagas y Áreas */}
               <div className="d-flex gap-3">
-                {/* Plagas */}
-                <div className="flex-fill bg-white shadow-sm rounded p-3 w-50">
-                  <h5 className="text-secondary mb-3">
-                    <Bug className="me-2" /> Plagas
-                  </h5>
-                  <p>
-                    {(() => {
-                      const pestMatches = selectedService.pest_to_control.match(/"([^"]+)"/g);
-                      return pestMatches
-                        ? pestMatches.map((item) => item.replace(/"/g, "")).join(", ")
-                        : "No especificado";
-                    })()}
-                  </p>
-                </div>
-
                 {/* Áreas */}
                 <div className="flex-fill bg-white shadow-sm rounded p-3 w-50">
                   <h5 className="text-secondary mb-3">
