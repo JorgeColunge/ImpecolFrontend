@@ -1,0 +1,147 @@
+/* Contenedor general de hallazgos */
+.findings-container {
+    margin-top: 20px;
+  }
+  
+  /* Estilo para cada hallazgo */
+  .finding-item {
+    border: 1px solid #dee2e6;
+    border-radius: 5px;
+    margin-bottom: 10px;
+    padding: 10px;
+    background-color: #f8f9fa;
+  }
+  
+  /* Ocultar detalles del hallazgo */
+  .d-none {
+    display: none !important;
+  }
+  
+  /* Mostrar detalles del hallazgo */
+  .d-block {
+    display: block !important;
+  }
+  
+  /* Imagen de previsualización */
+  .image-preview {
+    max-width: 100%;
+    max-height: 150px;
+    margin-top: 10px;
+    object-fit: cover;
+    border: 1px solid #dee2e6;
+    border-radius: 5px;
+  }
+  
+  /* Área de arrastrar/seleccionar imagen */
+  .drag-drop-area {
+    border: 2px dashed #ced4da;
+    padding: 10px;
+    text-align: center;
+    color: #6c757d;
+    border-radius: 5px;
+    margin-top: 10px;
+  }
+  
+  /* General Styles */
+  .findings-table {
+    table-layout: fixed;
+  }
+  
+  .findings-table td {
+    vertical-align: top;
+  }
+
+  .finding-details .row {
+    display: flex;
+    justify-content: space-between;
+  }
+  
+  /* Altura estándar para campos de la tabla */
+  .table-input,
+  .table-textarea {
+    height: 150px; /* Altura estándar */
+  }
+  
+  /* Estilo para el contenedor de imágenes */
+  .image-upload-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 150px;
+    border: 2px dashed #6c757d; /* Borde punteado */
+    border-radius: 8px;
+    text-align: center;
+    color: #6c757d; /* Color de texto */
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+  }
+  
+  .image-upload-container img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: cover;
+    position: absolute;
+  }
+  
+  .image-upload-container:hover {
+    border-color: #495057; /* Cambio de color al pasar el ratón */
+  }
+  
+  .image-upload-container input[type="file"] {
+    position: absolute;
+    opacity: 0;
+    height: 100%;
+    width: 100%;
+    cursor: pointer;
+  }
+
+  .signature-canvas {
+    border: 1px solid #ced4da;
+    border-radius: 5px;
+  }
+  
+  
+  /* Responsividad para dispositivos móviles */
+  @media (max-width: 768px) {
+    /* Altura estándar para campos de la tabla */
+    .table-input,
+    .table-textarea {
+        height: auto; /* Altura estándar */
+    }
+
+    .table td {
+      display: block;
+      width: 100%;
+    }
+  
+    .table thead {
+      display: none; /* Oculta los encabezados en móviles */
+    }
+  
+    .table td::before {
+      content: attr(data-label);
+      font-weight: bold;
+      display: block;
+      margin-bottom: 5px;
+      color: #6c757d;
+    }
+  
+    .image-upload-container {
+      margin-bottom: 15px; /* Espaciado adicional para campos verticales */
+    }
+  
+    .finding-item {
+      padding: 15px;
+    }
+  
+    .form-label {
+      font-size: 14px;
+    }
+  
+    .image-preview {
+      max-width: 100%;
+      max-height: 100px;
+    }
+  }
+  

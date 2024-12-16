@@ -1,0 +1,52 @@
+.category-column {
+    white-space: nowrap; /* Evita que el texto se divida en varias líneas */
+    overflow: hidden; /* Asegura que el contenido adicional no desborde */
+    text-overflow: ellipsis; /* Añade "..." si el texto es muy largo */
+    min-width: fit-content; /* Se ajusta al tamaño mínimo necesario */
+    max-width: fit-content; /* Limita el ancho al contenido del encabezado */
+    text-align: center; /* Centra el contenido horizontalmente */
+}
+
+.small-icon {
+    font-size: 14px; /* Reduce el tamaño de la fuente del icono */
+    width: 20px; /* Ajusta el ancho del contenedor */
+    height: 20px; /* Ajusta el alto del contenedor */
+    display: flex; /* Centra el contenido */
+    justify-content: center; /* Centra horizontalmente */
+    align-items: center; /* Centra verticalmente */
+    cursor: pointer; /* Muestra un cursor de "mano" al pasar sobre el icono */
+    padding: 2px; /* Ajusta el relleno interno */
+  }
+
+  td,
+  th {
+      padding: 8px; /* Asegura un relleno uniforme */
+      margin: 0; /* Remueve márgenes */
+  }
+  
+  .description-column {
+    border: none; /* Elimina cualquier borde */
+    padding: 0;   /* Elimina el espacio interno */
+  }
+  
+  
+  .actions-column {
+    width: 110px; /* Ancho fijo de la columna, como prefieres */
+    text-align: center; /* Centra el contenido horizontalmente */
+    vertical-align: middle; /* Centra el contenido verticalmente */
+    padding: 0; /* Elimina cualquier padding adicional */
+}
+
+.action-icon {
+    display: flex; /* Hace que el contenedor sea flexible */
+    justify-content: center; /* Centra horizontalmente */
+    align-items: center; /* Centra verticalmente */
+    height: 100%; /* Asegura que ocupe toda la altura de la celda */
+    width: 100%; /* Asegura que ocupe todo el ancho de la celda */
+    margin: 0 auto; /* Centra horizontalmente si es necesario */
+    cursor: pointer; /* Cambia el cursor al pasar sobre el ícono */
+}
+
+td {
+    vertical-align: middle; /* Asegura que el contenido de todas las celdas esté centrado verticalmente */
+}

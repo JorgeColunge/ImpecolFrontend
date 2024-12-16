@@ -1,70 +1,98 @@
 .sidebar {
-  width: 60px;
-  height: 100vh;
-  background-color: #000;
-  color: #fff;
   position: fixed;
   top: 0;
   left: 0;
+  height: 100vh;
+  width: 60px; /* Ancho cuando el sidebar está cerrado */
+  background-color: #000;
+  color: #fff;
   transition: width 0.3s ease;
-  z-index: 1000;
-  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-top: 10px;
+  overflow-y: auto;
+  z-index: 1000; /* Asegura que esté debajo de la TopBar */
+  overflow-y: auto; /* Activar scroll vertical */
+  overflow-x: hidden; /* Ocultar scroll horizontal */
+  scrollbar-width: none; /* Para navegadores compatibles con esta propiedad */
+  -ms-overflow-style: none; /* Ocultar en Internet Explorer */
+}
+
+.sidebar::-webkit-scrollbar {
+  display: none; /* Ocultar barra de scroll en navegadores basados en WebKit */
+}
+
+/* Sidebar visible */
+.sidebar.visible {
+  display: block;
+}
+
+/* Sidebar oculto */
+.sidebar.hidden {
+  width: 0px; /* Oculta completamente el Sidebar */
 }
 
 .sidebar.open {
-  width: 240px;
-}
-
-.main-content {
-  margin-left: 60px;
-  transition: margin-left 0.3s ease;
-}
-
-.sidebar.open + .main-content {
-  margin-left: 240px;
+  width: 200px; /* Ancho cuando el sidebar está expandido */
+  overflow-y: auto;
 }
 
 .menu-toggle {
-  font-size: 1.5rem;
-  padding: 10px;
+  margin: 10px 0;
   cursor: pointer;
-  color: #fff;
 }
 
 .logo-container {
   text-align: center;
-  padding: 10px 0;
+  width: 100%;
+  margin-top: 5px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}
+
+.logo-mask {
+  width: 60px; /* Tamaño del área visible */
+  height: 60px; /* Tamaño del área visible (1:1) */
+  border-radius: 50%; /* Convierte el contenedor en un círculo */
+  overflow: hidden; /* Recorta la imagen fuera del círculo */
+  display: flex; /* Centra la imagen dentro del círculo */
+  justify-content: center;
+  align-items: center;
+  box-shadow: 0 0 5px rgba(0, 0, 0, 0.5); /* Opcional: añade sombra */
 }
 
 .logo {
-  width: 50px;
-  border-radius: 50%;
+  width: 110%; /* Asegura que la imagen ocupe todo el contenedor */
+  height: 110%; /* Asegura que la imagen llena el contenedor */
+  object-fit: cover; /* Recorta la imagen manteniendo la proporción */
+  object-position: center; /* Centra la imagen dentro del círculo */
 }
 
 .user-info {
-  color: #fff;
+  color: white;
   text-align: center;
+  margin-top: 5px;
+}
+
+.icon-list {
+  padding: 0;
   margin-top: 10px;
+  width: 100%;
 }
 
-.nav {
-  padding-left: 0;
-  display: flex;
-  flex-direction: column;
-  height: calc(100vh - 120px); /* Ajuste dinámico para el contenido del menú */
-  overflow-y: auto; /* Habilita desplazamiento si el contenido excede el alto */
-}
-
-.icon-list .nav-item {
-  padding: 10px 10px;
+.nav-item {
+  width: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: background 0.2s ease;
-}
-
-.icon-list .nav-item:hover {
-  background-color: #333;
+  padding: 10px 0;
+  height: 35px;
+  margin: 2px 0;
+  cursor: pointer;
+  transition: background 0.3s;
 }
 
 .nav-link {
@@ -72,38 +100,25 @@
   text-decoration: none;
   display: flex;
   align-items: center;
-  justify-content: center;
   width: 100%;
-  padding: 15px;
-  transition: background 0.2s ease;
+  justify-content: center;
+  transition: color 0.3s;
 }
 
 .nav-link:hover {
-  color: #ccc;
+  background-color: rgba(255, 255, 255, 0.1);
 }
 
 .nav-link span {
+  margin-left: 8px;
   display: none;
-  margin-left: 10px;
 }
 
 .sidebar.open .nav-link span {
   display: inline;
 }
 
-.icon-list .nav-item {
-  display: flex;
-  justify-content: center;
-  padding: 10px 0;
-}
-
-/* Estilo especial para el botón de Cerrar Sesión */
-.logout-item {
-  margin-top: auto;
-  padding: 15px 10px;
-  background-color: #333;
-}
-
-.logout-item .nav-link {
-  justify-content: center;
+.sidebar.open .nav-link svg {
+  width: 20px;
+  height: 20px;
 }

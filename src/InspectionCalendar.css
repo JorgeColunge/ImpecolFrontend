@@ -1,0 +1,414 @@
+/* Estilo del título (mes y año) */
+.custom-calendar .fc-toolbar-title {
+    @apply text-xl font-semibold text-gray-800;
+}
+
+/* Estilo de los botones */
+.custom-calendar .fc-button {
+    @apply bg-gray-100 text-gray-600 rounded-lg shadow-sm hover:bg-gray-200;
+}
+
+.custom-calendar .fc-button:hover {
+    @apply bg-gray-300;
+}
+
+.custom-calendar .fc-button-primary {
+    @apply bg-blue-500 text-white rounded-md hover:bg-blue-600;
+}
+
+/* Estilo de los días */
+.custom-calendar .fc-daygrid-day {
+    color: #177000;
+    border-top: none; /* Quitar bordes superiores */
+    border-bottom: none; /* Quitar bordes inferiores */
+}
+
+
+
+/* Estilo del encabezado del día */
+.custom-calendar .day-header {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 10px;
+}
+
+/* Estilo para los nombres de los días (LUN, MAR, etc.) */
+.custom-calendar .day-name {
+    font-size: 12px;
+    font-weight: 400;
+    color: #888;
+    text-decoration: none !important;
+}
+
+/* Estilo para los números de los días */
+.custom-calendar .day-number {
+    font-size: 24px; /* Ajustar tamaño del número */
+    font-weight: bold;
+    color: #000;
+    text-decoration: none !important;
+}
+
+
+/* Quitar subrayado por completo */
+.custom-calendar .fc-daygrid-day-top {
+    text-decoration: none;
+    border: none;
+    color: #000;
+    text-decoration: none !important;
+    align-items: center;
+}
+
+.fc-daygrid-day-number{
+    color: #000;
+    text-decoration: none !important;
+    align-items: center;
+}
+
+
+
+
+/* Para eventos en la vista semanal */
+.custom-calendar .fc-event {
+    @apply bg-fuchsia-500 text-white  px-2 py-1 flex items-center border-0;
+}
+
+.custom-calendar .fc-event .dot {
+    @apply w-2 h-2 bg-fuchsia-500  inline-block mr-2 border-0;
+}
+
+.fc .fc-daygrid-day-number{
+    text-decoration: none;
+}
+
+/* Quitar subrayado en los encabezados de los días (LUN, MAR, etc.) */
+.custom-calendar .fc .fc-col-header-cell-cushion {
+    text-decoration: none !important;
+    border: none !important; /* También elimina cualquier borde si es necesario */
+    font-weight: 400; /* Ajusta el grosor del texto */
+    color: #888; /* Personaliza el color del texto */
+}
+
+
+/* Estilo para el contenido del evento con altura reducida y sin texto */
+.custom-calendar .event-content {
+    height: 10px; /* Altura reducida para el evento */
+    overflow: hidden; /* Evita que el contenido desborde */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.custom-calendar .fc-event {
+    height: 100%; /* Asegúrate de que el evento mismo también tenga una altura reducida */
+    padding: 0; /* Elimina el relleno para que el evento sea solo un punto o una barra */
+    margin: 0;
+    width: 95%;
+}
+
+.custom-calendar .dot {
+    height: 8px;
+    width: 8px;
+    background-color: #ff00e1; /* Color para el punto que indica el evento de todo el día */
+}
+
+/* Ocultar el texto 'Todo el día' en la vista de semana y día */
+.fc .fc-timegrid-axis-cushion {
+    display: none;
+}
+
+
+
+
+.custom-calendar .fc-daygrid-block-event .fc-event-main {
+    white-space: nowrap;
+}
+
+.fc-daygrid-body {
+    height: 20px;
+}
+
+/* Cambiar el color de toda la columna del día actual en la vista de semana */
+.custom-calendar .fc-col-today {
+    background-color: rgb(226, 255, 226);
+    opacity: 0.5; /* Ajusta la opacidad para hacer más visible el contenido */
+}
+
+/* Cambiar también el color de la parte horaria si es necesario */
+.custom-calendar .fc-timegrid-col.fc-day-today {
+    background-color: rgb(226, 255, 226);
+    opacity: 1; /* Ajusta la opacidad para hacer más visible el contenido */
+}
+
+.day-header{
+    color: green; /* Cambia el color a verde */
+    font-weight: bold; /* Opcional: hacer el texto más destacado */
+    text-decoration: none;
+    text-decoration: none !important; /* Asegúrate de sobrescribir cualquier estilo heredado */
+    border: none; /* Por si el subrayado es un borde */
+    outline: none; /* Por si el subrayado es un outline */
+}
+
+a {
+    text-decoration: none !important;
+}
+
+/* Ocultar la barra de desplazamiento en Chrome, Safari y Opera */
+.fc-scroller::-webkit-scrollbar {
+    display: none;
+}
+
+/* Ocultar la barra de desplazamiento en IE, Edge y Firefox */
+.fc-scroller {
+    -ms-overflow-style: none;  /* IE y Edge */
+    scrollbar-width: none;     /* Firefox */
+}
+
+
+.fc .fc-daygrid-day.fc-day-today{
+    background-color: rgb(226, 255, 226); /* Fondo azul claro */
+    color: white;
+    border-radius: 5px; /* Opcional: bordes redondeados */
+    padding: 5px; /* Opcional: espaciado interno */
+}
+
+.custom-today-cell {
+    background-color: rgba(240, 120, 240, 0.2); /* Color con opacidad */
+    font-weight: bold;
+}
+
+
+/* Estructura de la cabecera personalizada */
+.header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 16px;
+}
+
+/* Columnas dentro de la cabecera */
+.header-col {
+    display: flex;
+    align-items: center;
+}
+
+/* Botones de navegación en la columna izquierda */
+.header-col.left .control-button {
+    background-color: #f0f0f0;
+    border: none;
+    padding: 8px 12px;
+    margin-right: 8px;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: background-color 0.3s ease;
+}
+
+.header-col.left .control-button:hover {
+    background-color: #e0e0e0;
+}
+
+/* Botones de vista y añadir en la columna derecha */
+.header-col.right .view-button,
+.header-col.right .add-button {
+    background-color: #6c63ff;
+    color: white;
+    border: none;
+    padding: 8px 12px;
+    margin-right: 8px;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: background-color 0.3s ease;
+}
+
+.header-col.right .view-button:hover,
+.header-col.right .add-button:hover {
+    background-color: #5a54e6;
+}
+
+/* Último botón sin margen derecho */
+.header-col.right .add-button {
+    margin-right: 0;
+}
+
+/* Espacio entre botones dentro de la columna */
+.header-col > .view-button, 
+.header-col > .control-button {
+    margin-right: 8px;
+}
+
+.header-col > .view-button:last-child, 
+.header-col > .control-button:last-child {
+    margin-right: 0;
+}
+
+/* Contenido personalizado del calendario */
+.custom-calendar {
+    margin-top: 16px;
+}
+
+.modal-input {
+    width: 100%;
+    padding: 8px;
+    margin: 10px 0;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+}
+
+.modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 20px;
+}
+
+.modal-button {
+    background-color: #6c63ff;
+    color: white;
+    padding: 10px 15px;
+    border: none;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: background-color 0.3s ease;
+}
+
+.modal-button.cancel {
+    background-color: #f44336;
+}
+
+.modal-button:hover {
+    background-color: #5a54e6;
+}
+
+.modal-button.cancel:hover {
+    background-color: #e53935;
+}
+
+.tooltip {
+    position: absolute;
+    background: rgba(0, 0, 0, 0.75);
+    color: white;
+    padding: 5px;
+    border-radius: 4px;
+    font-size: 12px;
+    z-index: 1000;
+    pointer-events: none;
+}
+
+/* Contenedor de eventos */
+.event-container {
+    font-family: 'Roboto', sans-serif; /* Fuente similar a Google Calendar */
+    font-size: 14px; /* Tamaño del texto */
+    
+}
+
+/* Estilo del ID del evento */
+.event-id {
+    font-weight: bold; /* Negrita para el ID */
+}
+
+/* Estilo de las horas */
+.event-time {
+    font-size: 12px; /* Tamaño más pequeño para las horas */
+    width: 150px;
+}
+
+/* Para bordes más suaves de todos los eventos */
+.fc-event {
+    border-radius: 10px;
+    overflow: hidden; /* Asegura que el contenido respete el radio */
+    padding-left: 8px; /* Espaciado interno */
+    border-radius: 10px; /* Bordes redondeados */
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.5); /* Sombra suave */
+}
+
+.user-list {
+    overflow-y: auto;
+    max-height: 70vh;
+    width: 100%;
+}
+
+.user-item,
+.user-item-all{
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+    
+}
+
+.user-item,
+.user-item-all {
+    display: flex;
+    align-items: center;
+    padding: 10px;
+    background-color: #ffffff;
+    border-width: 1.7px;
+    border: 1px solid #e9ecef;
+    margin-bottom: 5px;
+    transition: background-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.user-item.selected,
+.user-item-all.selected {
+    background-color: #ffffff;
+    color: #ffffff;
+    border-width: 1.7px;
+    border-color: #177000;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+}
+
+.user-item:hover,
+.user-item-all:hover {
+    border-color: #177000;
+    border-width: 1.7px;
+    background-color: #bfecb580;
+    cursor: pointer;
+
+}
+
+/* Estilo de la tabla */
+.modern-table {
+    border-collapse: separate;
+    border-spacing: 0 0; /* Espaciado entre filas */
+    width: 100%; /* Asegura que la tabla ocupe todo el contenedor */
+    table-layout: fixed; /* Evita el desbordamiento horizontal */
+    z-index: 5;
+  }
+  
+  .modern-table thead th {
+    background-color: #f5f5f5;
+    color: #333;
+    font-weight: bold;
+    border-bottom: 2px solid #ddd;
+    text-transform: uppercase;
+    text-align: center;
+    padding: 12px;
+  }
+  
+  .modern-table tbody tr {
+    background-color: #ffffff;
+    border: 1px solid #ddd;
+    z-index: 5;
+  }
+  
+  .modern-table tbody tr img,
+  .modern-table tbody tr .img-mask,
+  .modern-table tbody tr p {
+    transition: all 0.3s ease-in-out; /* Suave transición al pasar el cursor */
+    z-index: 5;
+  }
+  
+  .modern-table tbody tr:hover img,
+  .modern-table tbody tr:hover .img-mask,
+  .modern-table tbody tr:hover p {
+    transform: scale(1.1); /* Efecto de "zoom" al hacer hover */
+    z-index: 5;
+  }
+  
+  .modern-table tbody tr:hover {
+    background-color: #f9f9f9; /* Color al pasar el cursor */
+  }
+  
+  .modern-table tbody td {
+    text-align: center;
+    vertical-align: middle; /* Centrado vertical */
+    padding: 10px;
+    border-top: 1px solid #ddd;
+  }

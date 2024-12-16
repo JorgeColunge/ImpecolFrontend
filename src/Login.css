@@ -33,3 +33,25 @@ form .btn-primary:hover {
 .text-primary {
   color: #2575fc;
 }
+
+/* Estilo para la columna derecha */
+.col-md-6.bg-primary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white; /* Texto en blanco */
+  text-align: center; /* Centra el texto */
+  padding: 2rem;
+  border-radius: 0 8px 8px 0; /* Bordes redondeados a la derecha */
+}
+
+/* Estilo del título y descripción */
+.col-md-6.bg-primary h1 {
+  font-size: 2.5rem;
+  font-weight: bold;
+}
+
+.col-md-6.bg-primary p {
+  font-size: 1.2rem;
+  margin-top: 0.5rem;
+}

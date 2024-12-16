@@ -34,7 +34,7 @@ function Login({ onLogin }) {
       <div className="row w-100">
         <div className="col-md-6 bg-light p-5 rounded-start shadow-lg">
           <div className="text-center mb-4">
-            <img src="/images/Logo Vertical.png" alt="Logo" width="150" />
+            <img src="/images/Logo FumiPlagax.png" alt="Logo" width="300" />
           </div>
           <form onSubmit={handleSubmit}>
             <div className="mb-3">
@@ -67,13 +67,8 @@ function Login({ onLogin }) {
             <button type="submit" className="btn btn-primary w-100 mb-3">Iniciar Sesión</button>
             {error && <p className="text-danger text-center">{error}</p>}
           </form>
-          <div className="text-center">
-            <p className="mt-3">
-              ¿No tienes una cuenta? <a href="/register" className="text-decoration-none">Regístrate aquí</a>
-            </p>
-          </div>
         </div>
-        <div className="col-md-6 d-none d-md-flex align-items-center justify-content-center bg-primary rounded-end">
+        <div className="col-md-6 d-flex align-items-center justify-content-center bg-primary rounded-end">
           <div className="text-center text-white">
             <h1>¡Limpieza impecable!</h1>
             <p>Tu aliado en el aseo.</p>

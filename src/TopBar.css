@@ -1,0 +1,268 @@
+.top-bar {
+  position: fixed;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background-color: #f8f9fa;
+  transition: margin-left 0.3s ease, width 0.3s ease; /* Animación de transición */
+  height: 70px;
+  box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1);
+  transform-origin: right center; /* Define el punto de transformación en el lado derecho */
+} 
+
+.topbar-logo {
+  width: 100px; /* Tamaño aún más reducido del logo */
+}
+
+  
+  .user-initial-circle {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    font-size: 18px;
+    font-weight: bold;
+    text-align: center;
+  }
+
+  .notification-menu {
+    max-height: 200px;
+    overflow-y: auto;
+    width: 250px;
+  }
+
+  .notification-dropdown-menu {
+    position: absolute; /* Asegura que el menú se posicione fuera del flujo normal */
+    z-index: 2000; /* Define un valor alto para que esté encima de otros elementos */
+    max-height: 300px; /* Limita el tamaño máximo del menú */
+    overflow-y: auto; /* Agrega scroll si hay muchas notificaciones */
+    width: 250px; /* Ajusta el ancho según prefieras */
+    background-color: #ffffff; /* Fondo blanco */
+    box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1); /* Sombra moderna */
+    border: 1px solid #ddd; /* Borde sutil */
+    border-radius: 5px; /* Esquinas redondeadas */
+  }  
+  
+  .notification-item {
+    padding: 10px;
+    font-size: 14px;
+    color: #333;
+  } 
+
+  .notification-count {
+    background-color: red !important; /* Sobrescribe cualquier color de fondo */
+    color: white !important;
+  }
+
+  /* Botón de hamburguesa */
+.arrows {
+  color: #000;
+  text-decoration: none;
+}
+
+.arrows:hover {
+  color: green;
+}
+
+.arrows {
+  display: none; /* Oculta el botón en tabletas y escritorios */
+}
+
+/* General styles for the dropdown menu */
+.notification-dropdown-menu {
+  max-height: 300px; /* Limita la altura máxima */
+  overflow-y: auto; /* Permite scroll solo cuando es necesario */
+  background-color: #ffffff; /* Fondo blanco */
+  border: 1px solid #ddd; /* Borde sutil */
+  border-radius: 10px; /* Esquinas redondeadas */
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); /* Sombra moderna */
+  padding: 10px; /* Espaciado interno */
+}
+
+/* Ocultar barra de scroll (solo para Chrome y Edge) */
+.custom-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Notificación individual */
+.notification-item {
+  padding: 10px;
+  border-bottom: 1px solid #f0f0f0; /* Separador sutil entre notificaciones */
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  transition: background-color 0.2s ease;
+  border-radius: 5px;
+}
+
+.notification-item:hover {
+  background-color: #f9f9f9; /* Fondo más claro al pasar el mouse */
+}
+
+/* Texto de la notificación */
+.notification-text {
+  font-size: 14px;
+  color: #333; /* Texto oscuro */
+  white-space: normal; /* Permite múltiples líneas */
+  word-wrap: break-word; /* Ajusta el texto si es largo */
+  flex: 1; /* Asegura que el texto ocupe el ancho completo */
+}
+
+/* Badge de notificaciones */
+.notification-count {
+  position: absolute;
+  top: 0px;
+  right: 5px;
+  background-color: red !important;
+  color: white !important;
+  font-size: 10px;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: 1px solid white;
+}
+
+.notify-icon svg,
+.sync-icon svg {
+  color: black; /* Cambia el color del icono a negro */
+}
+
+.notify-icon .dropdown-toggle::after {
+  color: black; /* Cambia la flecha del dropdown a negro */
+}
+
+
+/* Ajustes responsivos para tablet (menor a 768px) */
+@media (max-width: 768px) {
+  .top-bar {
+    height: 60px; /* Reduce un poco la altura del TopBar */
+  }
+
+  .topbar-logo {
+    width: 75px;
+    display: none;
+  }
+
+  .top-bar .navbar-brand {
+    display: flex; /* Asegura que el logo y el texto estén en fila */
+    align-items: center; /* Centra verticalmente el logo y el texto */
+  }
+
+  .top-bar .navbar-brand img {
+    width: 50px; /* Reduce el tamaño del logo */
+  }
+
+  .top-bar .navbar-brand span {
+    font-size: 14px; /* Ajusta el tamaño del texto */
+  }
+
+  .top-bar .user-initial-circle {
+    width: 35px; /* Ajusta el tamaño del círculo del usuario */
+    height: 35px;
+    font-size: 16px;
+  }
+
+  .top-bar .notify-icon {
+    display: flex; /* Asegura que los íconos también se mantengan en fila */
+    align-items: center;
+    justify-content: center;
+  }
+
+  .top-bar .notify-icon svg {
+    width: 18px; /* Reduce el tamaño de los íconos */
+    height: 18px;
+  }
+
+  .top-bar .sync-icon svg {
+    width: 18px; /* Reduce aún más el tamaño de los íconos */
+    height: 18px;
+    margin-bottom: 2.3px;
+  }
+
+  .arrows {
+    display: flex; /* Oculta el botón en tabletas y escritorios */
+    margin: 0px;
+    padding: 0px;
+  }
+}
+
+/* Ajustes específicos para móviles (menor a 600px) */
+@media (max-width: 600px) {
+  .top-bar {
+    height: 55px; /* Reduce aún más la altura del TopBar */
+  }
+
+  .top-bar span {
+    display: none; /* Oculta el texto "Fumiplagax Services" */
+  }
+
+  .topbar-logo {
+    width: 70px; /* Tamaño aún más reducido del logo */
+    display: none;
+  }
+
+  .top-bar .navbar-brand img {
+    width: 40px; /* Reduce aún más el tamaño del logo */
+  }
+
+  .top-bar .user-initial-circle {
+    width: 30px; /* Ajusta el tamaño del círculo del usuario */
+    height: 30px;
+    font-size: 14px;
+  }
+
+  .top-bar .notify-icon svg {
+    width: 15px; /* Reduce aún más el tamaño de los íconos */
+    height: 15px;
+  }
+
+  .top-bar .sync-icon svg {
+    width: 15px; /* Reduce aún más el tamaño de los íconos */
+    height: 15px;
+    margin-bottom: 2.3px;
+  }
+}
+
+/* Ajustes específicos para móviles (menor a 600px) */
+@media (max-width: 300px) {
+  .top-bar {
+    height: 55px; /* Reduce aún más la altura del TopBar */
+  }
+
+  .top-bar span {
+    display: none; /* Oculta el texto "Fumiplagax Services" */
+  }
+
+  .topbar-logo {
+    width: 70px; /* Tamaño aún más reducido del logo */
+    display: none;
+  }
+
+  .top-bar .navbar-brand img {
+    width: 40px; /* Reduce aún más el tamaño del logo */
+  }
+
+  .top-bar .user-initial-circle {
+    width: 30px; /* Ajusta el tamaño del círculo del usuario */
+    height: 30px;
+    font-size: 14px;
+    display: none;
+  }
+
+  .top-bar .notify-icon svg {
+    width: 15px; /* Reduce aún más el tamaño de los íconos */
+    height: 15px;
+    display: none;
+  }
+
+  .top-bar .sync-icon svg {
+    width: 15px; /* Reduce aún más el tamaño de los íconos */
+    height: 15px;
+    margin-bottom: 2.3px;
+    display: none;
+  }
+}

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { useParams } from 'react-router-dom';
+import { PencilSquare, Person, Envelope, Phone } from 'react-bootstrap-icons';
 import 'bootstrap/dist/css/bootstrap.min.css';
 
 function ShowProfile() {
@@ -26,30 +27,39 @@ function ShowProfile() {
   if (loading) return <div>Cargando perfil del usuario...</div>;
 
   return (
-    <div className="container mt-5">
-      <h2>Perfil del Usuario</h2>
-      {user ? (
-        <div className="card p-4">
-          <div className="text-center">
-            <img
-              src={`http://localhost:10000${user.image || '/images/default-profile.png'}`}
-              alt="Profile"
-              className="rounded-circle"
-              width="150"
-              height="150"
-            />
+    <div className="container mt-3 d-flex justify-content-center">
+      <div className="card shadow-sm" style={{ maxWidth: '400px', borderRadius: '15px' }}>
+        <div className="card-body text-center position-relative">
+          <div className="position-relative">
+            <div className="img-mask mx-auto">
+              <img
+                src={`${user?.image || '/images/default-profile.png'}`}
+                alt="Profile"
+                className="rounded-img shadow-sm"
+                width="150"
+                height="150"
+              />
+            </div>
           </div>
-          <div className="mt-4">
-            <p><strong>Nombre:</strong> {user.name}</p>
-            <p><strong>Apellidos:</strong> {user.lastname}</p>
-            <p><strong>Rol:</strong> {user.rol}</p>
-            <p><strong>Email:</strong> {user.email}</p>
-            <p><strong>Teléfono:</strong> {user.phone}</p>
-          </div>
+          <h5 className="mt-3">{user?.name} {user?.lastname}</h5>
+          <p className="text-muted">{user?.rol}</p>
+          <hr />
+          <ul className="list-group list-group-flush">
+            <li className="list-group-item d-flex align-items-center">
+              <Person className="me-3" size={20} />
+              <span><strong>Nombre:</strong> {user?.name}</span>
+            </li>
+            <li className="list-group-item d-flex align-items-center">
+              <Envelope className="me-3" size={20} />
+              <span><strong>Email:</strong> {user?.email}</span>
+            </li>
+            <li className="list-group-item d-flex align-items-center">
+              <Phone className="me-3" size={20} />
+              <span><strong>Teléfono:</strong> {user?.phone}</span>
+            </li>
+          </ul>
         </div>
-      ) : (
-        <p>El usuario no se encontró.</p>
-      )}
+      </div>
     </div>
   );
 }

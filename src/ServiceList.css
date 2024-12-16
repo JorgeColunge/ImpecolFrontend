@@ -1,0 +1,203 @@
+.service-card {
+  border-radius: 8px;
+  background-color: #007bff;
+  color: #fff;
+  border: none;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  padding: 16px;
+  text-align: center;
+  transition: transform 0.2s, box-shadow 0.2s, background-color 0.2s;
+  cursor: pointer;
+  min-height: 280px; /* Incrementa la altura mínima */
+  position: relative; /* Necesario para posicionar los botones */
+  overflow: hidden; /* Asegura que el contenido no desborde */
+}
+
+.service-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+  background-color: #0056b3; /* Oscurece el fondo al pasar el cursor */
+}
+
+.service-card-title {
+  font-weight: bold;
+  font-size: 1.2em; /* Aumenta el tamaño del texto */
+  margin-bottom: 8px;
+}
+
+.service-card-subtitle {
+  color: #f8f9fa; /* Contraste para subtítulos */
+  margin-bottom: 8px;
+}
+
+.service-card-description {
+  font-size: 0.9em;
+  color: #f8f9fa; /* Texto de descripción */
+}
+
+.card-buttons {
+  z-index: 10; /* Asegura que estén encima de otros elementos */
+}
+
+.mb-4 {
+  margin-bottom: 16px; /* Espaciado entre filas */
+}
+
+.text-truncate {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  max-width: 300px; /* Nunca excede el contenedor padre */
+}
+
+.menu-actions {
+  position: absolute;
+  width: 100%;
+  background: white;
+  border: 1px solid #e0e0e0;
+  box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1);
+  border-radius: 8px;
+  overflow: hidden;
+  transition: transform 1s ease, opacity 0.3s ease;
+  bottom: 41px;
+  left: 0;
+  z-index: 2;
+  opacity: 0;
+  visibility: hidden;
+  transform: scaleY(0);
+  transform-origin: bottom;
+}
+
+.menu-actions.expand {
+  opacity: 1;
+  visibility: visible;
+  transform: scaleY(1);
+}
+
+.menu-actions button {
+  width: 100%;
+  padding: 8px 16px;
+  text-align: left;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.menu-actions button:hover {
+  background: #f1f1f1;
+}
+
+h6.text-muted {
+  font-weight: bold;
+  text-transform: uppercase;
+}
+
+.custom-table-container {
+  overflow-x: auto; /* Activa el scroll horizontal */
+  margin: 0 auto;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+}
+
+.custom-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 600px; /* Ancho mínimo para evitar compresión en móviles */
+  table-layout: fixed;
+}
+
+.custom-table th,
+.custom-table td {
+  padding: 10px 5px;
+  text-align: center;
+  border: 1px solid #ddd;
+  white-space: nowrap; /* Evita que el texto se rompa */
+}
+
+.custom-table th {
+  background-color: #f4f4f4;
+  font-weight: bold;
+  color: #333;
+}
+
+/* Ancho estándar para todas las columnas excepto observaciones */
+.custom-table th:not(:last-child),
+.custom-table td:not(:last-child) {
+  width: 100px;
+}
+
+/* Ancho fijo para observaciones */
+.custom-table th:last-child,
+.custom-table td:last-child {
+  width: 300px;
+  white-space: normal; /* Permite que el texto se divida en varias líneas */
+  text-align: left; /* Alineación a la izquierda para facilitar la lectura */
+  word-wrap: break-word; /* Divide palabras largas si es necesario */
+}
+
+.custom-table tbody tr:hover {
+  background-color: #f9f9f9;
+  cursor: pointer;
+}
+
+.custom-table-container::-webkit-scrollbar {
+  height: 8px;
+}
+
+.custom-table-container::-webkit-scrollbar-thumb {
+  background-color: #888;
+  border-radius: 4px;
+}
+
+.custom-table-container::-webkit-scrollbar-thumb:hover {
+  background-color: #555;
+}
+
+.loading-animation-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+}
+
+.spinner {
+  border: 4px solid rgba(0, 0, 0, 0.1);
+  border-left-color: #007bff;
+  border-radius: 50%;
+  width: 50px;
+  height: 50px;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% {
+      transform: rotate(0deg);
+  }
+  100% {
+      transform: rotate(360deg);
+  }
+}
+
+
+/* Para celulares */
+@media (min-width: 1230px) {
+  .text-truncate {
+    max-width: 600px; /* Nunca excede el contenedor padre */
+  }
+}
+
+/* Para celulares */
+@media (max-width: 575px) {
+  .text-truncate {
+    max-width: 400px; /* Nunca excede el contenedor padre */
+  }
+}
+
+/* Para celulares */
+@media (max-width: 395px) {
+  .text-truncate {
+    max-width: 300px; /* Nunca excede el contenedor padre */
+  }
+}
