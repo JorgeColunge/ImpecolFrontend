@@ -13,7 +13,7 @@
 } 
 
 .topbar-logo {
-  width: 100px; /* Tamaño aún más reducido del logo */
+  width: 70px; /* Tamaño aún más reducido del logo */
 }
 
   
@@ -197,7 +197,7 @@
   }
 
   .top-bar span {
-    display: none; /* Oculta el texto "Fumiplagax Services" */
+    display: none; /* Oculta el texto "Impecol Services" */
   }
 
   .topbar-logo {
@@ -234,7 +234,7 @@
   }
 
   .top-bar span {
-    display: none; /* Oculta el texto "Fumiplagax Services" */
+    display: none; /* Oculta el texto "Impecol Services" */
   }
 
   .topbar-logo {

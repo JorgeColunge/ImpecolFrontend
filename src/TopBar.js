@@ -93,17 +93,17 @@ const handleNotificationClick = async (notificationId, route) => {
           onClick={toggleSidebar} // Controla la visibilidad del SidebarMenu
         >
         <img
-          src="/images/Logo FumiPlagax.png"
+          src="/images/flor.png"
           alt="Logo"
           className="d-inline-block align-top topbar-logo"
         />
         </Button>
         <img
-          src="/images/Logo FumiPlagax.png"
+          src="/images/flor.png"
           alt="Logo"
           className=" align-top topbar-logo"
         />
-        <span className='mx-2'>Fumiplagax Services</span>
+        <span className='mx-2'>Impecol Services</span>
       </div>
 
       {/* Contenedor de los íconos */}
