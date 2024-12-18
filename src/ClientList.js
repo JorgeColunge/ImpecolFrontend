@@ -38,8 +38,7 @@ function ClientList() {
   const [showActionModal, setShowActionModal] = useState(false);
   const [actionType, setActionType] = useState(""); // "call" o "whatsapp"
   const [selectedNumber, setSelectedNumber] = useState(null);
-  const [airStations, setAirStations] = useState([]);
-  const [rodentStations, setRodentStations] = useState([]);
+  const [stations, setStations] = useState([]); // Estado único para todas las estaciones
   const [showImageModal, setShowImageModal] = useState(false); // Controla la visualización del modal
   const [selectedImage, setSelectedImage] = useState(null); // Almacena la URL de la imagen seleccionada
   const [maps, setMaps] = useState([]);
@@ -60,21 +59,12 @@ function ClientList() {
     category: ''
   });
 
-  const [showAddAirStationModal, setShowAddAirStationModal] = useState(false);
-  const [newAirStation, setNewAirStation] = useState({
-    description: '',
-    type: 'Aéreas',
-    control_method: 'Lámina',
-    client_id: null, // Se llenará automáticamente con el cliente seleccionado
-  });
-  const [showAddRodentStationModal, setShowAddRodentStationModal] = useState(false);
-  const [newRodentStation, setNewRodentStation] = useState({
-    description: '',
-    category: 'Roedores',
-    type: 'Caja Beta', // Valor predeterminado
-    control_method: 'Lámina', // Valor predeterminado
-    client_id: null, // Se llenará automáticamente con el cliente seleccionado
-  });
+  const [showAddStationModal, setShowAddStationModal] = useState(false); // Modal unificado
+const [newStation, setNewStation] = useState({
+  description: '',
+  type: 'Control', // Tipo predeterminado
+  client_id: null, // Se llenará automáticamente con el cliente seleccionado
+});
 
   const navigate = useNavigate();
 
@@ -147,84 +137,24 @@ const handleSearch = (e) => {
     setNewClient({ ...newClient, [name]: value });
   };
 
-  // Función para abrir el modal de agregar estación de roedores
-const handleShowAddRodentStationModal = () => {
-  const nextNumber = rodentStations.length + 1; // Calcula el siguiente número de estación
-  setNewRodentStation({
-    description: `${nextNumber}`,
-    category: 'Roedores',
-    type: 'Caja Beta', // Predeterminado
-    control_method: 'Lámina', // Predeterminado
-    client_id: selectedClient.id,
-  });
-  setShowAddRodentStationModal(true);
-};
-
-// Función para cerrar el modal de agregar estación de roedores
-const handleCloseAddRodentStationModal = () => {
-  setShowAddRodentStationModal(false);
-};
-
-// Función para manejar cambios en el formulario del modal de roedores
-const handleNewRodentStationInputChange = (e) => {
-  const { name, value } = e.target;
-  setNewRodentStation({ ...newRodentStation, [name]: value });
-};
-
-// Función para guardar una nueva estación de roedores
-const handleSaveNewRodentStation = async () => {
+const handleSaveNewStation = async () => {
   try {
-    const response = await axios.post('http://localhost:10000/api/stations', newRodentStation);
+    const { description, type } = newStation;
+    const response = await axios.post('http://localhost:10000/api/stations', {
+      description,
+      type,
+      client_id: selectedClient.id, // Asociar con el cliente seleccionado
+    });
+
     const addedStation = response.data.station;
+    setStations([...stations, addedStation]); // Actualiza la lista de estaciones
 
-    // Actualizar la tabla de estaciones de roedores
-    setRodentStations([...rodentStations, addedStation]);
-
-    handleShowNotification('Estación de roedores agregada exitosamente');
-    handleCloseAddRodentStationModal();
+    handleShowNotification('Estación agregada exitosamente');
+    setShowAddStationModal(false);
+    setNewStation({ description: '', type: 'Control' }); // Reiniciar formulario
   } catch (error) {
-    console.error('Error al guardar la estación de roedores:', error);
-    handleShowNotification('Hubo un error al guardar la estación de roedores');
-  }
-};
-
-  // Función para abrir el modal de agregar estación aérea
-const handleShowAddAirStationModal = () => {
-  const nextNumber = airStations.length + 1; // Calcula el siguiente número de estación
-  setNewAirStation({
-    description: `${nextNumber}`,
-    category: 'Aéreas',
-    control_method: 'Lámina',
-    client_id: selectedClient.id,
-  });
-  setShowAddAirStationModal(true);
-};
-
-// Función para cerrar el modal de agregar estación aérea
-const handleCloseAddAirStationModal = () => {
-  setShowAddAirStationModal(false);
-};
-
-// Función para manejar cambios en el formulario del modal
-const handleNewAirStationInputChange = (e) => {
-  const { name, value } = e.target;
-  setNewAirStation({ ...newAirStation, [name]: value });
-};
-
-// Función para guardar una nueva estación aérea
-const handleSaveNewAirStation = async () => {
-  try {
-    const response = await axios.post('http://localhost:10000/api/stations', newAirStation);
-    const addedStation = response.data.station;
-
-    // Actualizar la tabla de estaciones aéreas
-    setAirStations([...airStations, addedStation]);
-
-    handleShowNotification('Estación aérea agregada exitosamente');
-    handleCloseAddAirStationModal();
-  } catch (error) {
-    console.error('Error al guardar la estación aérea:', error);
-    handleShowNotification('Hubo un error al guardar la estación aérea');
+    console.error('Error al guardar la estación:', error);
+    handleShowNotification('Hubo un error al guardar la estación');
   }
 };
 
@@ -263,19 +193,12 @@ const handleSaveNewAirStation = async () => {
       const response = await axios.get(`http://localhost:10000/api/stations/client/${clientId}`);
       const stations = response.data;
   
-      // Filtrar las estaciones por categoría
-      const air = stations.filter(station => station.category === 'Aéreas');
-      const rodents = stations.filter(station => station.category === 'Roedores');
-  
-      setAirStations(air);
-      setRodentStations(rodents);
+      setStations(stations); // Guarda todas las estaciones en un solo estado
     } catch (error) {
       console.error("Error fetching stations by client:", error);
-      setAirStations([]);
-      setRodentStations([]);
+      setStations([]); // Reinicia el estado si hay un error
     }
-  }; 
-
+  };    
   
   const fetchMapsByClient = async (clientId) => {
     try {
@@ -783,116 +706,70 @@ const handleSaveNewAirStation = async () => {
                 <p><strong>Correo:</strong> {selectedClient.email || "No disponible"}</p>
               </div>
             </div>
+            {/* Nuevo contenedor unificado de Estaciones */}
+<div className="col-md-12 mb-4">
+  <div className="bg-white shadow-sm rounded p-3 station-container">
+    <h5 className="text-secondary mb-3">
+      <BuildingFill className="me-2" /> Estaciones
+    </h5>
+    <div className="table-container">
+    {stations.length > 0 ? (
+  <table className="table table-bordered table-hover">
+    <thead className="table-light">
+      <tr>
+        <th>#</th>
+        <th>Tipo</th>
+        <th>QR</th>
+      </tr>
+    </thead>
+    <tbody>
+      {stations.map((station, index) => (
+        <tr key={station.id}>
+          <td>{station.description}</td>
+          <td>{station.type || "No disponible"}</td>
+          <td>
+            {station.qr_code ? (
+              <img
+                src={`http://localhost:10000${station.qr_code}`}
+                alt={`QR de estación ${station.description}`}
+                style={{ maxWidth: "100px" }}
+              />
+            ) : (
+              "No disponible"
+            )}
+          </td>
+        </tr>
+      ))}
+    </tbody>
+  </table>
+) : (
+  <p className="text-center">No hay estaciones registradas.</p>
+)}
+    </div>
+    <div className="d-flex justify-content-end mt-3">
+    <Button
+  variant="outline-success"
+  className="px-3 py-1"
+  onClick={() => {
+    setNewStation({
+      description: '',
+      type: 'Control',
+      client_id: selectedClient.id, // Asociar cliente
+    });
+    setNewStation((prevState) => ({
+      ...prevState,
+      description: stations.length + 1, // Número incremental automático
+    }));
+    setShowAddStationModal(true);
+  }}
+>
+  <i className="fas fa-plus"></i> Agregar Estación
+</Button>
 
-            {/* Parte inferior izquierda: Estaciones Aéreas */}
-            <div className="col-md-6 mb-4">
-              <div className="bg-white shadow-sm rounded p-3 station-container">
-                <h5 className="text-secondary mb-3">
-                  <BuildingFill className="me-2" /> Estaciones Aéreas
-                </h5>
-              <div className="table-container">
-                {airStations.length > 0 ? (
-                  <div className="table-responsive">
-                  <table className="table table-bordered table-hover">
-                    <thead className="table-light">
-                      <tr>
-                        <th>#</th>
-                        <th>Método de Control</th>
-                        <th>QR</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {airStations.map((station) => (
-                        <tr key={station.id}>
-                          <td>{station.description}</td>
-                          <td>{station.control_method}</td>
-                          <td className="text-center">
-                            {station.qr_code ? (
-                              <img
-                                src={`http://localhost:10000${station.qr_code}`}
-                                alt={`QR de estación aérea ${station.description}`}
-                                className="img-fluid rounded"
-                                style={{ maxWidth: '150px' }}
-                              />
-                            ) : (
-                              <span className="text-muted">No disponible</span>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>      
-                ) : (
-                  <p>No hay estaciones aéreas registradas.</p>
-                )}
-              </div>
-              <div className="d-flex justify-content-end mt-3">
-                <Button
-                  variant="outline-success"
-                  className="px-3 py-1"
-                  onClick={handleShowAddAirStationModal}
-                >
-                  <i className="fas fa-plus"></i> Agregar Estación
-                </Button>
-              </div>
-            </div>
-          </div>
+    </div>
+  </div>
+</div>
 
-            {/* Parte inferior derecha: Estaciones de Roedores */}
-            <div className="col-md-6 mb-4">
-              <div className="bg-white shadow-sm rounded p-3 station-container">
-                <h5 className="text-secondary mb-3">
-                  <i className="fas fa-paw me-2"></i> Estaciones de Roedores
-                </h5>
-                <div className="table-responsive">
-                {rodentStations.length > 0 ? (
-                  <table className="table table-bordered table-hover">
-                    <thead className="table-light">
-                      <tr>
-                        <th>#</th>
-                        <th>Tipo</th>
-                        <th>Método de Control</th>
-                        <th>QR</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {rodentStations.map((station) => (
-                        <tr key={station.id}>
-                          <td>{station.description}</td>
-                          <td>{station.type}</td>
-                          <td>{station.control_method}</td>
-                          <td className="text-center">
-                            {station.qr_code ? (
-                              <img
-                                src={`http://localhost:10000${station.qr_code}`}
-                                alt={`QR de estación de roedores ${station.description}`}
-                                className="img-fluid rounded"
-                                style={{ maxWidth: '150px' }}
-                              />
-                            ) : (
-                              <span className="text-muted">No disponible</span>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                  ) : (
-                    <p>No hay estaciones de roedores registradas.</p>
-                  )}
-                </div>
-                <div className="d-flex justify-content-end mt-3">
-                  <Button
-                    variant="outline-success"
-                    className="px-3 py-1"
-                    onClick={handleShowAddRodentStationModal}
-                  >
-                    <i className="fas fa-plus"></i> Agregar Estación
-                  </Button>
-                </div>
-              </div>
-            </div>
         {/* Parte inferior central: Mapas */}
         <div className="col-md-12 mb-4">
           <div className="bg-white shadow-sm rounded p-3">
@@ -1087,112 +964,49 @@ const handleSaveNewAirStation = async () => {
           </Button>
         </Modal.Footer>
       </Modal>
+      <Modal show={showAddStationModal} onHide={() => setShowAddStationModal(false)}>
+  <Modal.Header closeButton>
+    <Modal.Title>Agregar Estación</Modal.Title>
+  </Modal.Header>
+  <Modal.Body>
+    <Form>
+    <Form.Group controlId="formStationDescription" className="mb-3">
+  <Form.Label>#</Form.Label>
+  <Form.Control
+    type="text"
+    name="description"
+    value={stations.length + 1} // Valor autoincrementado
+    readOnly // Deshabilita la edición
+    style={{ backgroundColor: '#e9ecef', color: '#495057' }} // Color gris
+  />
+</Form.Group>
 
-      <Modal show={showAddAirStationModal} onHide={handleCloseAddAirStationModal}>
-        <Modal.Header closeButton>
-          <Modal.Title>Agregar Estación Aérea</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          <Form>
-            <Form.Group controlId="formAirStationType" className="mb-3">
-            <Form.Label>Tipo</Form.Label>
-              <Form.Control
-                type="text"
-                name="category"
-                value={newAirStation.category}
-                onChange={handleNewAirStationInputChange}
-                disabled
-              />
-              <Form.Label>#</Form.Label>
-              <Form.Control
-                type="text"
-                name="description"
-                value={newAirStation.description}
-                onChange={handleNewAirStationInputChange}
-                disabled
-              />
-            </Form.Group>
-            <Form.Group controlId="formAirStationControlMethod" className="mb-3">
-              <Form.Label>Método de Control</Form.Label>
-              <Form.Control
-                type="text"
-                name="control_method"
-                value={newAirStation.control_method}
-                onChange={handleNewAirStationInputChange}
-                disabled
-              />
-            </Form.Group>
-          </Form>
-        </Modal.Body>
-        <Modal.Footer>
-          <Button variant="secondary" onClick={handleCloseAddAirStationModal}>
-            Cancelar
-          </Button>
-          <Button variant="success" onClick={handleSaveNewAirStation}>
-            Guardar
-          </Button>
-        </Modal.Footer>
-      </Modal>
+      <Form.Group controlId="formStationType" className="mb-3">
+        <Form.Label>Tipo</Form.Label>
+        <Form.Select
+          name="type"
+          value={newStation.type}
+          onChange={(e) =>
+            setNewStation({ ...newStation, type: e.target.value })
+          }
+        >
+          <option value="Control">Control</option>
+          <option value="Localización">Localización</option>
+          <option value="Jardinería">Jardinería</option>
+        </Form.Select>
+      </Form.Group>
+    </Form>
+  </Modal.Body>
+  <Modal.Footer>
+    <Button variant="secondary" onClick={() => setShowAddStationModal(false)}>
+      Cancelar
+    </Button>
+    <Button variant="success" onClick={handleSaveNewStation}>
+      Guardar
+    </Button>
+  </Modal.Footer>
+</Modal>
 
-      <Modal show={showAddRodentStationModal} onHide={handleCloseAddRodentStationModal}>
-        <Modal.Header closeButton>
-          <Modal.Title>Agregar Estación de Roedores</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          <Form>
-            <Form.Group controlId="formRodentStationCategory" className="mb-3">
-              <Form.Label>Tipo</Form.Label>
-              <Form.Control
-                type="text"
-                name="category"
-                value={newRodentStation.category}
-                onChange={handleNewRodentStationInputChange}
-                disabled
-              />
-              <Form.Label>#</Form.Label>
-              <Form.Control
-                type="text"
-                name="description"
-                value={newRodentStation.description}
-                onChange={handleNewRodentStationInputChange}
-                disabled
-              />
-            </Form.Group>
-            <Form.Group controlId="formRodentStationType" className="mb-3">
-              <Form.Label>Tipo de Estación</Form.Label>
-              <Form.Select
-                name="type"
-                value={newRodentStation.type}
-                onChange={handleNewRodentStationInputChange}
-              >
-                <option value="Caja Beta">Caja Beta</option>
-                <option value="Tubo">Tubo</option>
-              </Form.Select>
-            </Form.Group>
-            <Form.Group controlId="formRodentStationControlMethod" className="mb-3">
-              <Form.Label>Método de Control</Form.Label>
-              <Form.Select
-                name="control_method"
-                value={newRodentStation.control_method}
-                onChange={handleNewRodentStationInputChange}
-              >
-                <option value="Lámina">Lámina</option>
-                <option value="Cebo">Cebo</option>
-                <option value="Impacto">Impacto</option>
-                <option value="Bebedero">Bebedero</option>
-              </Form.Select>
-            </Form.Group>
-          </Form>
-        </Modal.Body>
-        <Modal.Footer>
-          <Button variant="secondary" onClick={handleCloseAddRodentStationModal}>
-            Cancelar
-          </Button>
-          <Button variant="success" onClick={handleSaveNewRodentStation}>
-            Guardar
-          </Button>
-        </Modal.Footer>
-      </Modal>
       <Modal show={showAddMapModal} onHide={handleCloseAddMapModal}>
   <Modal.Header closeButton>
     <Modal.Title>Agregar Mapa</Modal.Title>
