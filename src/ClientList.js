@@ -37,6 +37,7 @@ function ClientList() {
   const [showNotificationModal, setShowNotificationModal] = useState(false);
   const [showActionModal, setShowActionModal] = useState(false);
   const [actionType, setActionType] = useState(""); // "call" o "whatsapp"
+  const [showAddStationModal, setShowAddStationModal] = useState(false);
   const [selectedNumber, setSelectedNumber] = useState(null);
   const [stations, setStations] = useState([]); // Estado único para todas las estaciones
   const [showImageModal, setShowImageModal] = useState(false); // Controla la visualización del modal
@@ -59,12 +60,12 @@ function ClientList() {
     category: ''
   });
 
-  const [showAddStationModal, setShowAddStationModal] = useState(false); // Modal unificado
-const [newStation, setNewStation] = useState({
-  description: '',
-  type: 'Control', // Tipo predeterminado
-  client_id: null, // Se llenará automáticamente con el cliente seleccionado
-});
+  const [newStation, setNewStation] = useState({
+    description: '',
+    type: 'Control', // Tipo predeterminado
+    category: '', // Nueva propiedad para categoría
+    client_id: null, // Se llenará automáticamente con el cliente seleccionado
+  });  
 
   const navigate = useNavigate();
 
@@ -139,10 +140,11 @@ const handleSearch = (e) => {
 
 const handleSaveNewStation = async () => {
   try {
-    const { description, type } = newStation;
+    const { description, type, category } = newStation;
     const response = await axios.post('http://localhost:10000/api/stations', {
       description,
       type,
+      category,
       client_id: selectedClient.id, // Asociar con el cliente seleccionado
     });
 
@@ -151,7 +153,7 @@ const handleSaveNewStation = async () => {
 
     handleShowNotification('Estación agregada exitosamente');
     setShowAddStationModal(false);
-    setNewStation({ description: '', type: 'Control' }); // Reiniciar formulario
+    setNewStation({ description: '', type: 'Control', category }); // Reiniciar formulario
   } catch (error) {
     console.error('Error al guardar la estación:', error);
     handleShowNotification('Hubo un error al guardar la estación');
@@ -719,28 +721,30 @@ const handleSaveNewStation = async () => {
       <tr>
         <th>#</th>
         <th>Tipo</th>
+        <th>Categoría</th>
         <th>QR</th>
       </tr>
     </thead>
     <tbody>
-      {stations.map((station, index) => (
-        <tr key={station.id}>
-          <td>{station.description}</td>
-          <td>{station.type || "No disponible"}</td>
-          <td>
-            {station.qr_code ? (
-              <img
-                src={`http://localhost:10000${station.qr_code}`}
-                alt={`QR de estación ${station.description}`}
-                style={{ maxWidth: "100px" }}
-              />
-            ) : (
-              "No disponible"
-            )}
-          </td>
-        </tr>
-      ))}
-    </tbody>
+  {stations.map((station, index) => (
+    <tr key={station.id}>
+      <td>{station.description}</td>
+      <td>{station.type || "No disponible"}</td>
+      <td>{station.category || "No disponible"}</td> {/* Nueva columna */}
+      <td>
+        {station.qr_code ? (
+          <img
+            src={`http://localhost:10000${station.qr_code}`}
+            alt={`QR de estación ${station.description}`}
+            style={{ maxWidth: "100px" }}
+          />
+        ) : (
+          "No disponible"
+        )}
+      </td>
+    </tr>
+  ))}
+</tbody>
   </table>
 ) : (
   <p className="text-center">No hay estaciones registradas.</p>
@@ -992,9 +996,25 @@ const handleSaveNewStation = async () => {
         >
           <option value="Control">Control</option>
           <option value="Localización">Localización</option>
-          <option value="Jardinería">Jardinería</option>
+          <option value="Jardineria">Jardineria</option>
         </Form.Select>
       </Form.Group>
+      <Form.Group controlId="formStationCategory" className="mb-3">
+  <Form.Label>Categoría</Form.Label>
+  <Form.Select
+    name="category"
+    value={newStation.category}
+    onChange={(e) =>
+      setNewStation({ ...newStation, category: e.target.value })
+    }
+  >
+    <option value="">Seleccione una categoría</option>
+    <option value="Hogar">Hogar</option>
+    <option value="Empresarial">Empresarial</option>
+    <option value="Horizontal">Horizontal</option>
+    <option value="Jardineria">Jardineria</option>
+  </Form.Select>
+</Form.Group>
     </Form>
   </Modal.Body>
   <Modal.Footer>

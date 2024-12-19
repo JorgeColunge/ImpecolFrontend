@@ -35,9 +35,9 @@ function Inspection() {
     description: '', // Nuevo campo
     photo: null,
   });  
-  const [stationModalOpenDesinsectacion, setStationModalOpenDesinsectacion] = useState(false);
-  const [currentStationIdDesinsectacion, setCurrentStationIdDesinsectacion] = useState(null);
-  const [stationFindingDesinsectacion, setStationFindingDesinsectacion] = useState({
+  const [stationModalOpenHorizontal, setStationModalOpenHorizontal] = useState(false);
+  const [currentStationIdHorizontal, setCurrentStationIdHorizontal] = useState(null);
+  const [stationFindingHorizontal, setStationFindingHorizontal] = useState({
     captureQuantity: '',
     physicalState: 'Buena', // Default: Buena
     damageLocation: '',
@@ -50,7 +50,7 @@ function Inspection() {
   const [isMobile, setIsMobile] = useState(false);
   const [viewStationModalOpen, setViewStationModalOpen] = useState(false);
   const [viewStationData, setViewStationData] = useState({});
-  const [stationType, setStationType] = useState(null); // 'Desratización' o 'Desinsectación'
+  const [stationType, setStationType] = useState(null);
   const [signModalOpen, setSignModalOpen] = useState(false);
   const [techSignaturePreview, setTechSignaturePreview] = useState(null);
   const [clientSignaturePreview, setClientSignaturePreview] = useState(null);
@@ -68,8 +68,10 @@ function Inspection() {
   const { setHasUnsavedChanges, setUnsavedRoute } = useUnsavedChanges();
   const [notification, setNotification] = useState({ show: false, message: '' });
   const [confirmDelete, setConfirmDelete] = useState({ show: false, type: null, index: null });
-  const [searchTermDesratizacion, setSearchTermDesratizacion] = useState('');
-  const [searchTermDesinsectacion, setSearchTermDesinsectacion] = useState('');
+  const [searchTermJardineria, setSearchTermJardineria] = useState('');
+  const [searchTermHogar, setSearchTermHogar] = useState('');
+  const [searchTermEmpresarial, setSearchTermEmpresarial] = useState('');
+  const [searchTermHorizontal, setSearchTermHorizontal] = useState('');
   const [qrScannerOpen, setQrScannerOpen] = useState(false);
   const [currentQrStationType, setCurrentQrStationType] = useState(null);
 
@@ -223,12 +225,18 @@ function Inspection() {
     console.log("Valor recibido del escáner QR:", scannedValue);
     const normalizedValue = scannedValue.toLowerCase();
   
-    if (currentQrStationType === "Desratización") {
-      setSearchTermDesratizacion(normalizedValue);
-      console.log("Estado de búsqueda actualizado (Desratización):", normalizedValue);
-    } else if (currentQrStationType === "Desinsectación") {
-      setSearchTermDesinsectacion(normalizedValue);
-      console.log("Estado de búsqueda actualizado (Desinsectación):", normalizedValue);
+    if (currentQrStationType === "Jardineria") {
+      setSearchTermJardineria(normalizedValue);
+      console.log("Estado de búsqueda actualizado (Jardineria):", normalizedValue);
+    } else if (currentQrStationType === "Horizontal") {
+      setSearchTermHorizontal(normalizedValue);
+      console.log("Estado de búsqueda actualizado (Horizontal):", normalizedValue);
+    } else if (currentQrStationType === "Empresarial") {
+      setSearchTermEmpresarial(normalizedValue);
+      console.log("Estado de búsqueda actualizado (Empresarial):", normalizedValue);
+    } else if (currentQrStationType === "Hogar") {
+      setSearchTermHogar(normalizedValue);
+      console.log("Estado de búsqueda actualizado (Hogar):", normalizedValue);
     }
   
     setQrScannerOpen(false); // Cierra el modal
@@ -244,11 +252,11 @@ function Inspection() {
       if (stationFinding.photo) {
         URL.revokeObjectURL(stationFinding.photo);
       }
-      if (stationFindingDesinsectacion.photo) {
-        URL.revokeObjectURL(stationFindingDesinsectacion.photo);
+      if (stationFindingHorizontal.photo) {
+        URL.revokeObjectURL(stationFindingHorizontal.photo);
       }
     };
-  }, [stationFinding.photo, stationFindingDesinsectacion.photo]);
+  }, [stationFinding.photo, stationFindingHorizontal.photo]);
 
   useEffect(() => {
     // Detectar si el dispositivo es móvil
@@ -654,26 +662,26 @@ const dataURLtoBlob = (dataURL) => {
     handleCloseStationModal();
   };
   
-  const handleSaveStationFindingDesinsectacion = () => {
+  const handleSaveStationFindingHorizontal = () => {
     setClientStations((prevStations) => ({
       ...prevStations,
-      [currentStationIdDesinsectacion]: { ...stationFindingDesinsectacion },
+      [currentStationIdHorizontal]: { ...stationFindingHorizontal },
     }));
-    handleCloseStationModalDesinsectacion();
+    handleCloseStationModalHorizontal();
   };
    
 
-  const handleOpenStationModalDesinsectacion = (stationId) => {
-    setCurrentStationIdDesinsectacion(stationId);
+  const handleOpenStationModalHorizontal = (stationId) => {
+    setCurrentStationIdHorizontal(stationId);
   
     if (clientStations[stationId]) {
-      setStationFindingDesinsectacion({
+      setStationFindingHorizontal({
         ...clientStations[stationId], // Carga los datos existentes
         photoBlob: null, // Asegúrate de que `photoBlob` esté vacío para nuevas selecciones
       });
     } else {
       // Si no hay hallazgo previo, usa valores predeterminados
-      setStationFindingDesinsectacion({
+      setStationFindingHorizontal({
         captureQuantity: '',
         physicalState: 'Buena',
         damageLocation: '',
@@ -685,14 +693,14 @@ const dataURLtoBlob = (dataURL) => {
       });
     }
   
-    setStationModalOpenDesinsectacion(true);
+    setStationModalOpenHorizontal(true);
   };
   
   
-  const handleCloseStationModalDesinsectacion = () => {
-    setCurrentStationIdDesinsectacion(null);
-    setStationModalOpenDesinsectacion(false);
-    setStationFindingDesinsectacion({
+  const handleCloseStationModalHorizontal = () => {
+    setCurrentStationIdHorizontal(null);
+    setStationModalOpenHorizontal(false);
+    setStationFindingHorizontal({
       captureQuantity: '',
       physicalState: 'Buena',
       damageLocation: '',
@@ -703,8 +711,8 @@ const dataURLtoBlob = (dataURL) => {
     });
   };
   
-  const handleStationFindingChangeDesinsectacion = (field, value) => {
-    setStationFindingDesinsectacion((prevFinding) => {
+  const handleStationFindingChangeHorizontal = (field, value) => {
+    setStationFindingHorizontal((prevFinding) => {
       const updatedFinding = {
         ...prevFinding,
         [field]: value,
@@ -713,13 +721,13 @@ const dataURLtoBlob = (dataURL) => {
       // Marcar cambios detectados
       setHasUnsavedChanges(true);
       setUnsavedRoute(location.pathname);
-      console.log(`Hallazgo de desinsectación id asignado: ${updatedFinding.id}`);
+      console.log(`Hallazgo de Horizontal id asignado: ${updatedFinding.id}`);
       return updatedFinding; // Retornar el estado actualizado
     });
   };
   
   
-  const handleStationFindingPhotoChangeDesinsectacion = (file) => {
+  const handleStationFindingPhotoChangeHorizontal = (file) => {
     if (!file || !file.type.startsWith("image/")) {
       console.error("No se seleccionó un archivo válido o no es una imagen.");
       showNotification("Seleccione un archivo válido de tipo imagen.");
@@ -728,7 +736,7 @@ const dataURLtoBlob = (dataURL) => {
   
     const photoURL = URL.createObjectURL(file);
   
-    setStationFindingDesinsectacion((prevFinding) => ({
+    setStationFindingHorizontal((prevFinding) => ({
       ...prevFinding,
       photo: photoURL, // URL para previsualización
       photoBlob: file, // Blob para guardar offline o enviar online
@@ -786,15 +794,27 @@ const handleViewStation = (stationId) => {
   setViewStationModalOpen(true);
 };
 
-const handleViewStationDesratizacion = (stationId) => {
+const handleViewStationJardineria = (stationId) => {
   setViewStationData(clientStations[stationId] || {});
-  setStationType('Desratización');
+  setStationType('Jardineria');
   setViewStationModalOpen(true);
 };
 
-const handleViewStationDesinsectacion = (stationId) => {
+const handleViewStationHogar = (stationId) => {
   setViewStationData(clientStations[stationId] || {});
-  setStationType('Desinsectación');
+  setStationType('Hogar');
+  setViewStationModalOpen(true);
+};
+
+const handleViewStationHorizontal = (stationId) => {
+  setViewStationData(clientStations[stationId] || {});
+  setStationType('Horizontal');
+  setViewStationModalOpen(true);
+};
+
+const handleViewStationEmpresarial = (stationId) => {
+  setViewStationData(clientStations[stationId] || {});
+  setStationType('Empresarial');
   setViewStationModalOpen(true);
 };
 
@@ -884,7 +904,7 @@ const handleDeleteFinding = () => {
           <div className="card-header">{type}</div>
           <div className="card-body">
 
-            {type === 'Desratización' && stations.length > 0 && (
+            {type === 'Jardineria' && stations.length > 0 && (
               <div className="mt-1">
                 <h6>Hallazgos en Estaciones</h6>
                 <div className="mb-3 d-flex">
@@ -892,13 +912,13 @@ const handleDeleteFinding = () => {
                     type="text"
                     className="form-control me-2"
                     placeholder="Buscar estación por descripción"
-                    value={searchTermDesratizacion}
-                    onChange={(e) => setSearchTermDesratizacion(e.target.value)}
+                    value={searchTermJardineria}
+                    onChange={(e) => setSearchTermJardineria(e.target.value)}
                   />
                   <QrCodeScan
                     size={40}
                     className="btn p-0 mx-4"
-                    onClick={() => handleOpenQrScanner("Desratización")}
+                    onClick={() => handleOpenQrScanner("Jardineria")}
                   />
                 </div>
                 <div className="table-responsive mt-3">
@@ -906,13 +926,13 @@ const handleDeleteFinding = () => {
                     // Vista móvil con colapso
                     stations
                       .filter((station) => {
-                        // Validar primero que la categoría sea "Roedores"
-                        if (station.category !== "Roedores") {
+                        // Validar primero que la categoría sea "Jardineria"
+                        if (station.category !== "Jardineria") {
                           return false;
                         }
 
                         // Normalizamos el término de búsqueda
-                        const search = searchTermDesratizacion.trim().toLowerCase();
+                        const search = searchTermJardineria.trim().toLowerCase();
 
                         // Verificamos si el término de búsqueda tiene el formato "station-<id>"
                         const stationPrefix = "station-";
@@ -1003,7 +1023,7 @@ const handleDeleteFinding = () => {
                       <p>Sin hallazgo reportado</p>
                       <button
                         className="btn btn-outline-success"
-                        onClick={() => handleOpenStationModalDesinsectacion(station.id)}
+                        onClick={() => handleOpenStationModalHorizontal(station.id)}
                         disabled={techSignaturePreview && clientSignaturePreview}
                       >
                         +
@@ -1032,13 +1052,13 @@ const handleDeleteFinding = () => {
   console.log("Evaluando estación:", station);
 
   // Verificar categoría
-  if (station.category !== "Roedores") {
+  if (station.category !== "Jardineria") {
     console.log(`Estación ${station.name || `ID: ${station.id}`} excluida por categoría:`, station.category);
     return false;
   }
 
   // Normalizamos el término de búsqueda
-  const search = searchTermDesratizacion.trim().toLowerCase();
+  const search = searchTermJardineria.trim().toLowerCase();
   console.log("Término de búsqueda utilizado:", search); // Log del término de búsqueda
 
   const stationPrefix = "station-";
@@ -1084,7 +1104,507 @@ const handleDeleteFinding = () => {
                                 {!isMobile && (
                                   <button
                                     className="btn btn-link p-0"
-                                    onClick={() => handleViewStationDesratizacion(station.id)}
+                                    onClick={() => handleViewStationJardineria(station.id)}
+                                    style={{ border: "none", background: "none" }}
+                                    >
+                                    <Eye
+                                    className='mx-2'
+                                      size={"25px"}
+                                      color='blue'
+                                      type='button'
+                                    />
+                                    </button>
+                                  )}
+                                  <button
+                                    className="btn btn-link p-0"
+                                    onClick={() => handleOpenStationModal(station.id)}
+                                    disabled={techSignaturePreview && clientSignaturePreview} // Bloquear si ya está firmado
+                                    style={{ border: "none", background: "none" }} // Estilo para eliminar apariencia de botón
+                                  >
+                                    <PencilSquare
+                                      className="mx-2"
+                                      size={"20px"}
+                                      color={techSignaturePreview && clientSignaturePreview ? "gray" : "green"} // Cambiar color si está bloqueado
+                                      type="button"
+                                      title={techSignaturePreview && clientSignaturePreview ? "Inspección firmada, edición bloqueada" : "Editar"}
+                                    />
+                                  </button>
+                                </td>
+                              </>
+                            ) : (
+                              <>
+                                <td colSpan="4">Sin hallazgo reportado</td>
+                                <td>
+                                  <button
+                                    className="btn btn-outline-success"
+                                    onClick={() => handleOpenStationModal(station.id)}
+                                    disabled={techSignaturePreview && clientSignaturePreview}
+                                  >
+                                    +
+                                  </button>
+                                </td>
+                              </>
+                            )}
+                            </tr>
+                          ))}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+              </div>
+            )}
+
+{type === 'Hogar' && stations.length > 0 && (
+              <div className="mt-1">
+                <h6>Hallazgos en Estaciones</h6>
+                <div className="mb-3 d-flex">
+                  <input
+                    type="text"
+                    className="form-control me-2"
+                    placeholder="Buscar estación por descripción"
+                    value={searchTermHogar}
+                    onChange={(e) => setSearchTermHogar(e.target.value)}
+                  />
+                  <QrCodeScan
+                    size={40}
+                    className="btn p-0 mx-4"
+                    onClick={() => handleOpenQrScanner("Hogar")}
+                  />
+                </div>
+                <div className="table-responsive mt-3">
+                  {isMobile ? (
+                    // Vista móvil con colapso
+                    stations
+                      .filter((station) => {
+                        // Validar primero que la categoría sea "Hogar"
+                        if (station.category !== "Hogar") {
+                          return false;
+                        }
+
+                        // Normalizamos el término de búsqueda
+                        const search = searchTermHogar.trim().toLowerCase();
+
+                        // Verificamos si el término de búsqueda tiene el formato "station-<id>"
+                        const stationPrefix = "station-";
+                        const isStationSearch = search.startsWith(stationPrefix);
+
+                        // Búsqueda por ID exacto
+                        if (isStationSearch) {
+                          const stationId = Number(search.replace(stationPrefix, ""));
+                          return !isNaN(stationId) && station.id === stationId;
+                        }
+
+                        // Búsqueda general en nombre y descripción
+                        const stationName = station.name ? station.name.toLowerCase() : "";
+                        const stationDescription = station.description ? station.description.toLowerCase() : "";
+                        return stationName.includes(search) || stationDescription.includes(search);
+                      })
+                      .map((station) => {
+                        const currentKey = `station-${station.id}`;
+                        return (
+                          <div
+                            key={station.id}
+                            className="finding-item border mb-3 p-2"
+                            style={{ borderRadius: '5px', backgroundColor: '#f8f9fa' }}
+                          >
+                            <div className="d-flex justify-content-between align-items-center">
+                              <strong>{station.name || `Estación ${station.description}`}</strong>
+                              <div
+                                className="icon-toggle"
+                                onClick={() => handleCollapseToggle(currentKey)}
+                                style={{ cursor: 'pointer' }}
+                              >
+                                {collapseStates[currentKey] ? (
+                                  <ArrowUpSquare title="Ocultar" />
+                                ) : (
+                                  <ArrowDownSquare title="Expandir" />
+                                )}
+                              </div>
+                            </div>
+                            <div
+                              className={`finding-details ${
+                                collapseStates[currentKey] ? 'd-block' : 'd-none'
+                              } mt-2`}
+                            >
+                             {clientStations[station.id] ? (
+                      <>
+                        <p><strong>Finalidad:</strong> {clientStations[station.id].purpose || '-'}</p>
+
+                        {clientStations[station.id].purpose === 'Consumo' && (
+                          <p><strong>Cantidad Consumida:</strong> {clientStations[station.id].consumptionAmount || '-'}</p>
+                        )}
+
+                        {clientStations[station.id].purpose === 'Captura' && (
+                          <p><strong>Cantidad Capturada:</strong> {clientStations[station.id].captureQuantity || '-'}</p>
+                        )}
+
+                        <p><strong>Estado Físico:</strong> {clientStations[station.id].physicalState || '-'}</p>
+                        {clientStations[station.id].physicalState === 'Dañada' && (
+                          <>
+                            <p><strong>Lugar del Daño:</strong> {clientStations[station.id].damageLocation || '-'}</p>
+                            <p><strong>Requiere Cambio:</strong> {clientStations[station.id].requiresChange || '-'}</p>
+                            {clientStations[station.id].requiresChange === 'Si' && (
+                              <p><strong>Prioridad de Cambio:</strong> {clientStations[station.id].changePriority || '-'}</p>
+                            )}
+                          </>
+                        )}
+                        <p><strong>Descripción:</strong> {clientStations[station.id].description || '-'}</p>
+                        <div className="mb-3">
+                          {clientStations[station.id].photo ? (
+                            <img
+                              src={clientStations[station.id].photo}
+                              alt="Foto"
+                              style={{ width: '150px', objectFit: 'cover' }}
+                            />
+                          ) : (
+                            <span>Sin Foto</span>
+                          )}
+                        </div>
+                        <button
+                          className="btn btn-outline-success"
+                          onClick={() => handleOpenStationModal(station.id)}
+                          disabled={techSignaturePreview && clientSignaturePreview}
+                        >
+                          Editar
+                        </button>
+                      </>
+                  ) : (
+                    <>
+                      <p>Sin hallazgo reportado</p>
+                      <button
+                        className="btn btn-outline-success"
+                        onClick={() => handleOpenStationModalHorizontal(station.id)}
+                        disabled={techSignaturePreview && clientSignaturePreview}
+                      >
+                        +
+                      </button>
+                    </>
+                  )}
+                            </div>
+                          </div>
+                        );
+                      })
+                  ) : (
+                    // Vista de tabla para tablet y computadora
+                    <table className="table table-bordered">
+                      <thead>
+                        <tr>
+                          <th>Estación</th>
+                          <th>Finalidad</th>
+                          <th>Estado Físico</th>
+                          <th>Descripción</th>
+                          <th>Foto</th>
+                          <th>Acciones</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                      {stations.filter((station) => {
+  console.log("Evaluando estación:", station);
+
+  // Verificar categoría
+  if (station.category !== "Hogar") {
+    console.log(`Estación ${station.name || `ID: ${station.id}`} excluida por categoría:`, station.category);
+    return false;
+  }
+
+  // Normalizamos el término de búsqueda
+  const search = searchTermHogar.trim().toLowerCase();
+  console.log("Término de búsqueda utilizado:", search); // Log del término de búsqueda
+
+  const stationPrefix = "station-";
+  const isStationSearch = search.startsWith(stationPrefix);
+
+  // Búsqueda por ID exacto usando el prefijo
+  if (isStationSearch) {
+    const stationId = Number(search.replace(stationPrefix, ""));
+    console.log(`Buscando estación con ID ${stationId} en estación con ID:`, station.id);
+    const match = !isNaN(stationId) && station.id === stationId;
+    console.log(`Resultado de búsqueda exacta para estación ${station.id}:`, match ? "Coincide" : "No coincide");
+    return match;
+  }
+
+  // Búsqueda general en nombre o descripción
+  const stationName = station.name ? station.name.toLowerCase() : "";
+  const stationDescription = station.description ? station.description.toLowerCase() : "";
+  const matches = stationName.includes(search) || stationDescription.includes(search);
+
+  console.log(`Resultado del filtro general para estación ${station.name || `ID: ${station.id}`}:`, matches ? "Incluida" : "Excluida");
+  return matches;
+})
+                          .map((station) => (
+                            <tr key={station.id}>
+                              <td className='align-middle'>{station.name || `Estación ${station.description}`}</td>
+                              {clientStations[station.id] ? (
+                              <>
+                                <td className='align-middle'>{clientStations[station.id].purpose || '-'}</td>
+                                <td className='align-middle'>{clientStations[station.id].physicalState || '-'}</td>
+                                <td className='align-middle'>{clientStations[station.id].description || '-'}</td>
+                                <td className='align-middle mx-1 px-1'>
+                                  {clientStations[station.id].photo ? (
+                                    <img
+                                      src={clientStations[station.id].photo}
+                                      alt="Foto"
+                                      style={{ width: '250px', objectFit: 'cover', margin: "0px", padding: "0px" }}
+                                    />
+                                  ) : (
+                                    '-'
+                                  )}
+                                </td>
+                                <td className='align-middle'>
+                                {!isMobile && (
+                                  <button
+                                    className="btn btn-link p-0"
+                                    onClick={() => handleViewStationHogar(station.id)}
+                                    style={{ border: "none", background: "none" }}
+                                    >
+                                    <Eye
+                                    className='mx-2'
+                                      size={"25px"}
+                                      color='blue'
+                                      type='button'
+                                    />
+                                    </button>
+                                  )}
+                                  <button
+                                    className="btn btn-link p-0"
+                                    onClick={() => handleOpenStationModal(station.id)}
+                                    disabled={techSignaturePreview && clientSignaturePreview} // Bloquear si ya está firmado
+                                    style={{ border: "none", background: "none" }} // Estilo para eliminar apariencia de botón
+                                  >
+                                    <PencilSquare
+                                      className="mx-2"
+                                      size={"20px"}
+                                      color={techSignaturePreview && clientSignaturePreview ? "gray" : "green"} // Cambiar color si está bloqueado
+                                      type="button"
+                                      title={techSignaturePreview && clientSignaturePreview ? "Inspección firmada, edición bloqueada" : "Editar"}
+                                    />
+                                  </button>
+                                </td>
+                              </>
+                            ) : (
+                              <>
+                                <td colSpan="4">Sin hallazgo reportado</td>
+                                <td>
+                                  <button
+                                    className="btn btn-outline-success"
+                                    onClick={() => handleOpenStationModal(station.id)}
+                                    disabled={techSignaturePreview && clientSignaturePreview}
+                                  >
+                                    +
+                                  </button>
+                                </td>
+                              </>
+                            )}
+                            </tr>
+                          ))}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+              </div>
+            )}
+
+{type === 'Empresarial' && stations.length > 0 && (
+              <div className="mt-1">
+                <h6>Hallazgos en Estaciones</h6>
+                <div className="mb-3 d-flex">
+                  <input
+                    type="text"
+                    className="form-control me-2"
+                    placeholder="Buscar estación por descripción"
+                    value={searchTermEmpresarial}
+                    onChange={(e) => setSearchTermEmpresarial(e.target.value)}
+                  />
+                  <QrCodeScan
+                    size={40}
+                    className="btn p-0 mx-4"
+                    onClick={() => handleOpenQrScanner("Empresarial")}
+                  />
+                </div>
+                <div className="table-responsive mt-3">
+                  {isMobile ? (
+                    // Vista móvil con colapso
+                    stations
+                      .filter((station) => {
+                        // Validar primero que la categoría sea "Empresarial"
+                        if (station.category !== "Empresarial") {
+                          return false;
+                        }
+
+                        // Normalizamos el término de búsqueda
+                        const search = searchTermEmpresarial.trim().toLowerCase();
+
+                        // Verificamos si el término de búsqueda tiene el formato "station-<id>"
+                        const stationPrefix = "station-";
+                        const isStationSearch = search.startsWith(stationPrefix);
+
+                        // Búsqueda por ID exacto
+                        if (isStationSearch) {
+                          const stationId = Number(search.replace(stationPrefix, ""));
+                          return !isNaN(stationId) && station.id === stationId;
+                        }
+
+                        // Búsqueda general en nombre y descripción
+                        const stationName = station.name ? station.name.toLowerCase() : "";
+                        const stationDescription = station.description ? station.description.toLowerCase() : "";
+                        return stationName.includes(search) || stationDescription.includes(search);
+                      })
+                      .map((station) => {
+                        const currentKey = `station-${station.id}`;
+                        return (
+                          <div
+                            key={station.id}
+                            className="finding-item border mb-3 p-2"
+                            style={{ borderRadius: '5px', backgroundColor: '#f8f9fa' }}
+                          >
+                            <div className="d-flex justify-content-between align-items-center">
+                              <strong>{station.name || `Estación ${station.description}`}</strong>
+                              <div
+                                className="icon-toggle"
+                                onClick={() => handleCollapseToggle(currentKey)}
+                                style={{ cursor: 'pointer' }}
+                              >
+                                {collapseStates[currentKey] ? (
+                                  <ArrowUpSquare title="Ocultar" />
+                                ) : (
+                                  <ArrowDownSquare title="Expandir" />
+                                )}
+                              </div>
+                            </div>
+                            <div
+                              className={`finding-details ${
+                                collapseStates[currentKey] ? 'd-block' : 'd-none'
+                              } mt-2`}
+                            >
+                             {clientStations[station.id] ? (
+                      <>
+                        <p><strong>Finalidad:</strong> {clientStations[station.id].purpose || '-'}</p>
+
+                        {clientStations[station.id].purpose === 'Consumo' && (
+                          <p><strong>Cantidad Consumida:</strong> {clientStations[station.id].consumptionAmount || '-'}</p>
+                        )}
+
+                        {clientStations[station.id].purpose === 'Captura' && (
+                          <p><strong>Cantidad Capturada:</strong> {clientStations[station.id].captureQuantity || '-'}</p>
+                        )}
+
+                        <p><strong>Estado Físico:</strong> {clientStations[station.id].physicalState || '-'}</p>
+                        {clientStations[station.id].physicalState === 'Dañada' && (
+                          <>
+                            <p><strong>Lugar del Daño:</strong> {clientStations[station.id].damageLocation || '-'}</p>
+                            <p><strong>Requiere Cambio:</strong> {clientStations[station.id].requiresChange || '-'}</p>
+                            {clientStations[station.id].requiresChange === 'Si' && (
+                              <p><strong>Prioridad de Cambio:</strong> {clientStations[station.id].changePriority || '-'}</p>
+                            )}
+                          </>
+                        )}
+                        <p><strong>Descripción:</strong> {clientStations[station.id].description || '-'}</p>
+                        <div className="mb-3">
+                          {clientStations[station.id].photo ? (
+                            <img
+                              src={clientStations[station.id].photo}
+                              alt="Foto"
+                              style={{ width: '150px', objectFit: 'cover' }}
+                            />
+                          ) : (
+                            <span>Sin Foto</span>
+                          )}
+                        </div>
+                        <button
+                          className="btn btn-outline-success"
+                          onClick={() => handleOpenStationModal(station.id)}
+                          disabled={techSignaturePreview && clientSignaturePreview}
+                        >
+                          Editar
+                        </button>
+                      </>
+                  ) : (
+                    <>
+                      <p>Sin hallazgo reportado</p>
+                      <button
+                        className="btn btn-outline-success"
+                        onClick={() => handleOpenStationModalHorizontal(station.id)}
+                        disabled={techSignaturePreview && clientSignaturePreview}
+                      >
+                        +
+                      </button>
+                    </>
+                  )}
+                            </div>
+                          </div>
+                        );
+                      })
+                  ) : (
+                    // Vista de tabla para tablet y computadora
+                    <table className="table table-bordered">
+                      <thead>
+                        <tr>
+                          <th>Estación</th>
+                          <th>Finalidad</th>
+                          <th>Estado Físico</th>
+                          <th>Descripción</th>
+                          <th>Foto</th>
+                          <th>Acciones</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                      {stations.filter((station) => {
+  console.log("Evaluando estación:", station);
+
+  // Verificar categoría
+  if (station.category !== "Empresarial") {
+    console.log(`Estación ${station.name || `ID: ${station.id}`} excluida por categoría:`, station.category);
+    return false;
+  }
+
+  // Normalizamos el término de búsqueda
+  const search = searchTermEmpresarial.trim().toLowerCase();
+  console.log("Término de búsqueda utilizado:", search); // Log del término de búsqueda
+
+  const stationPrefix = "station-";
+  const isStationSearch = search.startsWith(stationPrefix);
+
+  // Búsqueda por ID exacto usando el prefijo
+  if (isStationSearch) {
+    const stationId = Number(search.replace(stationPrefix, ""));
+    console.log(`Buscando estación con ID ${stationId} en estación con ID:`, station.id);
+    const match = !isNaN(stationId) && station.id === stationId;
+    console.log(`Resultado de búsqueda exacta para estación ${station.id}:`, match ? "Coincide" : "No coincide");
+    return match;
+  }
+
+  // Búsqueda general en nombre o descripción
+  const stationName = station.name ? station.name.toLowerCase() : "";
+  const stationDescription = station.description ? station.description.toLowerCase() : "";
+  const matches = stationName.includes(search) || stationDescription.includes(search);
+
+  console.log(`Resultado del filtro general para estación ${station.name || `ID: ${station.id}`}:`, matches ? "Incluida" : "Excluida");
+  return matches;
+})
+                          .map((station) => (
+                            <tr key={station.id}>
+                              <td className='align-middle'>{station.name || `Estación ${station.description}`}</td>
+                              {clientStations[station.id] ? (
+                              <>
+                                <td className='align-middle'>{clientStations[station.id].purpose || '-'}</td>
+                                <td className='align-middle'>{clientStations[station.id].physicalState || '-'}</td>
+                                <td className='align-middle'>{clientStations[station.id].description || '-'}</td>
+                                <td className='align-middle mx-1 px-1'>
+                                  {clientStations[station.id].photo ? (
+                                    <img
+                                      src={clientStations[station.id].photo}
+                                      alt="Foto"
+                                      style={{ width: '250px', objectFit: 'cover', margin: "0px", padding: "0px" }}
+                                    />
+                                  ) : (
+                                    '-'
+                                  )}
+                                </td>
+                                <td className='align-middle'>
+                                {!isMobile && (
+                                  <button
+                                    className="btn btn-link p-0"
+                                    onClick={() => handleViewStationEmpresarial(station.id)}
                                     style={{ border: "none", background: "none" }}
                                     >
                                     <Eye
@@ -1135,7 +1655,7 @@ const handleDeleteFinding = () => {
             )}
 
 
-            {type === 'Desinsectación' && stations.length > 0 && (
+            {type === 'Horizontal' && stations.length > 0 && (
               <div className="mt-1">
                 <h6>Hallazgos en Estaciones</h6>
                 <div className="mb-3 d-flex">
@@ -1143,13 +1663,13 @@ const handleDeleteFinding = () => {
                     type="text"
                     className="form-control"
                     placeholder="Buscar estación por descripción"
-                    value={searchTermDesinsectacion}
-                    onChange={(e) => setSearchTermDesinsectacion(e.target.value)}
+                    value={searchTermHorizontal}
+                    onChange={(e) => setSearchTermHorizontal(e.target.value)}
                   />
                   <QrCodeScan
                     size={40}
                     className="btn p-0 mx-4"
-                    onClick={() => handleOpenQrScanner("Desinsectación")}
+                    onClick={() => handleOpenQrScanner("Horizontal")}
                   />
                 </div>
                 <div className="table-responsive mt-3">
@@ -1157,13 +1677,13 @@ const handleDeleteFinding = () => {
                     // Vista móvil con colapso
                     stations
                       .filter((station) => {
-                        // Validar primero que la categoría sea "Aéreas"
-                        if (station.category !== "Aéreas") {
+                        // Validar primero que la categoría sea "Horizontal"
+                        if (station.category !== "Horizontal") {
                           return false;
                         }
 
                         // Normalizamos el término de búsqueda
-                        const search = searchTermDesinsectacion.trim().toLowerCase();
+                        const search = searchTermHorizontal.trim().toLowerCase();
 
                         // Verificamos si el término de búsqueda tiene el formato "station-<id>"
                         const stationPrefix = "station-";
@@ -1181,7 +1701,7 @@ const handleDeleteFinding = () => {
                         return stationName.includes(search) || stationDescription.includes(search);
                       })
                       .map((station) => {
-                        const currentKey = `station-desinsectacion-${station.id}`;
+                        const currentKey = `station-Horizontal-${station.id}`;
                         return (
                           <div
                             key={station.id}
@@ -1225,7 +1745,7 @@ const handleDeleteFinding = () => {
                                   </div>
                                   <button
                                     className="btn btn-outline-success"
-                                    onClick={() => handleOpenStationModalDesinsectacion(station.id)}
+                                    onClick={() => handleOpenStationModalHorizontal(station.id)}
                                     disabled={techSignaturePreview && clientSignaturePreview}
                                   >
                                     Editar
@@ -1236,7 +1756,7 @@ const handleDeleteFinding = () => {
                                   <p>Sin hallazgo reportado</p>
                                   <button
                                     className="btn btn-outline-success"
-                                    onClick={() => handleOpenStationModalDesinsectacion(station.id)}
+                                    onClick={() => handleOpenStationModalHorizontal(station.id)}
                                     disabled={techSignaturePreview && clientSignaturePreview}
                                   >
                                     +
@@ -1263,12 +1783,12 @@ const handleDeleteFinding = () => {
                       <tbody>
                         {stations
                           .filter((station) => {
-                            const search = searchTermDesinsectacion.trim().toLowerCase(); // Normalizamos el término de búsqueda
+                            const search = searchTermHorizontal.trim().toLowerCase(); // Normalizamos el término de búsqueda
                             const stationPrefix = "station-"; // Prefijo esperado para búsqueda por ID
                             const isStationSearch = search.startsWith(stationPrefix);
 
-                            // Verificar primero que la categoría sea "Aéreas"
-                            if (station.category !== "Aéreas") {
+                            // Verificar primero que la categoría sea "Horizontal"
+                            if (station.category !== "Horizontal") {
                               return false;
                             }
 
@@ -1312,7 +1832,7 @@ const handleDeleteFinding = () => {
                                   {!isMobile && (
                                     <button
                                       className="btn btn-link p-0"
-                                      onClick={() => handleViewStationDesinsectacion(station.id)}
+                                      onClick={() => handleViewStationHorizontal(station.id)}
                                       style={{ border: "none", background: "none" }}
                                     >
                                       <Eye
@@ -1334,7 +1854,7 @@ const handleDeleteFinding = () => {
                                       size={"20px"}
                                       color='green'
                                       type='button'
-                                      onClick={() => handleOpenStationModalDesinsectacion(station.id)}
+                                      onClick={() => handleOpenStationModalHorizontal(station.id)}
                                       disabled={techSignaturePreview && clientSignaturePreview}
                                     />
                                   </button>
@@ -1346,7 +1866,7 @@ const handleDeleteFinding = () => {
                                   <td>
                                     <button
                                       className="btn btn-outline-success"
-                                      onClick={() => handleOpenStationModalDesinsectacion(station.id)}
+                                      onClick={() => handleOpenStationModalHorizontal(station.id)}
                                       disabled={techSignaturePreview && clientSignaturePreview}
                                     >
                                       +
@@ -1808,7 +2328,7 @@ const handleDeleteFinding = () => {
         </Modal.Footer>
         </Modal>
 
-        <Modal show={stationModalOpenDesinsectacion} onHide={handleCloseStationModalDesinsectacion} size="lg">
+        <Modal show={stationModalOpenHorizontal} onHide={handleCloseStationModalHorizontal} size="lg">
         <Modal.Header closeButton>
             <Modal.Title>Agregar Hallazgo para la Estación</Modal.Title>
         </Modal.Header>
@@ -1818,8 +2338,8 @@ const handleDeleteFinding = () => {
             <input
                 type="number"
                 className="form-control"
-                value={stationFindingDesinsectacion.captureQuantity}
-                onChange={(e) => handleStationFindingChangeDesinsectacion('captureQuantity', e.target.value)}
+                value={stationFindingHorizontal.captureQuantity}
+                onChange={(e) => handleStationFindingChangeHorizontal('captureQuantity', e.target.value)}
                 placeholder="Ingrese la cantidad de capturas"
             />
             </div>
@@ -1827,22 +2347,22 @@ const handleDeleteFinding = () => {
             <label className="form-label">Estado Físico</label>
             <select
                 className="form-select"
-                value={stationFindingDesinsectacion.physicalState}
-                onChange={(e) => handleStationFindingChangeDesinsectacion('physicalState', e.target.value)}
+                value={stationFindingHorizontal.physicalState}
+                onChange={(e) => handleStationFindingChangeHorizontal('physicalState', e.target.value)}
             >
                 <option value="Buena">Buena</option>
                 <option value="Dañada">Dañada</option>
                 <option value="Faltante">Faltante</option>
             </select>
             </div>
-            {stationFindingDesinsectacion.physicalState === 'Dañada' && (
+            {stationFindingHorizontal.physicalState === 'Dañada' && (
             <>
                 <div className="mb-3">
                 <label className="form-label">Lugar del Daño</label>
                 <select
                     className="form-select"
-                    value={stationFindingDesinsectacion.damageLocation}
-                    onChange={(e) => handleStationFindingChangeDesinsectacion('damageLocation', e.target.value)}
+                    value={stationFindingHorizontal.damageLocation}
+                    onChange={(e) => handleStationFindingChangeHorizontal('damageLocation', e.target.value)}
                 >
                     <option value="Marco">Marco</option>
                     <option value="Estacas">Estacas</option>
@@ -1853,20 +2373,20 @@ const handleDeleteFinding = () => {
                 <label className="form-label">Requiere Cambio</label>
                 <select
                     className="form-select"
-                    value={stationFindingDesinsectacion.requiresChange}
-                    onChange={(e) => handleStationFindingChangeDesinsectacion('requiresChange', e.target.value)}
+                    value={stationFindingHorizontal.requiresChange}
+                    onChange={(e) => handleStationFindingChangeHorizontal('requiresChange', e.target.value)}
                 >
                     <option value="Si">Si</option>
                     <option value="No">No</option>
                 </select>
                 </div>
-                {stationFindingDesinsectacion.requiresChange === 'Si' && (
+                {stationFindingHorizontal.requiresChange === 'Si' && (
                 <div className="mb-3">
                     <label className="form-label">Prioridad de Cambio</label>
                     <select
                     className="form-select"
-                    value={stationFindingDesinsectacion.changePriority}
-                    onChange={(e) => handleStationFindingChangeDesinsectacion('changePriority', e.target.value)}
+                    value={stationFindingHorizontal.changePriority}
+                    onChange={(e) => handleStationFindingChangeHorizontal('changePriority', e.target.value)}
                     >
                     <option value="Si">Si</option>
                     <option value="No">No</option>
@@ -1880,8 +2400,8 @@ const handleDeleteFinding = () => {
             <textarea
                 className="form-control"
                 rows="3"
-                value={stationFindingDesinsectacion.description}
-                onChange={(e) => handleStationFindingChangeDesinsectacion('description', e.target.value)}
+                value={stationFindingHorizontal.description}
+                onChange={(e) => handleStationFindingChangeHorizontal('description', e.target.value)}
                 placeholder="Ingrese una descripción del hallazgo"
                 disabled={techSignaturePreview && clientSignaturePreview}
             ></textarea>
@@ -1889,9 +2409,9 @@ const handleDeleteFinding = () => {
             <div className="mb-3">
             <label className="form-label">Fotografía</label>
             <div className="image-upload-container">
-              {stationFindingDesinsectacion.photo ? (
+              {stationFindingHorizontal.photo ? (
                 <img
-                  src={stationFindingDesinsectacion.photo}
+                  src={stationFindingHorizontal.photo}
                   alt="Preview"
                   className="image-preview"
                 />
@@ -1907,7 +2427,7 @@ const handleDeleteFinding = () => {
                 onChange={(e) => {
                   const file = e.target.files[0];
                   if (file) {
-                    handleStationFindingPhotoChangeDesinsectacion(file); // Mantiene la lógica original
+                    handleStationFindingPhotoChangeHorizontal(file); // Mantiene la lógica original
                   }
                 }}
               />
@@ -1915,10 +2435,10 @@ const handleDeleteFinding = () => {
           </div>
         </Modal.Body>
         <Modal.Footer>
-            <button className="btn btn-secondary" onClick={handleCloseStationModalDesinsectacion}>
+            <button className="btn btn-secondary" onClick={handleCloseStationModalHorizontal}>
             Cancelar
             </button>
-            <button className="btn btn-success" onClick={handleSaveStationFindingDesinsectacion}>
+            <button className="btn btn-success" onClick={handleSaveStationFindingHorizontal}>
             Guardar Hallazgo
             </button>
         </Modal.Footer>
@@ -1929,7 +2449,7 @@ const handleDeleteFinding = () => {
           <Modal.Title>Detalles de la Estación</Modal.Title>
         </Modal.Header>
         <Modal.Body>
-          {stationType === 'Desratización' && (
+          {stationType === 'Jardineria' && (
             <>
               <p><strong>Finalidad:</strong> {viewStationData.purpose || '-'}</p>
               {viewStationData.purpose === 'Consumo' && (
@@ -1940,7 +2460,109 @@ const handleDeleteFinding = () => {
               )}
             </>
           )}
-          {stationType === 'Desinsectación' && (
+          {stationType === 'Horizontal' && (
+            <>
+              <p><strong>Capturas:</strong> {viewStationData.captureQuantity || '-'}</p>
+            </>
+          )}
+          <p><strong>Estado Físico:</strong> {viewStationData.physicalState || '-'}</p>
+          {viewStationData.physicalState === 'Dañada' && (
+            <>
+              <p><strong>Lugar del Daño:</strong> {viewStationData.damageLocation || '-'}</p>
+              <p><strong>Requiere Cambio:</strong> {viewStationData.requiresChange || '-'}</p>
+              {viewStationData.requiresChange === 'Si' && (
+                <p><strong>Prioridad de Cambio:</strong> {viewStationData.changePriority || '-'}</p>
+              )}
+            </>
+          )}
+          <p><strong>Descripción:</strong> {viewStationData.description || '-'}</p>
+          <div className="mb-3">
+            {viewStationData.photo ? (
+              <img
+                src={viewStationData.photo}
+                alt="Foto"
+                style={{ width: '300px', objectFit: 'cover' }}
+              />
+            ) : (
+              <span>Sin Foto</span>
+            )}
+          </div>
+        </Modal.Body>
+        <Modal.Footer>
+          <button className="btn btn-secondary" onClick={() => setViewStationModalOpen(false)}>
+            Cerrar
+          </button>
+        </Modal.Footer>
+      </Modal>
+
+      <Modal show={viewStationModalOpen} onHide={() => setViewStationModalOpen(false)} size="lg">
+        <Modal.Header closeButton>
+          <Modal.Title>Detalles de la Estación</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          {stationType === 'Hogar' && (
+            <>
+              <p><strong>Finalidad:</strong> {viewStationData.purpose || '-'}</p>
+              {viewStationData.purpose === 'Consumo' && (
+                <p><strong>Cantidad Consumida:</strong> {viewStationData.consumptionAmount || '-'}</p>
+              )}
+              {viewStationData.purpose === 'Captura' && (
+                <p><strong>Cantidad Capturada:</strong> {viewStationData.captureQuantity || '-'}</p>
+              )}
+            </>
+          )}
+          {stationType === 'Horizontal' && (
+            <>
+              <p><strong>Capturas:</strong> {viewStationData.captureQuantity || '-'}</p>
+            </>
+          )}
+          <p><strong>Estado Físico:</strong> {viewStationData.physicalState || '-'}</p>
+          {viewStationData.physicalState === 'Dañada' && (
+            <>
+              <p><strong>Lugar del Daño:</strong> {viewStationData.damageLocation || '-'}</p>
+              <p><strong>Requiere Cambio:</strong> {viewStationData.requiresChange || '-'}</p>
+              {viewStationData.requiresChange === 'Si' && (
+                <p><strong>Prioridad de Cambio:</strong> {viewStationData.changePriority || '-'}</p>
+              )}
+            </>
+          )}
+          <p><strong>Descripción:</strong> {viewStationData.description || '-'}</p>
+          <div className="mb-3">
+            {viewStationData.photo ? (
+              <img
+                src={viewStationData.photo}
+                alt="Foto"
+                style={{ width: '300px', objectFit: 'cover' }}
+              />
+            ) : (
+              <span>Sin Foto</span>
+            )}
+          </div>
+        </Modal.Body>
+        <Modal.Footer>
+          <button className="btn btn-secondary" onClick={() => setViewStationModalOpen(false)}>
+            Cerrar
+          </button>
+        </Modal.Footer>
+      </Modal>
+
+      <Modal show={viewStationModalOpen} onHide={() => setViewStationModalOpen(false)} size="lg">
+        <Modal.Header closeButton>
+          <Modal.Title>Detalles de la Estación</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          {stationType === 'Empresarial' && (
+            <>
+              <p><strong>Finalidad:</strong> {viewStationData.purpose || '-'}</p>
+              {viewStationData.purpose === 'Consumo' && (
+                <p><strong>Cantidad Consumida:</strong> {viewStationData.consumptionAmount || '-'}</p>
+              )}
+              {viewStationData.purpose === 'Captura' && (
+                <p><strong>Cantidad Capturada:</strong> {viewStationData.captureQuantity || '-'}</p>
+              )}
+            </>
+          )}
+          {stationType === 'Horizontal' && (
             <>
               <p><strong>Capturas:</strong> {viewStationData.captureQuantity || '-'}</p>
             </>

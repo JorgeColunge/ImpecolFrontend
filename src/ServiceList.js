@@ -129,13 +129,12 @@
       }, 2500); // 2.5 segundos
     };
 
-    const serviceOptions = [
+    const [availableServiceOptions, setAvailableServiceOptions] = useState([
       "Empresarial",
       "Hogar",
       "Horizontal",
       "Jardineria",
-    ];
-    
+    ]);
 
     const [showInterventionAreas, setShowInterventionAreas] = useState(false);
 
@@ -219,21 +218,42 @@
 
   const handleServiceTypeChange = (e) => {
     const { value, checked } = e.target;
+  
     setNewService((prevService) => {
       const updatedServiceType = checked
         ? [...prevService.service_type, value]
         : prevService.service_type.filter((type) => type !== value);
-
-      // Calcula las áreas válidas para los tipos seleccionados
+  
+      // Actualiza las opciones disponibles según las selecciones realizadas
+      const updateAvailableOptions = (selected) => {
+        let newOptions = ["Empresarial", "Hogar", "Horizontal", "Jardineria"];
+  
+        if (selected.includes("Empresarial")) {
+          newOptions = newOptions.filter((opt) => opt !== "Horizontal" && opt !== "Hogar");
+        }
+        if (selected.includes("Horizontal")) {
+          newOptions = newOptions.filter((opt) => opt !== "Empresarial" && opt !== "Hogar");
+        }
+        if (selected.includes("Hogar")) {
+          newOptions = newOptions.filter((opt) => opt !== "Empresarial" && opt !== "Horizontal");
+        }
+  
+        return newOptions;
+      };
+  
+      // Actualiza las áreas válidas para los tipos seleccionados
       const validAreas = updatedServiceType
         .flatMap((type) => serviceAreaMapping[type] || [])
         .filter((area, index, self) => self.indexOf(area) === index);
-
+  
       // Limpia las áreas de intervención no válidas
       const updatedInterventionAreas = prevService.intervention_areas.filter((area) =>
         validAreas.includes(area)
       );
-
+  
+      // Actualiza las opciones disponibles en el estado
+      setAvailableServiceOptions(updateAvailableOptions(updatedServiceType));
+  
       return {
         ...prevService,
         service_type: updatedServiceType,
@@ -241,7 +261,7 @@
       };
     });
   };
-
+  
     const handleSaveChanges = async () => {
       try {
         // Convierte los campos al formato requerido por la base de datos
@@ -836,17 +856,18 @@
   <Form.Group className="mt-3">
     <Form.Label style={{ fontWeight: "bold" }}>Tipo de Servicio</Form.Label>
     <div className="d-flex flex-wrap">
-      {serviceOptions.map((option, index) => (
-        <div key={index} className="col-4 mb-2">
-          <Form.Check
-            type="checkbox"
-            label={<span style={{ fontSize: "0.8rem" }}>{option}</span>}
-            value={option}
-            checked={newService.service_type.includes(option)}
-            onChange={(e) => handleServiceTypeChange(e)}
-          />
-        </div>
-      ))}
+    {availableServiceOptions.map((option, index) => (
+  <div key={index} className="col-4 mb-2">
+    <Form.Check
+      type="checkbox"
+      label={<span style={{ fontSize: "0.8rem" }}>{option}</span>}
+      value={option}
+      checked={newService.service_type.includes(option)}
+      onChange={(e) => handleServiceTypeChange(e)}
+    />
+  </div>
+))}
+
     </div>
   </Form.Group>
 
@@ -1009,7 +1030,7 @@
                 <Form.Group className="mt-3">
                   <Form.Label style={{ fontWeight: "bold" }}>Tipo de Servicio</Form.Label>
                   <div className="d-flex flex-wrap">
-                    {serviceOptions.map((option, index) => (
+                    {availableServiceOptions.map((option, index) => (
                       <div key={index} className="col-4 mb-2">
                         <Form.Check
                           type="checkbox"
