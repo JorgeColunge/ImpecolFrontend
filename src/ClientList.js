@@ -985,21 +985,7 @@ const handleSaveNewStation = async () => {
   />
 </Form.Group>
 
-      <Form.Group controlId="formStationType" className="mb-3">
-        <Form.Label>Tipo</Form.Label>
-        <Form.Select
-          name="type"
-          value={newStation.type}
-          onChange={(e) =>
-            setNewStation({ ...newStation, type: e.target.value })
-          }
-        >
-          <option value="Control">Control</option>
-          <option value="Localización">Localización</option>
-          <option value="Jardineria">Jardineria</option>
-        </Form.Select>
-      </Form.Group>
-      <Form.Group controlId="formStationCategory" className="mb-3">
+<Form.Group controlId="formStationCategory" className="mb-3">
   <Form.Label>Categoría</Form.Label>
   <Form.Select
     name="category"
@@ -1014,7 +1000,40 @@ const handleSaveNewStation = async () => {
     <option value="Horizontal">Horizontal</option>
     <option value="Jardineria">Jardineria</option>
   </Form.Select>
+
 </Form.Group>
+
+<Form.Group controlId="formStationType" className="mb-3">
+  <Form.Label>Tipo</Form.Label>
+  <Form.Select
+    name="type"
+    value={newStation.type}
+    onChange={(e) =>
+      setNewStation({ ...newStation, type: e.target.value })
+    }
+  >
+    {newStation.category === "Jardineria" ? (
+      <>
+        <option value="Jardineria">Jardineria</option>
+        <option value="Localización">Localización</option>
+      </>
+    ) : newStation.category === "Hogar" ||
+      newStation.category === "Empresarial" ||
+      newStation.category === "Horizontal" ? (
+      <>
+        <option value="Control">Control</option>
+        <option value="Localización">Localización</option>
+      </>
+    ) : (
+      <>
+        <option value="Control">Control</option>
+        <option value="Localización">Localización</option>
+        <option value="Jardineria">Jardineria</option>
+      </>
+    )}
+  </Form.Select>
+</Form.Group>
+
     </Form>
   </Modal.Body>
   <Modal.Footer>
