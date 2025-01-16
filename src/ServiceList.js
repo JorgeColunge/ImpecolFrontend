@@ -189,7 +189,7 @@ function ServiceList() {
 
   const fetchInspections = async (serviceId) => {
     try {
-      const response = await axios.get(`http://localhost:10000/api/inspections?service_id=${serviceId}`);
+      const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/inspections?service_id=${serviceId}`);
       const formattedInspections = response.data
         .filter((inspection) => inspection.service_id === serviceId) // Filtra por `service_id`
         .map((inspection) => ({
@@ -398,7 +398,7 @@ const handleServiceTypeChange = (e) => {
   
       // Enviar la solicitud al servidor
       const response = await axios.put(
-        `http://localhost:10000/api/services/${editService.id}`,
+        `${process.env.REACT_APP_API_URL}/api/services/${editService.id}`,
         formattedEditService
       );
   
@@ -420,7 +420,7 @@ const handleServiceTypeChange = (e) => {
   
   const handleDeleteClick = async (serviceId) => {
     try {
-      const response = await axios.delete(`http://localhost:10000/api/services/${serviceId}`);
+      const response = await axios.delete(`${process.env.REACT_APP_API_URL}/api/services/${serviceId}`);
       if (response.data.success) {
         setServices(services.filter(service => service.id !== serviceId));
       }
@@ -431,7 +431,7 @@ const handleServiceTypeChange = (e) => {
 
   const fetchTechnicians = async () => {
     try {
-      const response = await axios.get('http://localhost:10000/api/users?role=Technician');
+      const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/users?role=Technician`);
       setTechnicians(response.data);
     } catch (error) {
       console.error("Error fetching technicians:", error);
@@ -441,9 +441,9 @@ const handleServiceTypeChange = (e) => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const servicesResponse = await axios.get('http://localhost:10000/api/services');
-        const clientsResponse = await axios.get('http://localhost:10000/api/clients');
-        const techniciansResponse = await axios.get('http://localhost:10000/api/users?role=Technician');
+        const servicesResponse = await axios.get(`${process.env.REACT_APP_API_URL}/api/services`);
+        const clientsResponse = await axios.get(`${process.env.REACT_APP_API_URL}/api/clients`);
+        const techniciansResponse = await axios.get(`${process.env.REACT_APP_API_URL}/api/users?role=Technician`);
 
         setServices(servicesResponse.data);
         setClients(clientsResponse.data);
@@ -461,8 +461,8 @@ const handleServiceTypeChange = (e) => {
   useEffect(() => {
     const fetchServicesAndClients = async () => {
       try {
-        const servicesResponse = await axios.get('http://localhost:10000/api/services');
-        const clientsResponse = await axios.get('http://localhost:10000/api/clients');
+        const servicesResponse = await axios.get(`${process.env.REACT_APP_API_URL}/api/services`);
+        const clientsResponse = await axios.get(`${process.env.REACT_APP_API_URL}/api/clients`);
         
         const clientData = {};
         clientsResponse.data.forEach(client => {
@@ -480,7 +480,7 @@ const handleServiceTypeChange = (e) => {
   
     const fetchTechnicians = async () => {
       try {
-        const response = await axios.get('http://localhost:10000/api/users?role=Technician');
+        const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/users?role=Technician`);
         setTechnicians(response.data);
       } catch (error) {
         console.error("Error fetching technicians:", error);
@@ -645,7 +645,7 @@ const handleServiceTypeChange = (e) => {
     };
 
     try {
-        const response = await axios.post("http://localhost:10000/api/inspections", inspectionData);
+        const response = await axios.post(`${process.env.REACT_APP_API_URL}/api/inspections`, inspectionData);
 
         if (response.data.success) {
         showNotification("Error","Inspección guardada con éxito");
@@ -706,7 +706,7 @@ const filteredTechniciansForCompanion = technicians.filter(
     };
   
     try {
-      const response = await axios.post('http://localhost:10000/api/services', serviceData);
+      const response = await axios.post(`${process.env.REACT_APP_API_URL}/api/services`, serviceData);
       if (response.data.success) {
         setServices([...services, response.data.service]);
         handleCloseAddServiceModal();
