@@ -58,10 +58,14 @@ function Inspection() {
   const { setHasUnsavedChanges, setUnsavedRoute } = useUnsavedChanges();
   const [notification, setNotification] = useState({ show: false, message: '' });
   const [confirmDelete, setConfirmDelete] = useState({ show: false, type: null, index: null });
-  const [searchTermJardineria, setSearchTermJardineria] = useState('');
-  const [searchTermHogar, setSearchTermHogar] = useState('');
-  const [searchTermEmpresarial, setSearchTermEmpresarial] = useState('');
-  const [searchTermHorizontal, setSearchTermHorizontal] = useState('');
+  const [SearchTermJardineriaLocal, setSearchTermJardineriaLocal] = useState('');
+  const [SearchTermJardineriaJardineria, setSearchTermJardineriaJardineria] = useState('');
+  const [SearchTermHogarLocal, setSearchTermHogarLocal] = useState('');
+  const [SearchTermHogarControl, setSearchTermHogarControl] = useState('');
+  const [SearchTermEmpresarialControl, setSearchTermEmpresarialControl] = useState('');
+  const [SearchTermEmpresarialLocal, setSearchTermEmpresarialLocal] = useState('');
+  const [searchTermHorizontalControl, setSearchTermHorizontalControl] = useState('');
+  const [searchTermHorizontalLocal, setSearchTermHorizontalLocal] = useState('');
   const [qrScannerOpen, setQrScannerOpen] = useState(false);
   const [currentQrStationType, setCurrentQrStationType] = useState(null);
 
@@ -292,16 +296,28 @@ function Inspection() {
     const normalizedValue = scannedValue.toLowerCase();
   
     if (currentQrStationType === "Jardineria") {
-      setSearchTermJardineria(normalizedValue);
+      setSearchTermJardineriaLocal(normalizedValue);
       console.log("Estado de búsqueda actualizado (Jardineria):", normalizedValue);
-    } else if (currentQrStationType === "Horizontal") {
-      setSearchTermHorizontal(normalizedValue);
+    } else if (currentQrStationType === "Jardineria") {
+      setSearchTermJardineriaJardineria(normalizedValue);
       console.log("Estado de búsqueda actualizado (Horizontal):", normalizedValue);
-    } else if (currentQrStationType === "Empresarial") {
-      setSearchTermEmpresarial(normalizedValue);
+    } else if (currentQrStationType === "Horizontal") {
+      setSearchTermHorizontalControl(normalizedValue);
+      console.log("Estado de búsqueda actualizado (Horizontal):", normalizedValue);
+    }  else if (currentQrStationType === "Horizontal") {
+      setSearchTermHorizontalLocal(normalizedValue);
+      console.log("Estado de búsqueda actualizado (Horizontal):", normalizedValue);
+    }else if (currentQrStationType === "Empresarial") {
+      setSearchTermEmpresarialControl(normalizedValue);
+      console.log("Estado de búsqueda actualizado (Empresarial):", normalizedValue);
+    }else if (currentQrStationType === "Empresarial") {
+      setSearchTermEmpresarialLocal(normalizedValue);
       console.log("Estado de búsqueda actualizado (Empresarial):", normalizedValue);
     } else if (currentQrStationType === "Hogar") {
-      setSearchTermHogar(normalizedValue);
+      setSearchTermHogarLocal(normalizedValue);
+      console.log("Estado de búsqueda actualizado (Hogar):", normalizedValue);
+    }else if (currentQrStationType === "Hogar") {
+      setSearchTermHogarControl(normalizedValue);
       console.log("Estado de búsqueda actualizado (Hogar):", normalizedValue);
     }
   
@@ -978,8 +994,8 @@ const handleDeleteFinding = () => {
                     type="text"
                     className="form-control me-2"
                     placeholder="Buscar estación por descripción"
-                    value={searchTermJardineria}
-                    onChange={(e) => setSearchTermJardineria(e.target.value)}
+                    value={SearchTermJardineriaLocal}
+                    onChange={(e) => setSearchTermJardineriaLocal(e.target.value)}
                   />
                 </div>
                 <QrCodeScan
@@ -996,6 +1012,11 @@ const handleDeleteFinding = () => {
                         if (station.category !== "Jardineria") {
                           return false;
                         }
+
+                                                                         // Validar que el tipo sea "Localización"
+                                                                         if (station.type !== "Localización") {
+                                                                          return false;
+                                                                         }
 
                         // Normalizamos el término de búsqueda
                         const search = searchTermJardineria.trim().toLowerCase();
@@ -1247,8 +1268,8 @@ const handleDeleteFinding = () => {
                     type="text"
                     className="form-control me-2"
                     placeholder="Buscar estación por descripción"
-                    value={searchTermHogar}
-                    onChange={(e) => setSearchTermHogar(e.target.value)}
+                    value={SearchTermHogarLocal}
+                    onChange={(e) => setSearchTermHogarLocal(e.target.value)}
                   />
                 </div>
                 <QrCodeScan
@@ -1265,6 +1286,11 @@ const handleDeleteFinding = () => {
                         if (station.category !== "Hogar") {
                           return false;
                         }
+
+                                                 // Validar que el tipo sea "Localización"
+                                                 if (station.type !== "Localización") {
+                                                  return false;
+                                                 }
 
                         // Normalizamos el término de búsqueda
                         const search = searchTermHogar.trim().toLowerCase();
@@ -1533,7 +1559,7 @@ const handleDeleteFinding = () => {
                         // Validar primero que la categoría sea "Empresarial"
                         if (station.category !== "Empresarial") {
                           return false;
-                        }
+                         }
 
                         // Normalizamos el término de búsqueda
                         const search = searchTermEmpresarial.trim().toLowerCase();
@@ -1786,8 +1812,8 @@ const handleDeleteFinding = () => {
                     type="text"
                     className="form-control me-2"
                     placeholder="Buscar estación por descripción"
-                    value={searchTermHorizontal}
-                    onChange={(e) => setSearchTermHorizontal(e.target.value)}
+                    value={searchTermHorizontalLocal}
+                    onChange={(e) => setSearchTermHorizontalLocal(e.target.value)}
                   />
                 </div>
                 <QrCodeScan
@@ -1803,6 +1829,11 @@ const handleDeleteFinding = () => {
                         // Validar primero que la categoría sea "Horizontal"
                         if (station.category !== "Horizontal") {
                           return false;
+                        }
+
+                        // Validar que el tipo sea "Localización"
+                          if (station.type !== "Localización") {
+                         return false;
                         }
 
                         // Normalizamos el término de búsqueda

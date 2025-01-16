@@ -17,26 +17,19 @@ function ProductList() {
   const [newProduct, setNewProduct] = useState({
     name: '',
     description_type: '',
-    dose: '',
-    residual_duration: '',
     safety_data_sheet: '',
     technical_sheet: '',
     health_registration: '',
     emergency_card: '',
     category: [] // Inicializa la categoría como un arreglo vacío
-  });  
+  });
+   
 
   const categoryOptions = [
-    "Desinsectación",
-    "Desratización",
-    "Desinfección",
-    "Roceria",
-    "Limpieza y aseo de archivos",
-    "Lavado shut basura",
-    "Encarpado",
-    "Lavado de tanque",
-    "Inspección",
-    "Diagnostico"
+    "Hogar",
+    "Empresarial",
+    "Jardinería",
+    "Horizontal"
   ];
 
   const [expandedCardId, setExpandedCardId] = useState(null);
@@ -235,8 +228,6 @@ function ProductList() {
       const formData = new FormData();
       formData.append('name', newProduct.name);
       formData.append('description_type', newProduct.description_type);
-      formData.append('dose', newProduct.dose);
-      formData.append('residual_duration', newProduct.residual_duration);
       formData.append(
         'category',
         JSON.stringify(Array.isArray(newProduct.category) ? newProduct.category : [])
@@ -269,16 +260,12 @@ function ProductList() {
           prevProducts.map((product) =>
             product.id === editingProduct.id
               ? {
-                  ...response.data.product, // Accede directamente al producto dentro de la respuesta
-                  category: Array.isArray(response.data.product.category)
-                    ? response.data.product.category
-                    : typeof response.data.product.category === 'string'
-                    ? JSON.parse(response.data.product.category) // Convierte la cadena JSON a un arreglo
-                    : [],
+                  ...response.data.product
                 }
               : product
           )
         );
+        
       } else {
         const newProduct = {
           ...response.data.product, // Usamos el producto directamente
@@ -371,18 +358,6 @@ function ProductList() {
               : "Sin categoría"}
           </span>
         </div>
-        <div className="mt-2">
-          <BsDropletHalf className="text-info me-2" />
-          <span>
-            <strong>Dosis:</strong> {product.dose || "No especificada"}
-          </span>
-        </div>
-        <div className="mt-2">
-          <BsClockHistory className="text-success me-2" />
-          <span>
-            <strong>Duración Residual:</strong> {product.residual_duration || "No especificada"}
-          </span>
-        </div>
       </Card.Body>
       <Card.Footer
         className="text-center position-relative"
@@ -457,14 +432,6 @@ function ProductList() {
   </div>
 </Form.Group>
 
-            <Form.Group controlId="formDose" className="mb-3">
-              <Form.Label>Dosis</Form.Label>
-              <Form.Control type="text" name="dose" value={newProduct.dose} onChange={handleInputChange} />
-            </Form.Group>
-            <Form.Group controlId="formResidualDuration" className="mb-3">
-              <Form.Label>Duración Residual</Form.Label>
-              <Form.Control type="text" name="residual_duration" value={newProduct.residual_duration} onChange={handleInputChange} />
-            </Form.Group>
             <Form.Group controlId="formSafetyDataSheet" className="mb-3 d-flex align-items-center flex-column">
   <div className="d-flex w-100 align-items-center">
     <Form.Label className="me-2">Hoja de Datos de Seguridad</Form.Label>
@@ -649,22 +616,6 @@ function ProductList() {
           {Array.isArray(selectedProduct.category) && selectedProduct.category.length > 0
   ? selectedProduct.category.join(", ")
   : "Sin categoría"}
-        </p>
-
-        <p>
-          <strong>
-            <BsDropletHalf className="text-info me-2" />
-            Dosis:
-          </strong>{" "}
-          {selectedProduct.dose}
-        </p>
-
-        <p>
-          <strong>
-            <BsClockHistory className="text-success me-2" />
-            Duración Residual:
-          </strong>{" "}
-          {selectedProduct.residual_duration}
         </p>
 
         <div className="d-flex justify-content-between align-items-center">
