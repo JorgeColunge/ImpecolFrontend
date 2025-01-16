@@ -21,7 +21,7 @@ export const saveRequest = async (request) => {
 
     const completeUrl = request.url.startsWith('http')
       ? request.url
-      : `http://localhost:10000/api${request.url}`;
+      : `${process.env.REACT_APP_API_URL}/api${request.url}`;
 
     let serializableBody;
     if (request.body instanceof FormData) {

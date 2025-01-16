@@ -36,7 +36,7 @@ export const saveUsers = async (users, initialSync) => {
       users.map(async (user) => {
         if (user.image) {
           try {
-            const response = await fetch(`http://localhost:10000${user.image}`);
+            const response = await fetch(`${process.env.REACT_APP_API_URL}${user.image}`);
             if (response.ok) {
               const blob = await response.blob();
               user.imageBlob = blob; // Almacena el blob en el objeto del usuario

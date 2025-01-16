@@ -12,7 +12,7 @@ function ShowProfile() {
   useEffect(() => {
     const fetchUser = async () => {
       try {
-        const response = await axios.get(`http://localhost:10000/api/users/${id}`);
+        const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/users/${id}`);
         setUser(response.data);
       } catch (error) {
         console.error("Error al obtener el perfil del usuario:", error);

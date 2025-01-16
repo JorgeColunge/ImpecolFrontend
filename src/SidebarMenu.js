@@ -15,7 +15,8 @@ function SidebarMenu({ onLogout, userInfo, isSidebarVisible, onToggle }) {
     setShowUnsavedModal,
   } = useUnsavedChanges();
 
-  const [user, setUser] = useState(null); // Estado para manejar los datos del usuario
+  const [user, setUser] = useState(null);
+  const [client, setClient] = useState(null);
 
   const handleLogout = () => {
     onLogout();
@@ -32,17 +33,40 @@ function SidebarMenu({ onLogout, userInfo, isSidebarVisible, onToggle }) {
   useEffect(() => {
     if (!userInfo?.id_usuario) return;
   
-    const fetchUser = async () => {
+    const fetchUserOrClient = async () => {
       try {
-        const response = await axios.get(`http://localhost:10000/api/users/${userInfo.id_usuario}`);
-        setUser(response.data); // Actualiza el estado del usuario
+        console.log("Iniciando fetchUserOrClient para userInfo:", userInfo);
+    
+        // Intenta obtener la información del usuario
+        console.log("Intentando obtener información del usuario desde /api/users...");
+        const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/users/${userInfo.id_usuario}`);
+        
+        if (response.data && Object.keys(response.data).length > 0) {
+          console.log("Usuario encontrado en /api/users:", response.data);
+          setUser(response.data);
+        }
       } catch (error) {
-        console.error("Error al obtener los datos del usuario:", error);
+        if (error.response && error.response.status === 404) {
+          // Si el error es un 404, intenta consultar en /api/clients
+          console.log("Usuario no encontrado en /api/users. Intentando buscar en /api/clients...");
+          try {
+            const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/clients/${userInfo.id_usuario}`);
+            console.log("Cliente encontrado en /api/clients:", response.data);
+            setClient(response.data);
+          } catch (clientError) {
+            console.error("Error al obtener datos del cliente:", clientError);
+          }
+        } else {
+          // Otros errores que no sean 404
+          console.error("Error al obtener los datos del usuario o cliente:", error);
+        }
       }
     };
-  
-    fetchUser();
+    
+    fetchUserOrClient();       
   }, [userInfo?.id_usuario, userInfo]);  
+
+  const [activePath, setActivePath] = useState(""); // Estado para la ruta activa
 
   const handleNavigation = (path) => {
     if (hasUnsavedChanges) {
@@ -50,11 +74,12 @@ function SidebarMenu({ onLogout, userInfo, isSidebarVisible, onToggle }) {
       setShowUnsavedModal(true); // Muestra el modal
       return;
     }
+    setActivePath(path); // Actualiza la ruta activa
     navigate(path); // Navega directamente si no hay cambios pendientes
     if (isOpen) {
       toggleMenu(); // Colapsa la barra si está abierta
     }
-  };
+  };  
 
   const toggleMenu = () => {
     setIsOpen(!isOpen);
@@ -70,6 +95,12 @@ function SidebarMenu({ onLogout, userInfo, isSidebarVisible, onToggle }) {
       icon: <Person size={20} />,
       path: "/profile",
       roles: ["Técnico", "Comercial", "Supervisor Técnico", "Administrador", "Superadministrador"],
+    },
+    {
+      label: "Perfil",
+      icon: <Person size={20} />,
+      path: "/client-profile",
+      roles: ["Cliente"],
     },
     {
       label: "Usuarios",
@@ -96,10 +127,22 @@ function SidebarMenu({ onLogout, userInfo, isSidebarVisible, onToggle }) {
       roles: ["Técnico", "Supervisor Técnico", "Administrador", "Superadministrador"],
     },
     {
+      label: "Agenda",
+      icon: <CalendarEvent size={20} />,
+      path: "/client-calendar",
+      roles: ["Cliente"],
+    },
+    {
       label: "Servicios",
       icon: <ClipboardCheck size={20} />,
       path: "/services",
       roles: ["Comercial", "Supervisor Técnico", "Administrador", "Superadministrador"],
+    },
+    {
+      label: "Servicios",
+      icon: <ClipboardCheck size={20} />,
+      path: "/myservicesclient",
+      roles: ["Cliente"],
     },
     {
       label: "Mis Servicios",
@@ -141,7 +184,7 @@ function SidebarMenu({ onLogout, userInfo, isSidebarVisible, onToggle }) {
       label: "Cerrar Sesión",
       icon: <BoxArrowRight size={20} />,
       action: handleLogout,
-      roles: ["Técnico", "Comercial", "Supervisor Técnico", "Administrador", "Superadministrador"],
+      roles: ["Técnico", "Cliente", "Comercial", "Supervisor Técnico", "Administrador", "Superadministrador"],
     },
   ];
 
@@ -157,7 +200,7 @@ function SidebarMenu({ onLogout, userInfo, isSidebarVisible, onToggle }) {
       <div className="logo-container">
         <div className="logo-mask">
           <img
-            src={`${user?.image || "/images/default-profile.png"}`}
+            src={`${client?.photo || user?.image || "/images/default-profile.png"}`}
             alt="Profile"
             className="logo"
           />
@@ -170,25 +213,28 @@ function SidebarMenu({ onLogout, userInfo, isSidebarVisible, onToggle }) {
         )}
       </div>
       {menuItems
-        .filter((item) => item.roles.includes(user?.rol))
-        .map((item, index) => (
-          <div key={index} className="nav-item">
-            {item.action ? (
-              <button className="nav-link btn btn-link" onClick={item.action}>
-                {item.icon}
-                {isOpen && <span>{item.label}</span>}
-              </button>
-            ) : (
-              <button
-                className="nav-link btn btn-link"
-                onClick={() => handleNavigation(item.path)}
-              >
-                {item.icon}
-                {isOpen && <span>{item.label}</span>}
-              </button>
-            )}
-          </div>
-        ))}
+  .filter((item) => item.roles.includes(user?.rol))
+  .map((item, index) => (
+    <div
+      key={index}
+      className={`nav-item ${activePath === item.path ? "active" : ""}`} // Añade la clase "active"
+    >
+      {item.action ? (
+        <button className="nav-link btn btn-link" onClick={item.action}>
+          {item.icon}
+          {isOpen && <span>{item.label}</span>}
+        </button>
+      ) : (
+        <button
+          className="nav-link btn btn-link"
+          onClick={() => handleNavigation(item.path)}
+        >
+          {item.icon}
+          {isOpen && <span>{item.label}</span>}
+        </button>
+      )}
+    </div>
+  ))}
     </div>
   );
 }

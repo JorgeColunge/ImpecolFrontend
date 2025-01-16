@@ -133,7 +133,7 @@ function Billing() {
 
   const fetchBilledServices = async () => {
     try {
-      const response = await axios.get('http://localhost:10000/api/billing');
+      const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/billing`);
       const billingData = response.data;
   
       console.log("Datos recibidos de facturación:", billingData);
@@ -160,7 +160,7 @@ function Billing() {
 
   const fetchTechnicians = async () => {
     try {
-      const response = await axios.get('http://localhost:10000/api/users?role=Technician');
+      const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/users?role=Technician`);
       setTechnicians(response.data);
     } catch (error) {
       console.error("Error fetching technicians:", error);
@@ -169,7 +169,7 @@ function Billing() {
 
   const fetchInspections = async (serviceId) => {
     try {
-      const response = await axios.get(`http://localhost:10000/api/inspections?service_id=${serviceId}`);
+      const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/inspections?service_id=${serviceId}`);
       const formattedInspections = response.data
         .filter((inspection) => inspection.service_id === serviceId) // Filtra por `service_id`
         .map((inspection) => ({
@@ -363,7 +363,7 @@ function Billing() {
   
     try {
       // Enviar la facturación al backend
-      const response = await axios.post('http://localhost:10000/api/billing', formData, {
+      const response = await axios.post(`${process.env.REACT_APP_API_URL}/api/billing`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
   
@@ -486,9 +486,9 @@ const interventionAreaOptions = [
         setLoading(true);
         try {
             const [servicesResponse, clientsResponse, techniciansResponse] = await Promise.all([
-                axios.get('http://localhost:10000/api/services'),
-                axios.get('http://localhost:10000/api/clients'),
-                axios.get('http://localhost:10000/api/users?role=Technician'),
+                axios.get(`${process.env.REACT_APP_API_URL}/api/services`),
+                axios.get(`${process.env.REACT_APP_API_URL}/api/clients`),
+                axios.get(`${process.env.REACT_APP_API_URL}/api/users?role=Technician`),
             ]);
     
             setServices(servicesResponse.data);
@@ -537,9 +537,9 @@ const interventionAreaOptions = [
   useEffect(() => {
     const fetchServicesAndClients = async () => {
         try {
-          const servicesResponse = await axios.get('http://localhost:10000/api/services');
-          const clientsResponse = await axios.get('http://localhost:10000/api/clients');
-          const scheduleResponse = await axios.get('http://localhost:10000/api/service-schedule');
+          const servicesResponse = await axios.get(`${process.env.REACT_APP_API_URL}/api/services`);
+          const clientsResponse = await axios.get(`${process.env.REACT_APP_API_URL}/api/clients`);
+          const scheduleResponse = await axios.get(`${process.env.REACT_APP_API_URL}/api/service-schedule`);
           
           const clientData = {};
           clientsResponse.data.forEach(client => {
@@ -560,7 +560,7 @@ const interventionAreaOptions = [
   
     const fetchTechnicians = async () => {
       try {
-        const response = await axios.get('http://localhost:10000/api/users?role=Technician');
+        const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/users?role=Technician`);
         setTechnicians(response.data);
       } catch (error) {
         console.error("Error fetching technicians:", error);

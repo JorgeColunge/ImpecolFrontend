@@ -29,7 +29,7 @@ function CompanyStations() {
     const fetchStations = async () => {
       try {
         console.log(`Fetching stations for client ID: ${client_id}`);
-        const response = await axios.get(`http://localhost:10000/api/stations/client/${client_id}`);
+        const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/stations/client/${client_id}`);
         console.log('Stations fetched successfully:', response.data);
         setStations(response.data);
         setLoading(false);
@@ -71,7 +71,7 @@ function CompanyStations() {
       const stationData = { ...newStation, client_id };
       console.log('Station data being sent to the server:', stationData);
 
-      const response = await axios.post('http://localhost:10000/api/stations', stationData);
+      const response = await axios.post(`${process.env.REACT_APP_API_URL}/api/stations`, stationData);
 
       if (response.data.success) {
         console.log('Station created successfully:', response.data.station);

@@ -21,7 +21,7 @@ function EditMyProfile({ userInfo, onProfileUpdate }) {
   useEffect(() => {
     const fetchUserInfo = async () => {
       try {
-        const response = await axios.get(`http://localhost:10000/api/users/${id}`);
+        const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/users/${id}`);
         const userData = response.data;
         setName(userData.name);
         setLastname(userData.lastname);
@@ -65,7 +65,7 @@ function EditMyProfile({ userInfo, onProfileUpdate }) {
     }
 
     try {
-      const response = await axios.post('http://localhost:10000/api/updateProfile', formData);
+      const response = await axios.post(`${process.env.REACT_APP_API_URL}/api/updateProfile`, formData);
       if (response.status === 200) {
         const updatedUserInfo = {
           ...userInfo,

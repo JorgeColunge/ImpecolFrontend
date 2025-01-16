@@ -17,7 +17,7 @@ function TopBar({ userName, onSync, notifications, setNotifications, isSidebarOp
 const handleNotificationClick = async (notificationId, route) => {
   try {
     // Actualiza el estado de la notificación a "read" en el backend
-    await axios.put(`http://localhost:10000/api/notifications/${notificationId}/read`, {
+    await axios.put(`${process.env.REACT_APP_API_URL}/api/notifications/${notificationId}/read`, {
     });
     
     // Actualiza el estado local para marcar la notificación como "read"
@@ -41,6 +41,12 @@ const handleNotificationClick = async (notificationId, route) => {
 
     const handleNewNotification = (data) => {
       console.log('Nueva notificación recibida:', data);
+
+      // Verificar que la notificación tenga los datos esperados
+      if (!data || !data.notification || !data.notification.id) {
+        console.error('Notificación recibida con datos inválidos:', data);
+        return;
+      }
 
       // Normalizar la notificación
       const normalizedNotification = {
@@ -165,17 +171,23 @@ const handleNotificationClick = async (notificationId, route) => {
                   notification.state === 'pending' || notification.state === 'send'
               ) // Mostrar solo notificaciones con estado pending o send
               .map((notification, index) => (
-                <Dropdown.Item
-                  key={index}
-                  className={`notification-item ${notification.state === 'send' ? '' : 'font-weight-bold'}`}
-                  onClick={() => handleNotificationClick(notification.id, notification.route)}
-                >
-                  <div className="notification-text">
-                    {typeof notification.notification === 'string'
-                      ? notification.notification
-                      : JSON.stringify(notification.notification.message || 'Notificación sin mensaje')}
-                  </div>
-                </Dropdown.Item>
+<Dropdown.Item
+  key={index}
+  className={`notification-item ${notification.state === 'send' ? '' : 'font-weight-bold'}`}
+  onClick={() => {
+    if (!notification.id) {
+      console.error('Notificación sin ID al hacer clic:', notification);
+      return;
+    }
+    handleNotificationClick(notification.id, notification.route);
+  }}
+>
+  <div className="notification-text">
+    {typeof notification.notification === 'string'
+      ? notification.notification
+      : JSON.stringify(notification.notification.message || 'Notificación sin mensaje')}
+  </div>
+</Dropdown.Item>
               ))}
             {unreadCount === 0 && (
               <Dropdown.Item className="text-muted">No hay notificaciones</Dropdown.Item>

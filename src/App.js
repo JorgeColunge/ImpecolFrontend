@@ -6,21 +6,28 @@ import Register from './Register';
 import UserProfile from './UserProfile';
 import EditProfile from './EditProfile';
 import EditMyProfile from './EditMyProfile';
+import EditMyProfileClient from './EditMyProfileClient';
 import SidebarMenu from './SidebarMenu';
 import TopBar from './TopBar'; // Importa el componente TopBar
 import axios from 'axios';
 import UserList from './UserList';
+import ClientProfile from './ClientProfile';
 import ClientList from './ClientList';
 import ProductList from './ProductList';
 import ShowProfile from './ShowProfile';
 import InspectionCalendar from './InspectionCalendar';
+import CalendarClient from './CalendarClient';
 import MyServicesCalendar from './myServicesCalendar';
 import Inspections from './Inspections';
 import ServiceList from './ServiceList';
 import Inspection from './Inspection';
 import MyServices from './MyServices';
+import MyServicesClient from './MyServicesClient';
 import Billing from './Billing';
 import Rules from './Rules'
+import DocumentUploader from './DocumentUploader';
+import DocumentAutomation from './DocumentAutomation';
+import WordEditor from './WordEditor';
 import CompanyStations from './CompanyStations';
 import UnsavedChangesModal from './UnsavedChangesModal';
 import { UnsavedChangesProvider } from './UnsavedChangesContext';
@@ -104,7 +111,7 @@ function App() {
   useEffect(() => {
     const fetchNotifications = async () => {
       try {
-        const response = await axios.get(`http://localhost:10000/api/notifications/${userId}`);
+        const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/notifications/${userId}`);
         setNotifications(response.data.notifications);
       } catch (error) {
         console.error("Error fetching notifications:", error);
@@ -186,19 +193,26 @@ function App() {
                 <Route path="/login" element={isLoggedIn ? <Navigate to="/profile" /> : <Login onLogin={handleLogin} />} />
                 <Route path="/register" element={isLoggedIn ? <Navigate to="/profile" /> : <Register />} />
                 <Route path="/profile" element={<UserProfile userInfo={userInfo} />} />
+                <Route path="/client-profile" element={isAuthorized(["Cliente"])? <ClientProfile userInfo={userInfo}/> : <Navigate to="/login" />} />
                 <Route path="/edit-profile/:id" element={<EditProfile userInfo={userInfo} onProfileUpdate={handleProfileUpdate} />} />
                 <Route path="/edit-my-profile/:id" element={<EditMyProfile userInfo={userInfo} onProfileUpdate={handleProfileUpdate} />} />
+                <Route path="/edit-my-profile-client/:id" element={<EditMyProfileClient userInfo={userInfo} onProfileUpdate={handleProfileUpdate} />} />
                 <Route path="/users" element={isAuthorized(["Administrador", "Superadministrador"]) ? <UserList /> : <Navigate to="/login" />} />
                 <Route path="/clients" element={isAuthorized(["Comercial", "Supervisor Técnico", "Administrador", "Superadministrador"]) ? <ClientList /> : <Navigate to="/login" />} />
                 <Route path="/products" element={isAuthorized(["Supervisor Técnico", "Administrador", "Superadministrador"]) ? <ProductList /> : <Navigate to="/login" />} />
                 <Route path="/billing" element={isAuthorized(["Administrador", "Superadministrador"]) ? <Billing /> : <Navigate to="/login" />} />
                 <Route path="/services" element={isAuthorized(["Comercial", "Supervisor Técnico", "Administrador", "Superadministrador"]) ? <ServiceList /> : <Navigate to="/login" />} />
                 <Route path="/services-calendar" element={isAuthorized(["Comercial", "Supervisor Técnico", "Administrador", "Superadministrador"]) ? <InspectionCalendar /> : <Navigate to="/login" />} />
+                <Route path="/client-calendar" element={isAuthorized(["Cliente"]) ? <CalendarClient /> : <Navigate to="/login" />} />
                 <Route path="/myservices-calendar" element={isAuthorized(["Técnico", "Supervisor Técnico", "Administrador", "Superadministrador"]) ? <MyServicesCalendar /> : <Navigate to="/login" />} />
                 <Route path="/inspections" element={isAuthorized(["Supervisor Técnico", "Administrador", "Superadministrador"]) ? <Inspections /> : <Navigate to="/login" />} />
-                <Route path="/inspection/:inspectionId" element={isAuthorized(["Supervisor Técnico", "Administrador", "Superadministrador"]) ? <Inspection /> : <Navigate to="/login" />} />
+                <Route path="/inspection/:inspectionId" element={isAuthorized(["Supervisor Técnico", "Administrador", "Superadministrador", "Técnico", "Cliente"]) ? <Inspection /> : <Navigate to="/login" />} />
                 <Route path="/show-profile/:id" element={<ShowProfile />} />
                 <Route path="/myservices" element={isAuthorized(["Técnico", "Supervisor Técnico", "Administrador", "Superadministrador"]) ? <MyServices /> : <Navigate to="/login" />} />
+                <Route path="/myservicesclient" element={isAuthorized(["Cliente"]) ? <MyServicesClient /> : <Navigate to="/login" />} />
+                <Route path="/upload-document" element={isAuthorized(["Técnico", "Supervisor Técnico", "Administrador", "Superadministrador"]) ? <DocumentUploader /> : <Navigate to="/login" />} />
+                <Route path="/document-automation" element={isAuthorized(["Técnico", "Supervisor Técnico", "Administrador", "Superadministrador"]) ? <DocumentAutomation /> : <Navigate to="/login" />} />
+                <Route path="/word-editor" element={isAuthorized(["Técnico", "Supervisor Técnico", "Administrador", "Superadministrador"]) ? <WordEditor /> : <Navigate to="/login" />} />
                 <Route path="/stations/client/:client_id" element={isAuthorized(["Supervisor Técnico", "Administrador", "Superadministrador"]) ? <CompanyStations /> : <Navigate to="/login" />} />
                 <Route path="/rules" element={isAuthorized(["Supervisor Técnico", "Administrador", "Superadministrador"]) ? <Rules /> : <Navigate to="/login" />} />
               </Routes>

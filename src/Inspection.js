@@ -6,12 +6,14 @@ import { saveRequest, isOffline } from './offlineHandler';
 import { initDB, initUsersDB, saveUsers, getUsers } from './indexedDBHandler';
 import SignatureCanvas from 'react-signature-canvas';
 import "./Inspection.css";
-import { ArrowDownSquare, ArrowUpSquare, Eye, PencilSquare, QrCodeScan, XCircle } from 'react-bootstrap-icons';
+import { ArrowDownSquare, ArrowUpSquare, Eye, FileEarmarkArrowDown, FileEarmarkExcel, FileEarmarkImage, FileEarmarkPdf, FileEarmarkWord, PencilSquare, QrCodeScan, XCircle } from 'react-bootstrap-icons';
 import  {useUnsavedChanges} from './UnsavedChangesContext'
 import QrScannerComponent from './QrScannerComponent';
 import moment from 'moment';
 
 function Inspection() {
+  const storedUserInfo = JSON.parse(localStorage.getItem("user_info"));
+  const userRol = storedUserInfo?.rol || '';
   const { inspectionId } = useParams();
   const [inspectionData, setInspectionData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -22,30 +24,18 @@ function Inspection() {
   const [stations, setStations] = useState([]); // Estado para estaciones
   const [clientStations, setClientStations] = useState({}); // Estado para hallazgos en estaciones
   const [stationModalOpen, setStationModalOpen] = useState(false);
+  const [documents, setDocuments] = useState([]);
   const [currentStationId, setCurrentStationId] = useState(null);
   const [stationFinding, setStationFinding] = useState({
-    purpose: 'Consumo', // Valor predeterminado
-    consumptionAmount: 'Nada', // Valor predeterminado
-    captureQuantity: '',
-    marked: 'Si', // Valor predeterminado
-    physicalState: 'Buena', // Valor predeterminado
-    damageLocation: '',
-    requiresChange: 'No', // Valor predeterminado
-    changePriority: 'No', // Valor predeterminado
     description: '', // Nuevo campo
     photo: null,
+    latitude: '', // Nuevo campo para localización
+    longitude: '', // Nuevo campo para localización
+    altitude: '', // Nuevo campo para localización
+    timestamp: '', // Hora de la captura
   });  
   const [stationModalOpenHorizontal, setStationModalOpenHorizontal] = useState(false);
   const [currentStationIdHorizontal, setCurrentStationIdHorizontal] = useState(null);
-  const [stationFindingHorizontal, setStationFindingHorizontal] = useState({
-    captureQuantity: '',
-    physicalState: 'Buena', // Default: Buena
-    damageLocation: '',
-    requiresChange: 'No', // Default: No
-    changePriority: 'No', // Default: No
-    description: '',
-    photo: null,
-  });
   const [collapseStates, setCollapseStates] = useState({});
   const [isMobile, setIsMobile] = useState(false);
   const [viewStationModalOpen, setViewStationModalOpen] = useState(false);
@@ -135,41 +125,86 @@ function Inspection() {
   };
 
   useEffect(() => {
+    const preSignUrl = async (url) => {
+      try {
+        console.log(`Intentando pre-firmar la URL: ${url}`); // Log de inicio
+        const response = await api.post('/PrefirmarArchivos', { url });
+        console.log(`URL pre-firmada con éxito: ${response.data.signedUrl}`); // Log de éxito
+        return response.data.signedUrl;
+      } catch (error) {
+        console.error(`Error al pre-firmar la URL: ${url}`, error); // Log de error
+        return null; // Retorna null si hay un error
+      }
+    };
+  
     const fetchInspectionData = async () => {
       try {
-        const response = await api.get(`http://localhost:10000/api/inspections/${inspectionId}`);
+        console.log('Iniciando la carga de datos de inspección...');
+        const response = await api.get(`${process.env.REACT_APP_API_URL}/api/inspections/${inspectionId}`);
+        console.log('Datos de inspección obtenidos:', response.data);
+  
         setInspectionData(response.data);
   
         // Cargar observaciones generales
         setGeneralObservations(response.data.observations || '');
   
-        // Inicializar findingsByType y productsByType
+        // Inicializar findingsByType
         const initialFindings = response.data.findings?.findingsByType || {};
-        const initialProducts = response.data.findings?.productsByType || {};
-  
-        Object.keys(initialFindings).forEach((type) => {
-          initialFindings[type] = initialFindings[type].map((finding) => ({
-            ...finding,
-            photo: finding.photo ? `http://localhost:10000${finding.photo}` : null,
-            photoRelative: finding.photo || null,
-            photoBlob: null,
-          }));
-        });
+        console.log('Hallazgos iniciales:', initialFindings);
+
+        for (const type of Object.keys(initialFindings)) {
+          console.log(`Procesando hallazgos para el tipo: ${type}`);
+          initialFindings[type] = await Promise.all(
+            initialFindings[type].map(async (finding) => {
+              console.log(`Procesando hallazgo con ID: ${finding.id}`);
+        
+              // Validación para verificar si existe una URL de foto
+              if (!finding.photo) {
+                console.warn(`El hallazgo con ID ${finding.id} no tiene foto asociada.`);
+                return {
+                  ...finding,
+                  photo: null,
+                  photoRelative: null,
+                  photoBlob: null,
+                };
+              }
+        
+              // Intentar pre-firmar la URL
+              let signedUrl = null;
+              try {
+                signedUrl = await preSignUrl(finding.photo);
+                console.log(`URL pre-firmada para hallazgo con ID ${finding.id}: ${signedUrl}`);
+              } catch (error) {
+                console.error(`Error al pre-firmar la URL para hallazgo con ID ${finding.id}:`, error);
+              }
+        
+              return {
+                ...finding,
+                photo: signedUrl, // Usar la URL pre-firmada
+                photoRelative: finding.photo || null,
+                photoBlob: null,
+              };
+            })
+          );
+        }        
   
         setFindingsByType(initialFindings);
+        console.log('findingsByType actualizado:', initialFindings);
+
+        const initialProducts = response.data.findings?.productsByType || {};
         setProductsByType(initialProducts);
   
-        // Cargar firmas si existen
+        // Cargar firmas si existen y prefirmar URLs
         const signatures = response.data.findings?.signatures || {};
         if (signatures.technician?.signature) {
-          const techSignatureUrl = `http://localhost:10000${signatures.technician.signature}`;
-          setTechSignaturePreview(techSignatureUrl);
+          const techSignedUrl = await preSignUrl(signatures.technician.signature);
+          setTechSignaturePreview(techSignedUrl || signatures.technician.signature);
         }
         if (signatures.client?.signature) {
-          const clientSignatureUrl = `http://localhost:10000${signatures.client.signature}`;
-          setClientSignaturePreview(clientSignatureUrl);
+          const clientSignedUrl = await preSignUrl(signatures.client.signature);
+          setClientSignaturePreview(clientSignedUrl || signatures.client.signature);
         }
-
+  
         // Cargar datos del cliente
         if (signatures.client) {
           setSignData({
@@ -179,44 +214,75 @@ function Inspection() {
           });
         }
   
-        // Cargar estaciones
-        const initialStationsFindings = response.data.findings?.stationsFindings || [];
-        const clientStationsData = {};
-        initialStationsFindings.forEach((finding) => {
+      // Estaciones
+      const initialStationsFindings = response.data.findings?.stationsFindings || [];
+      console.log('Datos iniciales de hallazgos en estaciones:', initialStationsFindings);
+
+      // Procesar hallazgos de estaciones
+      const clientStationsData = {};
+      for (const finding of initialStationsFindings) {
+        try {
+          const signedUrl = finding.photo ? await preSignUrl(finding.photo) : null;
+
+          // Asegúrate de usar el stationId como clave única y validar correctamente
+          if (!finding.stationId) {
+            console.warn(`El hallazgo con ID ${finding.id} no tiene un stationId asociado.`);
+            continue; // Ignora este hallazgo si no tiene un stationId
+          }
+
+          // Crear una entrada única para cada stationId
           clientStationsData[finding.stationId] = {
             ...finding,
-            photo: finding.photo ? `http://localhost:10000${finding.photo}` : null,
+            photo: signedUrl, // Usar la URL pre-firmada si existe
             photoRelative: finding.photo || null,
             photoBlob: null,
           };
-        });
-  
-        setClientStations(clientStationsData);
+        } catch (error) {
+          console.error(`Error procesando el hallazgo para stationId ${finding.stationId}:`, error);
+        }
+      }
+
+      // Actualiza el estado con los datos procesados
+      setClientStations(clientStationsData);
+      console.log('Datos de estaciones procesados correctamente:', clientStationsData);
   
         // Cargar estaciones relacionadas
         const clientId = response.data.service_id
-          ? (await api.get(`http://localhost:10000/api/services/${response.data.service_id}`)).data
+          ? (await api.get(`${process.env.REACT_APP_API_URL}/api/services/${response.data.service_id}`)).data
               .client_id
           : null;
   
         if (clientId) {
           const stationsResponse = await api.get(
-            `http://localhost:10000/api/stations/client/${clientId}`
+            `${process.env.REACT_APP_API_URL}/api/stations/client/${clientId}`
           );
           setStations(stationsResponse.data);
         }
-
+  
         // Consultar productos disponibles
-        const productsResponse = await api.get(`http://localhost:10000/api/products`);
-        console.log("Productos obtenidos desde la API:", productsResponse.data);
+        const productsResponse = await api.get(`${process.env.REACT_APP_API_URL}/api/products`);
+        console.log('Productos obtenidos desde la API:', productsResponse.data);
         setAvailableProducts(productsResponse.data);
   
         setLoading(false);
+        console.log('Carga de datos de inspección completada.');
       } catch (error) {
-        console.error('Error fetching inspection data:', error);
+        console.error('Error al cargar los datos de inspección:', error);
         setLoading(false);
       }
     };
+    
+    const fetchDocuments = async () => {
+      try {
+        const response = await api.get(`${process.env.REACT_APP_API_URL}/api/get-documents`, {
+          params: { entity_type: 'inspection', entity_id: inspectionId },
+        });
+        setDocuments(response.data.documents || []);
+      } catch (error) {
+        console.error('Error fetching documents:', error);
+      }
+    };
+    fetchDocuments();
   
     fetchInspectionData();
   }, [inspectionId]); 
@@ -252,11 +318,11 @@ function Inspection() {
       if (stationFinding.photo) {
         URL.revokeObjectURL(stationFinding.photo);
       }
-      if (stationFindingHorizontal.photo) {
-        URL.revokeObjectURL(stationFindingHorizontal.photo);
+      if (stationFinding.photo) {
+        URL.revokeObjectURL(stationFinding.photo);
       }
     };
-  }, [stationFinding.photo, stationFindingHorizontal.photo]);
+  }, [stationFinding.photo, stationFinding.photo]);
 
   useEffect(() => {
     // Detectar si el dispositivo es móvil
@@ -337,7 +403,7 @@ const handleSaveChanges = async () => {
 
     // Ajuste en las firmas: eliminar el prefijo completo si existe
     const removePrefix = (url) => {
-      const prefix = "http://localhost:10000";
+      const prefix = "";
       return url && url.startsWith(prefix) ? url.replace(prefix, "") : url;
     };
 
@@ -561,49 +627,92 @@ const dataURLtoBlob = (dataURL) => {
     });
   };  
   
-
-  const handleOpenStationModal = (stationId) => {
-    setCurrentStationId(stationId);
+  const handleOpenStationModal = async (stationId) => {
+    const station = stations.find((s) => s.id === stationId); // Buscar la estación
+    if (!station) return;
   
-    if (clientStations[stationId]) {
-      setStationFinding({
-        ...clientStations[stationId], // Carga los datos existentes
-        photoBlob: null, // Asegúrate de que `photoBlob` esté vacío para nuevas selecciones
+    const captureGeolocation = (callback) => {
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            const { latitude, longitude, altitude } = position.coords;
+            const timestamp = new Date().toISOString();
+  
+            const locationData = {
+              latitude,
+              longitude,
+              altitude: altitude || "No disponible",
+              timestamp,
+            };
+  
+            console.log("Datos de geolocalización obtenidos:", locationData);
+            callback(locationData);
+          },
+          (error) => {
+            console.error("Error al obtener la ubicación:", error);
+            alert("No se pudo obtener la ubicación.");
+            callback({
+              latitude: "No disponible",
+              longitude: "No disponible",
+              altitude: "No disponible",
+              timestamp: new Date().toISOString(),
+            });
+          }
+        );
+      } else {
+        alert("La geolocalización no está soportada en este navegador.");
+        callback({
+          latitude: "No disponible",
+          longitude: "No disponible",
+          altitude: "No disponible",
+          timestamp: new Date().toISOString(),
+        });
+      }
+    };
+  
+    if (station.type === "Localización") {
+      const timestamp = moment().format('DD-MM-YYYY HH:mm');
+      // Obtener geolocalización y guardar directamente en StationFindings
+      captureGeolocation((locationData) => {
+        
+        // Guardar los datos directamente en clientStations
+        setClientStations((prevStations) => ({
+          ...prevStations,
+          [stationId]: {
+            ...locationData,
+            description: `✅ Registro exitoso ${timestamp} ✅`, // Descripción por defecto
+          },
+        }));
       });
-    } else {
-      // Si no hay hallazgo previo, usa valores predeterminados
-      setStationFinding({
-        purpose: 'Consumo',
-        consumptionAmount: 'Nada',
-        captureQuantity: '',
-        marked: 'No',
-        physicalState: 'Buena',
-        damageLocation: '',
-        requiresChange: 'No',
-        changePriority: 'No',
-        description: '',
-        photo: null,
-        photoBlob: null,
-      });
+      return;
     }
   
-    setStationModalOpen(true);
+    if (station.type === "Control") {
+      // Capturar geolocalización antes de abrir el modal
+      captureGeolocation((locationData) => {
+        // Guardar los datos de geolocalización en el estado del modal
+        setCurrentStationId(stationId);
+        setStationFinding({
+          ...locationData,
+          description: '', // Inicializamos para que el usuario pueda ingresar
+          photo: null, // Inicializamos para que el usuario pueda subir
+        });
+        setStationModalOpen(true); // Abrimos el modal para que el usuario complete
+      });
+    }
   };
-  
   
   const handleCloseStationModal = () => {
     setCurrentStationId(null);
     setStationModalOpen(false);
     setStationFinding({
-      purpose: 'Consumo',
-      consumptionAmount: 'Nada',
-      captureQuantity: '',
-      marked: 'No',
-      physicalState: 'Buena',
-      damageLocation: '',
-      requiresChange: 'No',
-      changePriority: 'No',
+      description: '',
       photo: null,
+      latitude: '', // Nuevo campo para localización
+      longitude: '', // Nuevo campo para localización
+      altitude: '', // Nuevo campo para localización
+      timestamp: '', // Hora de la captura
+
     });
   };
   
@@ -662,90 +771,6 @@ const dataURLtoBlob = (dataURL) => {
     handleCloseStationModal();
   };
   
-  const handleSaveStationFindingHorizontal = () => {
-    setClientStations((prevStations) => ({
-      ...prevStations,
-      [currentStationIdHorizontal]: { ...stationFindingHorizontal },
-    }));
-    handleCloseStationModalHorizontal();
-  };
-   
-
-  const handleOpenStationModalHorizontal = (stationId) => {
-    setCurrentStationIdHorizontal(stationId);
-  
-    if (clientStations[stationId]) {
-      setStationFindingHorizontal({
-        ...clientStations[stationId], // Carga los datos existentes
-        photoBlob: null, // Asegúrate de que `photoBlob` esté vacío para nuevas selecciones
-      });
-    } else {
-      // Si no hay hallazgo previo, usa valores predeterminados
-      setStationFindingHorizontal({
-        captureQuantity: '',
-        physicalState: 'Buena',
-        damageLocation: '',
-        requiresChange: 'No',
-        changePriority: 'No',
-        description: '',
-        photo: null,
-        photoBlob: null,
-      });
-    }
-  
-    setStationModalOpenHorizontal(true);
-  };
-  
-  
-  const handleCloseStationModalHorizontal = () => {
-    setCurrentStationIdHorizontal(null);
-    setStationModalOpenHorizontal(false);
-    setStationFindingHorizontal({
-      captureQuantity: '',
-      physicalState: 'Buena',
-      damageLocation: '',
-      requiresChange: 'No',
-      changePriority: 'No',
-      description: '',
-      photo: null,
-    });
-  };
-  
-  const handleStationFindingChangeHorizontal = (field, value) => {
-    setStationFindingHorizontal((prevFinding) => {
-      const updatedFinding = {
-        ...prevFinding,
-        [field]: value,
-        id: prevFinding.id || Date.now(), // Generar un id único si no existe
-      };
-      // Marcar cambios detectados
-      setHasUnsavedChanges(true);
-      setUnsavedRoute(location.pathname);
-      console.log(`Hallazgo de Horizontal id asignado: ${updatedFinding.id}`);
-      return updatedFinding; // Retornar el estado actualizado
-    });
-  };
-  
-  
-  const handleStationFindingPhotoChangeHorizontal = (file) => {
-    if (!file || !file.type.startsWith("image/")) {
-      console.error("No se seleccionó un archivo válido o no es una imagen.");
-      showNotification("Seleccione un archivo válido de tipo imagen.");
-      return;
-    }
-  
-    const photoURL = URL.createObjectURL(file);
-  
-    setStationFindingHorizontal((prevFinding) => ({
-      ...prevFinding,
-      photo: photoURL, // URL para previsualización
-      photoBlob: file, // Blob para guardar offline o enviar online
-    }));
-    // Marcar cambios detectados
-    setHasUnsavedChanges(true);
-    setUnsavedRoute(location.pathname);
-  };
-
   const saveStationFindingOffline = async (stationId, finding) => {
     const db = await initDB();
     const tx = db.transaction("stationFindings", "readwrite");
@@ -858,42 +883,84 @@ const handleDeleteFinding = () => {
       </div>
     );
 
-  const { inspection_type, inspection_sub_type, date, time, service_id } = inspectionData;
+  const { inspection_type, inspection_sub_type, date, time, service_id, exit_time } = inspectionData;
 
   const parsedInspectionTypes = inspection_type
-    ? inspection_type.split(",").map((type) => type.trim())
-    : [];
+  ? [...inspection_type.split(",").map((type) => type.trim()), "Observaciones Cliente"]
+  : ["Observaciones Cliente"];
 
   return (
     <div className="container mt-4">
 
-      {/* Sección General */}
+      {/* Tarjeta Información General */}
       <div className="card border-success mb-3" style={{ minHeight: 0, height: 'auto' }}>
-        <div className="card-header">General</div>
+        <div className="card-header">Información General</div>
         <div className="card-body">
-          <p><strong>Inspección:</strong> {inspectionId}</p>
-          <p><strong>Fecha:</strong> {moment(date).format('DD/MM/YYYY')}</p>
-          <p><strong>Hora:</strong> {time}</p>
-          <p><strong>Servicio:</strong> {service_id}</p>
-          <div className="mt-3">
-          <textarea
-            id="generalObservations"
-            className="form-control"
-            rows="4"
-            value={generalObservations}
-            onChange={(e) => {
-              const newValue = e.target.value;
-              setGeneralObservations(newValue);
+          {/* Primera fila: Información General y Documentos */}
+          <div className="row" style={{ minHeight: 0, height: 'auto' }}>
+            {/* Columna 1: Información General */}
+            <div className="col-md-6">
+              <p><strong>Inspección:</strong> {inspectionId}</p>
+              <p><strong>Fecha:</strong> {moment(date).format('DD/MM/YYYY')}</p>
+              <p><strong>Hora de Inicio:</strong> {moment(time, "HH:mm:ss").format("HH:mm")}</p>
+              <p><strong>Hora de Finalización:</strong> {moment(exit_time, "HH:mm:ss").format("HH:mm")}</p>
+              <p><strong>Servicio:</strong> {service_id}</p>
+            </div>
 
-              // Detectar cambios en las observaciones generales
-              if (newValue !== (inspectionData?.observations || '')) {
-                setHasUnsavedChanges(true);
-                setUnsavedRoute(location.pathname);
-              }
-            }}
-            placeholder="Ingrese sus observaciones generales aquí"
-            disabled={techSignaturePreview && clientSignaturePreview}
-          ></textarea>
+            {/* Columna 2: Documentos */}
+            <div className="col-md-6">
+              <h5>Documentos</h5>
+              {documents.length > 0 ? (
+                <div className="row" style={{ minHeight: 0, height: 'auto' }}>
+                  {documents.map((doc, index) => (
+                    <div className="col-6 col-md-3 text-center mb-3" key={index}>
+                      <a href={doc.signed_url} target="_blank" rel="noopener noreferrer" className="text-decoration-none text-dark">
+                        {doc.document_type === "doc" ? (
+                          <FileEarmarkWord size={40} color="blue" title="Documento Word" />
+                        ) : doc.document_type === "xlsx" ? (
+                          <FileEarmarkExcel size={40} color="green" title="Hoja de cálculo Excel" />
+                        ) : doc.document_type === "pdf" ? (
+                          <FileEarmarkPdf size={40} color="red" title="Documento PDF" />
+                        ) : ["jpg", "jpeg", "png"].includes(doc.document_type) ? (
+                          <FileEarmarkImage size={40} color="orange" title="Imagen" />
+                        ) : (
+                          <FileEarmarkArrowDown size={40} color="gray" title="Archivo" />
+                        )}
+                        <div className="mt-2">
+                          <small>{doc.document_name}</small>
+                        </div>
+                      </a>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p>No se encontraron documentos relacionados con esta inspección.</p>
+              )}
+            </div>
+          </div>
+
+          {/* Segunda fila: Observaciones */}
+          <div className="row mt-4" style={{ minHeight: 0, height: 'auto' }}>
+            <div className="col-12">
+              <textarea
+                id="generalObservations"
+                className="form-control"
+                rows="4"
+                value={generalObservations}
+                onChange={(e) => {
+                  const newValue = e.target.value;
+                  setGeneralObservations(newValue);
+
+                  // Detectar cambios en las observaciones generales
+                  if (newValue !== (inspectionData?.observations || '')) {
+                    setHasUnsavedChanges(true);
+                    setUnsavedRoute(location.pathname);
+                  }
+                }}
+                placeholder="Ingrese sus observaciones generales aquí"
+                disabled={techSignaturePreview && clientSignaturePreview || userRol === 'Cliente'}
+              ></textarea>
+            </div>
           </div>
         </div>
       </div>
@@ -904,10 +971,9 @@ const handleDeleteFinding = () => {
           <div className="card-header">{type}</div>
           <div className="card-body">
 
-            {type === 'Jardineria' && stations.length > 0 && (
+          {type === 'Jardineria' && stations.length > 0 && (
               <div className="mt-1">
-                <h6>Hallazgos en Estaciones</h6>
-                <div className="mb-3 d-flex">
+                <div style={{ display: 'none' }}>
                   <input
                     type="text"
                     className="form-control me-2"
@@ -915,12 +981,12 @@ const handleDeleteFinding = () => {
                     value={searchTermJardineria}
                     onChange={(e) => setSearchTermJardineria(e.target.value)}
                   />
-                  <QrCodeScan
-                    size={40}
-                    className="btn p-0 mx-4"
-                    onClick={() => handleOpenQrScanner("Jardineria")}
-                  />
                 </div>
+                <QrCodeScan
+                  size={40}
+                  className="btn p-0 mx-4"
+                  onClick={() => handleOpenQrScanner("Jardineria")}
+                />
                 <div className="table-responsive mt-3">
                   {isMobile ? (
                     // Vista móvil con colapso
@@ -933,36 +999,46 @@ const handleDeleteFinding = () => {
 
                         // Normalizamos el término de búsqueda
                         const search = searchTermJardineria.trim().toLowerCase();
-
-                        // Verificamos si el término de búsqueda tiene el formato "station-<id>"
                         const stationPrefix = "station-";
                         const isStationSearch = search.startsWith(stationPrefix);
 
-                        // Búsqueda por ID exacto
-                        if (isStationSearch) {
-                          const stationId = Number(search.replace(stationPrefix, ""));
-                          return !isNaN(stationId) && station.id === stationId;
+                        // Verificar si coincide con el término de búsqueda
+                        let matchesSearch = false;
+                        if (search) {
+                          if (isStationSearch) {
+                            const stationId = Number(search.replace(stationPrefix, ""));
+                            matchesSearch = !isNaN(stationId) && station.id === stationId;
+                          } else {
+                            const stationName = station.name ? station.name.toLowerCase() : "";
+                            const stationDescription = station.description
+                              ? station.description.toLowerCase()
+                              : "";
+                            matchesSearch =
+                              stationName.includes(search) || stationDescription.includes(search);
+                          }
                         }
 
-                        // Búsqueda general en nombre y descripción
-                        const stationName = station.name ? station.name.toLowerCase() : "";
-                        const stationDescription = station.description ? station.description.toLowerCase() : "";
-                        return stationName.includes(search) || stationDescription.includes(search);
+                        // Verificar si tiene hallazgos
+                        const hasFindings = !!clientStations[station.id];
+
+                        // Mostrar si tiene hallazgos o coincide con el término de búsqueda
+                        return hasFindings || matchesSearch;
                       })
+                      .sort((a, b) => b.type.localeCompare(a.type)) // Ordenar por `type` alfabéticamente inverso
                       .map((station) => {
                         const currentKey = `station-${station.id}`;
                         return (
                           <div
                             key={station.id}
                             className="finding-item border mb-3 p-2"
-                            style={{ borderRadius: '5px', backgroundColor: '#f8f9fa' }}
+                            style={{ borderRadius: "5px", backgroundColor: "#f8f9fa" }}
                           >
                             <div className="d-flex justify-content-between align-items-center">
                               <strong>{station.name || `Estación ${station.description}`}</strong>
                               <div
                                 className="icon-toggle"
                                 onClick={() => handleCollapseToggle(currentKey)}
-                                style={{ cursor: 'pointer' }}
+                                style={{ cursor: "pointer" }}
                               >
                                 {collapseStates[currentKey] ? (
                                   <ArrowUpSquare title="Ocultar" />
@@ -973,771 +1049,21 @@ const handleDeleteFinding = () => {
                             </div>
                             <div
                               className={`finding-details ${
-                                collapseStates[currentKey] ? 'd-block' : 'd-none'
-                              } mt-2`}
-                            >
-                             {clientStations[station.id] ? (
-                      <>
-                        <p><strong>Finalidad:</strong> {clientStations[station.id].purpose || '-'}</p>
-
-                        {clientStations[station.id].purpose === 'Consumo' && (
-                          <p><strong>Cantidad Consumida:</strong> {clientStations[station.id].consumptionAmount || '-'}</p>
-                        )}
-
-                        {clientStations[station.id].purpose === 'Captura' && (
-                          <p><strong>Cantidad Capturada:</strong> {clientStations[station.id].captureQuantity || '-'}</p>
-                        )}
-
-                        <p><strong>Estado Físico:</strong> {clientStations[station.id].physicalState || '-'}</p>
-                        {clientStations[station.id].physicalState === 'Dañada' && (
-                          <>
-                            <p><strong>Lugar del Daño:</strong> {clientStations[station.id].damageLocation || '-'}</p>
-                            <p><strong>Requiere Cambio:</strong> {clientStations[station.id].requiresChange || '-'}</p>
-                            {clientStations[station.id].requiresChange === 'Si' && (
-                              <p><strong>Prioridad de Cambio:</strong> {clientStations[station.id].changePriority || '-'}</p>
-                            )}
-                          </>
-                        )}
-                        <p><strong>Descripción:</strong> {clientStations[station.id].description || '-'}</p>
-                        <div className="mb-3">
-                          {clientStations[station.id].photo ? (
-                            <img
-                              src={clientStations[station.id].photo}
-                              alt="Foto"
-                              style={{ width: '150px', objectFit: 'cover' }}
-                            />
-                          ) : (
-                            <span>Sin Foto</span>
-                          )}
-                        </div>
-                        <button
-                          className="btn btn-outline-success"
-                          onClick={() => handleOpenStationModal(station.id)}
-                          disabled={techSignaturePreview && clientSignaturePreview}
-                        >
-                          Editar
-                        </button>
-                      </>
-                  ) : (
-                    <>
-                      <p>Sin hallazgo reportado</p>
-                      <button
-                        className="btn btn-outline-success"
-                        onClick={() => handleOpenStationModalHorizontal(station.id)}
-                        disabled={techSignaturePreview && clientSignaturePreview}
-                      >
-                        +
-                      </button>
-                    </>
-                  )}
-                            </div>
-                          </div>
-                        );
-                      })
-                  ) : (
-                    // Vista de tabla para tablet y computadora
-                    <table className="table table-bordered">
-                      <thead>
-                        <tr>
-                          <th>Estación</th>
-                          <th>Finalidad</th>
-                          <th>Estado Físico</th>
-                          <th>Descripción</th>
-                          <th>Foto</th>
-                          <th>Acciones</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                      {stations.filter((station) => {
-  console.log("Evaluando estación:", station);
-
-  // Verificar categoría
-  if (station.category !== "Jardineria") {
-    console.log(`Estación ${station.name || `ID: ${station.id}`} excluida por categoría:`, station.category);
-    return false;
-  }
-
-  // Normalizamos el término de búsqueda
-  const search = searchTermJardineria.trim().toLowerCase();
-  console.log("Término de búsqueda utilizado:", search); // Log del término de búsqueda
-
-  const stationPrefix = "station-";
-  const isStationSearch = search.startsWith(stationPrefix);
-
-  // Búsqueda por ID exacto usando el prefijo
-  if (isStationSearch) {
-    const stationId = Number(search.replace(stationPrefix, ""));
-    console.log(`Buscando estación con ID ${stationId} en estación con ID:`, station.id);
-    const match = !isNaN(stationId) && station.id === stationId;
-    console.log(`Resultado de búsqueda exacta para estación ${station.id}:`, match ? "Coincide" : "No coincide");
-    return match;
-  }
-
-  // Búsqueda general en nombre o descripción
-  const stationName = station.name ? station.name.toLowerCase() : "";
-  const stationDescription = station.description ? station.description.toLowerCase() : "";
-  const matches = stationName.includes(search) || stationDescription.includes(search);
-
-  console.log(`Resultado del filtro general para estación ${station.name || `ID: ${station.id}`}:`, matches ? "Incluida" : "Excluida");
-  return matches;
-})
-                          .map((station) => (
-                            <tr key={station.id}>
-                              <td className='align-middle'>{station.name || `Estación ${station.description}`}</td>
-                              {clientStations[station.id] ? (
-                              <>
-                                <td className='align-middle'>{clientStations[station.id].purpose || '-'}</td>
-                                <td className='align-middle'>{clientStations[station.id].physicalState || '-'}</td>
-                                <td className='align-middle'>{clientStations[station.id].description || '-'}</td>
-                                <td className='align-middle mx-1 px-1'>
-                                  {clientStations[station.id].photo ? (
-                                    <img
-                                      src={clientStations[station.id].photo}
-                                      alt="Foto"
-                                      style={{ width: '250px', objectFit: 'cover', margin: "0px", padding: "0px" }}
-                                    />
-                                  ) : (
-                                    '-'
-                                  )}
-                                </td>
-                                <td className='align-middle'>
-                                {!isMobile && (
-                                  <button
-                                    className="btn btn-link p-0"
-                                    onClick={() => handleViewStationJardineria(station.id)}
-                                    style={{ border: "none", background: "none" }}
-                                    >
-                                    <Eye
-                                    className='mx-2'
-                                      size={"25px"}
-                                      color='blue'
-                                      type='button'
-                                    />
-                                    </button>
-                                  )}
-                                  <button
-                                    className="btn btn-link p-0"
-                                    onClick={() => handleOpenStationModal(station.id)}
-                                    disabled={techSignaturePreview && clientSignaturePreview} // Bloquear si ya está firmado
-                                    style={{ border: "none", background: "none" }} // Estilo para eliminar apariencia de botón
-                                  >
-                                    <PencilSquare
-                                      className="mx-2"
-                                      size={"20px"}
-                                      color={techSignaturePreview && clientSignaturePreview ? "gray" : "green"} // Cambiar color si está bloqueado
-                                      type="button"
-                                      title={techSignaturePreview && clientSignaturePreview ? "Inspección firmada, edición bloqueada" : "Editar"}
-                                    />
-                                  </button>
-                                </td>
-                              </>
-                            ) : (
-                              <>
-                                <td colSpan="4">Sin hallazgo reportado</td>
-                                <td>
-                                  <button
-                                    className="btn btn-outline-success"
-                                    onClick={() => handleOpenStationModal(station.id)}
-                                    disabled={techSignaturePreview && clientSignaturePreview}
-                                  >
-                                    +
-                                  </button>
-                                </td>
-                              </>
-                            )}
-                            </tr>
-                          ))}
-                      </tbody>
-                    </table>
-                  )}
-                </div>
-              </div>
-            )}
-
-{type === 'Hogar' && stations.length > 0 && (
-              <div className="mt-1">
-                <h6>Hallazgos en Estaciones</h6>
-                <div className="mb-3 d-flex">
-                  <input
-                    type="text"
-                    className="form-control me-2"
-                    placeholder="Buscar estación por descripción"
-                    value={searchTermHogar}
-                    onChange={(e) => setSearchTermHogar(e.target.value)}
-                  />
-                  <QrCodeScan
-                    size={40}
-                    className="btn p-0 mx-4"
-                    onClick={() => handleOpenQrScanner("Hogar")}
-                  />
-                </div>
-                <div className="table-responsive mt-3">
-                  {isMobile ? (
-                    // Vista móvil con colapso
-                    stations
-                      .filter((station) => {
-                        // Validar primero que la categoría sea "Hogar"
-                        if (station.category !== "Hogar") {
-                          return false;
-                        }
-
-                        // Normalizamos el término de búsqueda
-                        const search = searchTermHogar.trim().toLowerCase();
-
-                        // Verificamos si el término de búsqueda tiene el formato "station-<id>"
-                        const stationPrefix = "station-";
-                        const isStationSearch = search.startsWith(stationPrefix);
-
-                        // Búsqueda por ID exacto
-                        if (isStationSearch) {
-                          const stationId = Number(search.replace(stationPrefix, ""));
-                          return !isNaN(stationId) && station.id === stationId;
-                        }
-
-                        // Búsqueda general en nombre y descripción
-                        const stationName = station.name ? station.name.toLowerCase() : "";
-                        const stationDescription = station.description ? station.description.toLowerCase() : "";
-                        return stationName.includes(search) || stationDescription.includes(search);
-                      })
-                      .map((station) => {
-                        const currentKey = `station-${station.id}`;
-                        return (
-                          <div
-                            key={station.id}
-                            className="finding-item border mb-3 p-2"
-                            style={{ borderRadius: '5px', backgroundColor: '#f8f9fa' }}
-                          >
-                            <div className="d-flex justify-content-between align-items-center">
-                              <strong>{station.name || `Estación ${station.description}`}</strong>
-                              <div
-                                className="icon-toggle"
-                                onClick={() => handleCollapseToggle(currentKey)}
-                                style={{ cursor: 'pointer' }}
-                              >
-                                {collapseStates[currentKey] ? (
-                                  <ArrowUpSquare title="Ocultar" />
-                                ) : (
-                                  <ArrowDownSquare title="Expandir" />
-                                )}
-                              </div>
-                            </div>
-                            <div
-                              className={`finding-details ${
-                                collapseStates[currentKey] ? 'd-block' : 'd-none'
-                              } mt-2`}
-                            >
-                             {clientStations[station.id] ? (
-                      <>
-                        <p><strong>Finalidad:</strong> {clientStations[station.id].purpose || '-'}</p>
-
-                        {clientStations[station.id].purpose === 'Consumo' && (
-                          <p><strong>Cantidad Consumida:</strong> {clientStations[station.id].consumptionAmount || '-'}</p>
-                        )}
-
-                        {clientStations[station.id].purpose === 'Captura' && (
-                          <p><strong>Cantidad Capturada:</strong> {clientStations[station.id].captureQuantity || '-'}</p>
-                        )}
-
-                        <p><strong>Estado Físico:</strong> {clientStations[station.id].physicalState || '-'}</p>
-                        {clientStations[station.id].physicalState === 'Dañada' && (
-                          <>
-                            <p><strong>Lugar del Daño:</strong> {clientStations[station.id].damageLocation || '-'}</p>
-                            <p><strong>Requiere Cambio:</strong> {clientStations[station.id].requiresChange || '-'}</p>
-                            {clientStations[station.id].requiresChange === 'Si' && (
-                              <p><strong>Prioridad de Cambio:</strong> {clientStations[station.id].changePriority || '-'}</p>
-                            )}
-                          </>
-                        )}
-                        <p><strong>Descripción:</strong> {clientStations[station.id].description || '-'}</p>
-                        <div className="mb-3">
-                          {clientStations[station.id].photo ? (
-                            <img
-                              src={clientStations[station.id].photo}
-                              alt="Foto"
-                              style={{ width: '150px', objectFit: 'cover' }}
-                            />
-                          ) : (
-                            <span>Sin Foto</span>
-                          )}
-                        </div>
-                        <button
-                          className="btn btn-outline-success"
-                          onClick={() => handleOpenStationModal(station.id)}
-                          disabled={techSignaturePreview && clientSignaturePreview}
-                        >
-                          Editar
-                        </button>
-                      </>
-                  ) : (
-                    <>
-                      <p>Sin hallazgo reportado</p>
-                      <button
-                        className="btn btn-outline-success"
-                        onClick={() => handleOpenStationModalHorizontal(station.id)}
-                        disabled={techSignaturePreview && clientSignaturePreview}
-                      >
-                        +
-                      </button>
-                    </>
-                  )}
-                            </div>
-                          </div>
-                        );
-                      })
-                  ) : (
-                    // Vista de tabla para tablet y computadora
-                    <table className="table table-bordered">
-                      <thead>
-                        <tr>
-                          <th>Estación</th>
-                          <th>Finalidad</th>
-                          <th>Estado Físico</th>
-                          <th>Descripción</th>
-                          <th>Foto</th>
-                          <th>Acciones</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                      {stations.filter((station) => {
-  console.log("Evaluando estación:", station);
-
-  // Verificar categoría
-  if (station.category !== "Hogar") {
-    console.log(`Estación ${station.name || `ID: ${station.id}`} excluida por categoría:`, station.category);
-    return false;
-  }
-
-  // Normalizamos el término de búsqueda
-  const search = searchTermHogar.trim().toLowerCase();
-  console.log("Término de búsqueda utilizado:", search); // Log del término de búsqueda
-
-  const stationPrefix = "station-";
-  const isStationSearch = search.startsWith(stationPrefix);
-
-  // Búsqueda por ID exacto usando el prefijo
-  if (isStationSearch) {
-    const stationId = Number(search.replace(stationPrefix, ""));
-    console.log(`Buscando estación con ID ${stationId} en estación con ID:`, station.id);
-    const match = !isNaN(stationId) && station.id === stationId;
-    console.log(`Resultado de búsqueda exacta para estación ${station.id}:`, match ? "Coincide" : "No coincide");
-    return match;
-  }
-
-  // Búsqueda general en nombre o descripción
-  const stationName = station.name ? station.name.toLowerCase() : "";
-  const stationDescription = station.description ? station.description.toLowerCase() : "";
-  const matches = stationName.includes(search) || stationDescription.includes(search);
-
-  console.log(`Resultado del filtro general para estación ${station.name || `ID: ${station.id}`}:`, matches ? "Incluida" : "Excluida");
-  return matches;
-})
-                          .map((station) => (
-                            <tr key={station.id}>
-                              <td className='align-middle'>{station.name || `Estación ${station.description}`}</td>
-                              {clientStations[station.id] ? (
-                              <>
-                                <td className='align-middle'>{clientStations[station.id].purpose || '-'}</td>
-                                <td className='align-middle'>{clientStations[station.id].physicalState || '-'}</td>
-                                <td className='align-middle'>{clientStations[station.id].description || '-'}</td>
-                                <td className='align-middle mx-1 px-1'>
-                                  {clientStations[station.id].photo ? (
-                                    <img
-                                      src={clientStations[station.id].photo}
-                                      alt="Foto"
-                                      style={{ width: '250px', objectFit: 'cover', margin: "0px", padding: "0px" }}
-                                    />
-                                  ) : (
-                                    '-'
-                                  )}
-                                </td>
-                                <td className='align-middle'>
-                                {!isMobile && (
-                                  <button
-                                    className="btn btn-link p-0"
-                                    onClick={() => handleViewStationHogar(station.id)}
-                                    style={{ border: "none", background: "none" }}
-                                    >
-                                    <Eye
-                                    className='mx-2'
-                                      size={"25px"}
-                                      color='blue'
-                                      type='button'
-                                    />
-                                    </button>
-                                  )}
-                                  <button
-                                    className="btn btn-link p-0"
-                                    onClick={() => handleOpenStationModal(station.id)}
-                                    disabled={techSignaturePreview && clientSignaturePreview} // Bloquear si ya está firmado
-                                    style={{ border: "none", background: "none" }} // Estilo para eliminar apariencia de botón
-                                  >
-                                    <PencilSquare
-                                      className="mx-2"
-                                      size={"20px"}
-                                      color={techSignaturePreview && clientSignaturePreview ? "gray" : "green"} // Cambiar color si está bloqueado
-                                      type="button"
-                                      title={techSignaturePreview && clientSignaturePreview ? "Inspección firmada, edición bloqueada" : "Editar"}
-                                    />
-                                  </button>
-                                </td>
-                              </>
-                            ) : (
-                              <>
-                                <td colSpan="4">Sin hallazgo reportado</td>
-                                <td>
-                                  <button
-                                    className="btn btn-outline-success"
-                                    onClick={() => handleOpenStationModal(station.id)}
-                                    disabled={techSignaturePreview && clientSignaturePreview}
-                                  >
-                                    +
-                                  </button>
-                                </td>
-                              </>
-                            )}
-                            </tr>
-                          ))}
-                      </tbody>
-                    </table>
-                  )}
-                </div>
-              </div>
-            )}
-
-{type === 'Empresarial' && stations.length > 0 && (
-              <div className="mt-1">
-                <h6>Hallazgos en Estaciones</h6>
-                <div className="mb-3 d-flex">
-                  <input
-                    type="text"
-                    className="form-control me-2"
-                    placeholder="Buscar estación por descripción"
-                    value={searchTermEmpresarial}
-                    onChange={(e) => setSearchTermEmpresarial(e.target.value)}
-                  />
-                  <QrCodeScan
-                    size={40}
-                    className="btn p-0 mx-4"
-                    onClick={() => handleOpenQrScanner("Empresarial")}
-                  />
-                </div>
-                <div className="table-responsive mt-3">
-                  {isMobile ? (
-                    // Vista móvil con colapso
-                    stations
-                      .filter((station) => {
-                        // Validar primero que la categoría sea "Empresarial"
-                        if (station.category !== "Empresarial") {
-                          return false;
-                        }
-
-                        // Normalizamos el término de búsqueda
-                        const search = searchTermEmpresarial.trim().toLowerCase();
-
-                        // Verificamos si el término de búsqueda tiene el formato "station-<id>"
-                        const stationPrefix = "station-";
-                        const isStationSearch = search.startsWith(stationPrefix);
-
-                        // Búsqueda por ID exacto
-                        if (isStationSearch) {
-                          const stationId = Number(search.replace(stationPrefix, ""));
-                          return !isNaN(stationId) && station.id === stationId;
-                        }
-
-                        // Búsqueda general en nombre y descripción
-                        const stationName = station.name ? station.name.toLowerCase() : "";
-                        const stationDescription = station.description ? station.description.toLowerCase() : "";
-                        return stationName.includes(search) || stationDescription.includes(search);
-                      })
-                      .map((station) => {
-                        const currentKey = `station-${station.id}`;
-                        return (
-                          <div
-                            key={station.id}
-                            className="finding-item border mb-3 p-2"
-                            style={{ borderRadius: '5px', backgroundColor: '#f8f9fa' }}
-                          >
-                            <div className="d-flex justify-content-between align-items-center">
-                              <strong>{station.name || `Estación ${station.description}`}</strong>
-                              <div
-                                className="icon-toggle"
-                                onClick={() => handleCollapseToggle(currentKey)}
-                                style={{ cursor: 'pointer' }}
-                              >
-                                {collapseStates[currentKey] ? (
-                                  <ArrowUpSquare title="Ocultar" />
-                                ) : (
-                                  <ArrowDownSquare title="Expandir" />
-                                )}
-                              </div>
-                            </div>
-                            <div
-                              className={`finding-details ${
-                                collapseStates[currentKey] ? 'd-block' : 'd-none'
-                              } mt-2`}
-                            >
-                             {clientStations[station.id] ? (
-                      <>
-                        <p><strong>Finalidad:</strong> {clientStations[station.id].purpose || '-'}</p>
-
-                        {clientStations[station.id].purpose === 'Consumo' && (
-                          <p><strong>Cantidad Consumida:</strong> {clientStations[station.id].consumptionAmount || '-'}</p>
-                        )}
-
-                        {clientStations[station.id].purpose === 'Captura' && (
-                          <p><strong>Cantidad Capturada:</strong> {clientStations[station.id].captureQuantity || '-'}</p>
-                        )}
-
-                        <p><strong>Estado Físico:</strong> {clientStations[station.id].physicalState || '-'}</p>
-                        {clientStations[station.id].physicalState === 'Dañada' && (
-                          <>
-                            <p><strong>Lugar del Daño:</strong> {clientStations[station.id].damageLocation || '-'}</p>
-                            <p><strong>Requiere Cambio:</strong> {clientStations[station.id].requiresChange || '-'}</p>
-                            {clientStations[station.id].requiresChange === 'Si' && (
-                              <p><strong>Prioridad de Cambio:</strong> {clientStations[station.id].changePriority || '-'}</p>
-                            )}
-                          </>
-                        )}
-                        <p><strong>Descripción:</strong> {clientStations[station.id].description || '-'}</p>
-                        <div className="mb-3">
-                          {clientStations[station.id].photo ? (
-                            <img
-                              src={clientStations[station.id].photo}
-                              alt="Foto"
-                              style={{ width: '150px', objectFit: 'cover' }}
-                            />
-                          ) : (
-                            <span>Sin Foto</span>
-                          )}
-                        </div>
-                        <button
-                          className="btn btn-outline-success"
-                          onClick={() => handleOpenStationModal(station.id)}
-                          disabled={techSignaturePreview && clientSignaturePreview}
-                        >
-                          Editar
-                        </button>
-                      </>
-                  ) : (
-                    <>
-                      <p>Sin hallazgo reportado</p>
-                      <button
-                        className="btn btn-outline-success"
-                        onClick={() => handleOpenStationModalHorizontal(station.id)}
-                        disabled={techSignaturePreview && clientSignaturePreview}
-                      >
-                        +
-                      </button>
-                    </>
-                  )}
-                            </div>
-                          </div>
-                        );
-                      })
-                  ) : (
-                    // Vista de tabla para tablet y computadora
-                    <table className="table table-bordered">
-                      <thead>
-                        <tr>
-                          <th>Estación</th>
-                          <th>Finalidad</th>
-                          <th>Estado Físico</th>
-                          <th>Descripción</th>
-                          <th>Foto</th>
-                          <th>Acciones</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                      {stations.filter((station) => {
-  console.log("Evaluando estación:", station);
-
-  // Verificar categoría
-  if (station.category !== "Empresarial") {
-    console.log(`Estación ${station.name || `ID: ${station.id}`} excluida por categoría:`, station.category);
-    return false;
-  }
-
-  // Normalizamos el término de búsqueda
-  const search = searchTermEmpresarial.trim().toLowerCase();
-  console.log("Término de búsqueda utilizado:", search); // Log del término de búsqueda
-
-  const stationPrefix = "station-";
-  const isStationSearch = search.startsWith(stationPrefix);
-
-  // Búsqueda por ID exacto usando el prefijo
-  if (isStationSearch) {
-    const stationId = Number(search.replace(stationPrefix, ""));
-    console.log(`Buscando estación con ID ${stationId} en estación con ID:`, station.id);
-    const match = !isNaN(stationId) && station.id === stationId;
-    console.log(`Resultado de búsqueda exacta para estación ${station.id}:`, match ? "Coincide" : "No coincide");
-    return match;
-  }
-
-  // Búsqueda general en nombre o descripción
-  const stationName = station.name ? station.name.toLowerCase() : "";
-  const stationDescription = station.description ? station.description.toLowerCase() : "";
-  const matches = stationName.includes(search) || stationDescription.includes(search);
-
-  console.log(`Resultado del filtro general para estación ${station.name || `ID: ${station.id}`}:`, matches ? "Incluida" : "Excluida");
-  return matches;
-})
-                          .map((station) => (
-                            <tr key={station.id}>
-                              <td className='align-middle'>{station.name || `Estación ${station.description}`}</td>
-                              {clientStations[station.id] ? (
-                              <>
-                                <td className='align-middle'>{clientStations[station.id].purpose || '-'}</td>
-                                <td className='align-middle'>{clientStations[station.id].physicalState || '-'}</td>
-                                <td className='align-middle'>{clientStations[station.id].description || '-'}</td>
-                                <td className='align-middle mx-1 px-1'>
-                                  {clientStations[station.id].photo ? (
-                                    <img
-                                      src={clientStations[station.id].photo}
-                                      alt="Foto"
-                                      style={{ width: '250px', objectFit: 'cover', margin: "0px", padding: "0px" }}
-                                    />
-                                  ) : (
-                                    '-'
-                                  )}
-                                </td>
-                                <td className='align-middle'>
-                                {!isMobile && (
-                                  <button
-                                    className="btn btn-link p-0"
-                                    onClick={() => handleViewStationEmpresarial(station.id)}
-                                    style={{ border: "none", background: "none" }}
-                                    >
-                                    <Eye
-                                    className='mx-2'
-                                      size={"25px"}
-                                      color='blue'
-                                      type='button'
-                                    />
-                                    </button>
-                                  )}
-                                  <button
-                                    className="btn btn-link p-0"
-                                    onClick={() => handleOpenStationModal(station.id)}
-                                    disabled={techSignaturePreview && clientSignaturePreview} // Bloquear si ya está firmado
-                                    style={{ border: "none", background: "none" }} // Estilo para eliminar apariencia de botón
-                                  >
-                                    <PencilSquare
-                                      className="mx-2"
-                                      size={"20px"}
-                                      color={techSignaturePreview && clientSignaturePreview ? "gray" : "green"} // Cambiar color si está bloqueado
-                                      type="button"
-                                      title={techSignaturePreview && clientSignaturePreview ? "Inspección firmada, edición bloqueada" : "Editar"}
-                                    />
-                                  </button>
-                                </td>
-                              </>
-                            ) : (
-                              <>
-                                <td colSpan="4">Sin hallazgo reportado</td>
-                                <td>
-                                  <button
-                                    className="btn btn-outline-success"
-                                    onClick={() => handleOpenStationModal(station.id)}
-                                    disabled={techSignaturePreview && clientSignaturePreview}
-                                  >
-                                    +
-                                  </button>
-                                </td>
-                              </>
-                            )}
-                            </tr>
-                          ))}
-                      </tbody>
-                    </table>
-                  )}
-                </div>
-              </div>
-            )}
-
-
-            {type === 'Horizontal' && stations.length > 0 && (
-              <div className="mt-1">
-                <h6>Hallazgos en Estaciones</h6>
-                <div className="mb-3 d-flex">
-                  <input
-                    type="text"
-                    className="form-control"
-                    placeholder="Buscar estación por descripción"
-                    value={searchTermHorizontal}
-                    onChange={(e) => setSearchTermHorizontal(e.target.value)}
-                  />
-                  <QrCodeScan
-                    size={40}
-                    className="btn p-0 mx-4"
-                    onClick={() => handleOpenQrScanner("Horizontal")}
-                  />
-                </div>
-                <div className="table-responsive mt-3">
-                  {isMobile ? (
-                    // Vista móvil con colapso
-                    stations
-                      .filter((station) => {
-                        // Validar primero que la categoría sea "Horizontal"
-                        if (station.category !== "Horizontal") {
-                          return false;
-                        }
-
-                        // Normalizamos el término de búsqueda
-                        const search = searchTermHorizontal.trim().toLowerCase();
-
-                        // Verificamos si el término de búsqueda tiene el formato "station-<id>"
-                        const stationPrefix = "station-";
-                        const isStationSearch = search.startsWith(stationPrefix);
-
-                        // Búsqueda por ID exacto
-                        if (isStationSearch) {
-                          const stationId = Number(search.replace(stationPrefix, ""));
-                          return !isNaN(stationId) && station.id === stationId;
-                        }
-
-                        // Búsqueda general en nombre y descripción
-                        const stationName = station.name ? station.name.toLowerCase() : "";
-                        const stationDescription = station.description ? station.description.toLowerCase() : "";
-                        return stationName.includes(search) || stationDescription.includes(search);
-                      })
-                      .map((station) => {
-                        const currentKey = `station-Horizontal-${station.id}`;
-                        return (
-                          <div
-                            key={station.id}
-                            className="finding-item border mb-3 p-2"
-                            style={{ borderRadius: '5px', backgroundColor: '#f8f9fa' }}
-                          >
-                            <div className="d-flex justify-content-between align-items-center">
-                              <strong>{station.name || `Estación ${station.description}`}</strong>
-                              <div
-                                className="icon-toggle"
-                                onClick={() => handleCollapseToggle(currentKey)}
-                                style={{ cursor: 'pointer' }}
-                              >
-                                {collapseStates[currentKey] ? (
-                                  <ArrowUpSquare title="Ocultar" />
-                                ) : (
-                                  <ArrowDownSquare title="Expandir" />
-                                )}
-                              </div>
-                            </div>
-                            <div
-                              className={`finding-details ${
-                                collapseStates[currentKey] ? 'd-block' : 'd-none'
+                                collapseStates[currentKey] ? "d-block" : "d-none"
                               } mt-2`}
                             >
                               {clientStations[station.id] ? (
                                 <>
-                                  <p><strong>Capturas:</strong> {clientStations[station.id].captureQuantity || '-'}</p>
-                                  <p><strong>Estado Físico:</strong> {clientStations[station.id].physicalState || '-'}</p>
-                                  <p><strong>Descripción:</strong> {clientStations[station.id].description || '-'}</p>
+                                  <p>
+                                    <strong>Descripción:</strong>{" "}
+                                    {clientStations[station.id].description || "-"}
+                                  </p>
                                   <div className="mb-3">
                                     {clientStations[station.id].photo ? (
                                       <img
                                         src={clientStations[station.id].photo}
                                         alt="Foto"
-                                        style={{ width: '150px', objectFit: 'cover' }}
+                                        style={{ width: "150px", objectFit: "cover" }}
                                       />
                                     ) : (
                                       <span>Sin Foto</span>
@@ -1745,8 +1071,11 @@ const handleDeleteFinding = () => {
                                   </div>
                                   <button
                                     className="btn btn-outline-success"
-                                    onClick={() => handleOpenStationModalHorizontal(station.id)}
-                                    disabled={techSignaturePreview && clientSignaturePreview}
+                                    onClick={() => handleOpenStationModal(station.id)}
+                                    disabled={
+                                      (techSignaturePreview && clientSignaturePreview) ||
+                                      userRol === "Cliente"
+                                    }
                                   >
                                     Editar
                                   </button>
@@ -1756,8 +1085,11 @@ const handleDeleteFinding = () => {
                                   <p>Sin hallazgo reportado</p>
                                   <button
                                     className="btn btn-outline-success"
-                                    onClick={() => handleOpenStationModalHorizontal(station.id)}
-                                    disabled={techSignaturePreview && clientSignaturePreview}
+                                    onClick={() => handleOpenStationModal(station.id)}
+                                    disabled={
+                                      (techSignaturePreview && clientSignaturePreview) ||
+                                      userRol === "Cliente"
+                                    }
                                   >
                                     +
                                   </button>
@@ -1770,104 +1102,937 @@ const handleDeleteFinding = () => {
                   ) : (
                     // Vista de tabla para tablet y computadora
                     <table className="table table-bordered">
-                      <thead>
-                        <tr>
-                          <th>Estación</th>
-                          <th>Cantidad de Capturas</th>
-                          <th>Estado Físico</th>
-                          <th>Descripción</th>
-                          <th>Foto</th>
-                          <th>Acciones</th>
-                        </tr>
-                      </thead>
                       <tbody>
                         {stations
                           .filter((station) => {
-                            const search = searchTermHorizontal.trim().toLowerCase(); // Normalizamos el término de búsqueda
-                            const stationPrefix = "station-"; // Prefijo esperado para búsqueda por ID
-                            const isStationSearch = search.startsWith(stationPrefix);
+                            console.log("Evaluando estación:", station);
 
-                            // Verificar primero que la categoría sea "Horizontal"
-                            if (station.category !== "Horizontal") {
+                            // Verificar categoría
+                            if (station.category !== "Jardineria") {
+                              console.log(
+                                `Estación ${station.name || `ID: ${station.id}`} excluida por categoría:`,
+                                station.category
+                              );
                               return false;
                             }
 
-                            // Búsqueda por ID exacto
-                            if (isStationSearch) {
-                              const stationId = Number(search.replace(stationPrefix, ""));
-                              return !isNaN(stationId) && station.id === stationId;
+                            // Normalizamos el término de búsqueda
+                            const search = searchTermJardineria.trim().toLowerCase();
+                            const stationPrefix = "station-";
+                            const isStationSearch = search.startsWith(stationPrefix);
+
+                            // Verificar si coincide con el término de búsqueda
+                            let matchesSearch = false;
+                            if (search) {
+                              if (isStationSearch) {
+                                const stationId = Number(search.replace(stationPrefix, ""));
+                                matchesSearch = !isNaN(stationId) && station.id === stationId;
+                              } else {
+                                const stationName = station.name ? station.name.toLowerCase() : "";
+                                const stationDescription = station.description
+                                  ? station.description.toLowerCase()
+                                  : "";
+                                matchesSearch =
+                                  stationName.includes(search) || stationDescription.includes(search);
+                              }
                             }
 
-                            // Búsqueda general en nombre, descripción o ID
-                            const stationName = station.name ? station.name.toLowerCase() : "";
-                            const stationDescription = station.description ? station.description.toLowerCase() : "";
-                            const stationId = station.id ? station.id.toString().toLowerCase() : "";
+                            // Verificar si tiene hallazgos
+                            const hasFindings = !!clientStations[station.id];
 
-                            return (
-                              stationName.includes(search) ||
-                              stationDescription.includes(search) ||
-                              stationId.includes(search)
-                            );
+                            // Mostrar si tiene hallazgos o coincide con el término de búsqueda
+                            return hasFindings || matchesSearch;
                           })
+                          .sort((a, b) => b.type.localeCompare(a.type)) // Ordenar por `type` alfabéticamente inverso
                           .map((station) => (
                             <tr key={station.id}>
-                              <td className='align-middle'>{station.name || `Estación ${station.description}`}</td>
+                              <td className="align-middle">
+                                {station.name || `Estación ${station.description}`}
+                              </td>
                               {clientStations[station.id] ? (
                                 <>
-                                  <td className='align-middle'>{clientStations[station.id].captureQuantity || '-'}</td>
-                                  <td className='align-middle'>{clientStations[station.id].physicalState || '-'}</td>
-                                  <td className='align-middle'>{clientStations[station.id].description || '-'}</td>
-                                  <td className='align-middle'>
+                                  <td className="align-middle">
+                                    {clientStations[station.id].description || "-"}
+                                  </td>
+                                  <td className="align-middle mx-1 px-1">
                                     {clientStations[station.id].photo ? (
                                       <img
                                         src={clientStations[station.id].photo}
                                         alt="Foto"
-                                        style={{ width: '250px', objectFit: 'cover', margin: "0px", padding: "0px" }}
+                                        style={{
+                                          width: "250px",
+                                          objectFit: "cover",
+                                          margin: "0px",
+                                          padding: "0px",
+                                        }}
                                       />
                                     ) : (
-                                      '-'
+                                      "-"
                                     )}
                                   </td>
-                                  <td className='align-middle'>
-                                  {!isMobile && (
+                                  <td className="align-middle">
+                                    {!isMobile && (
+                                      <button
+                                        className="btn btn-link p-0"
+                                        onClick={() => handleViewStationJardineria(station.id)}
+                                        style={{ border: "none", background: "none" }}
+                                      >
+                                        <Eye
+                                          className="mx-2"
+                                          size={"25px"}
+                                          color="blue"
+                                          type="button"
+                                        />
+                                      </button>
+                                    )}
                                     <button
                                       className="btn btn-link p-0"
-                                      onClick={() => handleViewStationHorizontal(station.id)}
+                                      onClick={() => handleOpenStationModal(station.id)}
+                                      disabled={
+                                        (techSignaturePreview && clientSignaturePreview) ||
+                                        userRol === "Cliente" || station.type === 'Localización'
+                                      }
                                       style={{ border: "none", background: "none" }}
                                     >
-                                      <Eye
-                                      className='mx-2'
-                                        size={"25px"}
-                                        color='blue'
-                                        type='button'
+                                      <PencilSquare
+                                        className="mx-2"
+                                        size={"20px"}
+                                        color={
+                                          (techSignaturePreview && clientSignaturePreview) ||
+                                          userRol === "Cliente"
+                                            ? "gray"
+                                            : "green"
+                                        }
+                                        type="button"
+                                        title={
+                                          (techSignaturePreview && clientSignaturePreview) ||
+                                          userRol === "Cliente"
+                                            ? "Inspección firmada, edición bloqueada"
+                                            : "Editar"
+                                        }
                                       />
                                     </button>
-                                  )}
-                                  <button
-                                    className="btn btn-link p-0"
-                                    onClick={() => handleOpenStationModal(station.id)}
-                                    disabled={techSignaturePreview && clientSignaturePreview}
-                                    style={{ border: "none", background: "none" }}
-                                  >
-                                    <PencilSquare
-                                    className='mx-2'
-                                      size={"20px"}
-                                      color='green'
-                                      type='button'
-                                      onClick={() => handleOpenStationModalHorizontal(station.id)}
-                                      disabled={techSignaturePreview && clientSignaturePreview}
-                                    />
-                                  </button>
                                   </td>
                                 </>
                               ) : (
                                 <>
-                                  <td colSpan="4">Sin hallazgo reportado</td>
+                                  <td colSpan="2">Sin hallazgo reportado</td>
                                   <td>
                                     <button
                                       className="btn btn-outline-success"
-                                      onClick={() => handleOpenStationModalHorizontal(station.id)}
-                                      disabled={techSignaturePreview && clientSignaturePreview}
+                                      onClick={() => handleOpenStationModal(station.id)}
+                                      disabled={
+                                        (techSignaturePreview && clientSignaturePreview) ||
+                                        userRol === "Cliente"
+                                      }
+                                    >
+                                      +
+                                    </button>
+                                  </td>
+                                </>
+                              )}
+                            </tr>
+                          ))}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {type === 'Hogar' && stations.length > 0 && (
+              <div className="mt-1">
+                <div style={{ display: 'none' }}>
+                  <input
+                    type="text"
+                    className="form-control me-2"
+                    placeholder="Buscar estación por descripción"
+                    value={searchTermHogar}
+                    onChange={(e) => setSearchTermHogar(e.target.value)}
+                  />
+                </div>
+                <QrCodeScan
+                  size={40}
+                  className="btn p-0 mx-4"
+                  onClick={() => handleOpenQrScanner("Hogar")}
+                />
+                <div className="table-responsive mt-3">
+                  {isMobile ? (
+                    // Vista móvil con colapso
+                    stations
+                      .filter((station) => {
+                        // Validar primero que la categoría sea "Hogar"
+                        if (station.category !== "Hogar") {
+                          return false;
+                        }
+
+                        // Normalizamos el término de búsqueda
+                        const search = searchTermHogar.trim().toLowerCase();
+                        const stationPrefix = "station-";
+                        const isStationSearch = search.startsWith(stationPrefix);
+
+                        // Verificar si coincide con el término de búsqueda
+                        let matchesSearch = false;
+                        if (search) {
+                          if (isStationSearch) {
+                            const stationId = Number(search.replace(stationPrefix, ""));
+                            matchesSearch = !isNaN(stationId) && station.id === stationId;
+                          } else {
+                            const stationName = station.name ? station.name.toLowerCase() : "";
+                            const stationDescription = station.description
+                              ? station.description.toLowerCase()
+                              : "";
+                            matchesSearch =
+                              stationName.includes(search) || stationDescription.includes(search);
+                          }
+                        }
+
+                        // Verificar si tiene hallazgos
+                        const hasFindings = !!clientStations[station.id];
+
+                        // Mostrar si tiene hallazgos o coincide con el término de búsqueda
+                        return hasFindings || matchesSearch;
+                      })
+                      .sort((a, b) => b.type.localeCompare(a.type)) // Ordenar por `type` alfabéticamente inverso
+                      .map((station) => {
+                        const currentKey = `station-${station.id}`;
+                        return (
+                          <div
+                            key={station.id}
+                            className="finding-item border mb-3 p-2"
+                            style={{ borderRadius: "5px", backgroundColor: "#f8f9fa" }}
+                          >
+                            <div className="d-flex justify-content-between align-items-center">
+                              <strong>{station.name || `Estación ${station.description}`}</strong>
+                              <div
+                                className="icon-toggle"
+                                onClick={() => handleCollapseToggle(currentKey)}
+                                style={{ cursor: "pointer" }}
+                              >
+                                {collapseStates[currentKey] ? (
+                                  <ArrowUpSquare title="Ocultar" />
+                                ) : (
+                                  <ArrowDownSquare title="Expandir" />
+                                )}
+                              </div>
+                            </div>
+                            <div
+                              className={`finding-details ${
+                                collapseStates[currentKey] ? "d-block" : "d-none"
+                              } mt-2`}
+                            >
+                              {clientStations[station.id] ? (
+                                <>
+                                  <p>
+                                    <strong>Descripción:</strong>{" "}
+                                    {clientStations[station.id].description || "-"}
+                                  </p>
+                                  <div className="mb-3">
+                                    {clientStations[station.id].photo ? (
+                                      <img
+                                        src={clientStations[station.id].photo}
+                                        alt="Foto"
+                                        style={{ width: "150px", objectFit: "cover" }}
+                                      />
+                                    ) : (
+                                      <span>Sin Foto</span>
+                                    )}
+                                  </div>
+                                  <button
+                                    className="btn btn-outline-success"
+                                    onClick={() => handleOpenStationModal(station.id)}
+                                    disabled={
+                                      (techSignaturePreview && clientSignaturePreview) ||
+                                      userRol === "Cliente"
+                                    }
+                                  >
+                                    Editar
+                                  </button>
+                                </>
+                              ) : (
+                                <>
+                                  <p>Sin hallazgo reportado</p>
+                                  <button
+                                    className="btn btn-outline-success"
+                                    onClick={() => handleOpenStationModal(station.id)}
+                                    disabled={
+                                      (techSignaturePreview && clientSignaturePreview) ||
+                                      userRol === "Cliente"
+                                    }
+                                  >
+                                    +
+                                  </button>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })
+                  ) : (
+                    // Vista de tabla para tablet y computadora
+                    <table className="table table-bordered">
+                      <tbody>
+                        {stations
+                          .filter((station) => {
+                            console.log("Evaluando estación:", station);
+
+                            // Verificar categoría
+                            if (station.category !== "Hogar") {
+                              console.log(
+                                `Estación ${station.name || `ID: ${station.id}`} excluida por categoría:`,
+                                station.category
+                              );
+                              return false;
+                            }
+
+                            // Normalizamos el término de búsqueda
+                            const search = searchTermHogar.trim().toLowerCase();
+                            const stationPrefix = "station-";
+                            const isStationSearch = search.startsWith(stationPrefix);
+
+                            // Verificar si coincide con el término de búsqueda
+                            let matchesSearch = false;
+                            if (search) {
+                              if (isStationSearch) {
+                                const stationId = Number(search.replace(stationPrefix, ""));
+                                matchesSearch = !isNaN(stationId) && station.id === stationId;
+                              } else {
+                                const stationName = station.name ? station.name.toLowerCase() : "";
+                                const stationDescription = station.description
+                                  ? station.description.toLowerCase()
+                                  : "";
+                                matchesSearch =
+                                  stationName.includes(search) || stationDescription.includes(search);
+                              }
+                            }
+
+                            // Verificar si tiene hallazgos
+                            const hasFindings = !!clientStations[station.id];
+
+                            // Mostrar si tiene hallazgos o coincide con el término de búsqueda
+                            return hasFindings || matchesSearch;
+                          })
+                          .sort((a, b) => b.type.localeCompare(a.type)) // Ordenar por `type` alfabéticamente inverso
+                          .map((station) => (
+                            <tr key={station.id}>
+                              <td className="align-middle">
+                                {station.name || `Estación ${station.description}`}
+                              </td>
+                              {clientStations[station.id] ? (
+                                <>
+                                  <td className="align-middle">
+                                    {clientStations[station.id].description || "-"}
+                                  </td>
+                                  <td className="align-middle mx-1 px-1">
+                                    {clientStations[station.id].photo ? (
+                                      <img
+                                        src={clientStations[station.id].photo}
+                                        alt="Foto"
+                                        style={{
+                                          width: "250px",
+                                          objectFit: "cover",
+                                          margin: "0px",
+                                          padding: "0px",
+                                        }}
+                                      />
+                                    ) : (
+                                      "-"
+                                    )}
+                                  </td>
+                                  <td className="align-middle">
+                                    {!isMobile && (
+                                      <button
+                                        className="btn btn-link p-0"
+                                        onClick={() => handleViewStationHogar(station.id)}
+                                        style={{ border: "none", background: "none" }}
+                                      >
+                                        <Eye
+                                          className="mx-2"
+                                          size={"25px"}
+                                          color="blue"
+                                          type="button"
+                                        />
+                                      </button>
+                                    )}
+                                    <button
+                                      className="btn btn-link p-0"
+                                      onClick={() => handleOpenStationModal(station.id)}
+                                      disabled={
+                                        (techSignaturePreview && clientSignaturePreview) ||
+                                        userRol === "Cliente" || station.type === 'Localización'
+                                      }
+                                      style={{ border: "none", background: "none" }}
+                                    >
+                                      <PencilSquare
+                                        className="mx-2"
+                                        size={"20px"}
+                                        color={
+                                          (techSignaturePreview && clientSignaturePreview) ||
+                                          userRol === "Cliente"
+                                            ? "gray"
+                                            : "green"
+                                        }
+                                        type="button"
+                                        title={
+                                          (techSignaturePreview && clientSignaturePreview) ||
+                                          userRol === "Cliente"
+                                            ? "Inspección firmada, edición bloqueada"
+                                            : "Editar"
+                                        }
+                                      />
+                                    </button>
+                                  </td>
+                                </>
+                              ) : (
+                                <>
+                                  <td colSpan="2">Sin hallazgo reportado</td>
+                                  <td>
+                                    <button
+                                      className="btn btn-outline-success"
+                                      onClick={() => handleOpenStationModal(station.id)}
+                                      disabled={
+                                        (techSignaturePreview && clientSignaturePreview) ||
+                                        userRol === "Cliente"
+                                      }
+                                    >
+                                      +
+                                    </button>
+                                  </td>
+                                </>
+                              )}
+                            </tr>
+                          ))}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {type === 'Empresarial' && stations.length > 0 && (
+              <div className="mt-1">
+                <div style={{ display: 'none' }}>
+                  <input
+                    type="text"
+                    className="form-control me-2"
+                    placeholder="Buscar estación por descripción"
+                    value={searchTermEmpresarial}
+                    onChange={(e) => setSearchTermEmpresarial(e.target.value)}
+                  />
+                </div>
+                <QrCodeScan
+                  size={40}
+                  className="btn p-0 mx-4"
+                  onClick={() => handleOpenQrScanner("Empresarial")}
+                />
+                <div className="table-responsive mt-3">
+                  {isMobile ? (
+                    // Vista móvil con colapso
+                    stations
+                      .filter((station) => {
+                        // Validar primero que la categoría sea "Empresarial"
+                        if (station.category !== "Empresarial") {
+                          return false;
+                        }
+
+                        // Normalizamos el término de búsqueda
+                        const search = searchTermEmpresarial.trim().toLowerCase();
+                        const stationPrefix = "station-";
+                        const isStationSearch = search.startsWith(stationPrefix);
+
+                        // Verificar si coincide con el término de búsqueda
+                        let matchesSearch = false;
+                        if (search) {
+                          if (isStationSearch) {
+                            const stationId = Number(search.replace(stationPrefix, ""));
+                            matchesSearch = !isNaN(stationId) && station.id === stationId;
+                          } else {
+                            const stationName = station.name ? station.name.toLowerCase() : "";
+                            const stationDescription = station.description
+                              ? station.description.toLowerCase()
+                              : "";
+                            matchesSearch =
+                              stationName.includes(search) || stationDescription.includes(search);
+                          }
+                        }
+
+                        // Verificar si tiene hallazgos
+                        const hasFindings = !!clientStations[station.id];
+
+                        // Mostrar si tiene hallazgos o coincide con el término de búsqueda
+                        return hasFindings || matchesSearch;
+                      })
+                      .sort((a, b) => b.type.localeCompare(a.type)) // Ordenar por `type` alfabéticamente inverso
+                      .map((station) => {
+                        const currentKey = `station-${station.id}`;
+                        return (
+                          <div
+                            key={station.id}
+                            className="finding-item border mb-3 p-2"
+                            style={{ borderRadius: "5px", backgroundColor: "#f8f9fa" }}
+                          >
+                            <div className="d-flex justify-content-between align-items-center">
+                              <strong>{station.name || `Estación ${station.description}`}</strong>
+                              <div
+                                className="icon-toggle"
+                                onClick={() => handleCollapseToggle(currentKey)}
+                                style={{ cursor: "pointer" }}
+                              >
+                                {collapseStates[currentKey] ? (
+                                  <ArrowUpSquare title="Ocultar" />
+                                ) : (
+                                  <ArrowDownSquare title="Expandir" />
+                                )}
+                              </div>
+                            </div>
+                            <div
+                              className={`finding-details ${
+                                collapseStates[currentKey] ? "d-block" : "d-none"
+                              } mt-2`}
+                            >
+                              {clientStations[station.id] ? (
+                                <>
+                                  <p>
+                                    <strong>Descripción:</strong>{" "}
+                                    {clientStations[station.id].description || "-"}
+                                  </p>
+                                  <div className="mb-3">
+                                    {clientStations[station.id].photo ? (
+                                      <img
+                                        src={clientStations[station.id].photo}
+                                        alt="Foto"
+                                        style={{ width: "150px", objectFit: "cover" }}
+                                      />
+                                    ) : (
+                                      <span>Sin Foto</span>
+                                    )}
+                                  </div>
+                                  <button
+                                    className="btn btn-outline-success"
+                                    onClick={() => handleOpenStationModal(station.id)}
+                                    disabled={
+                                      (techSignaturePreview && clientSignaturePreview) ||
+                                      userRol === "Cliente"
+                                    }
+                                  >
+                                    Editar
+                                  </button>
+                                </>
+                              ) : (
+                                <>
+                                  <p>Sin hallazgo reportado</p>
+                                  <button
+                                    className="btn btn-outline-success"
+                                    onClick={() => handleOpenStationModal(station.id)}
+                                    disabled={
+                                      (techSignaturePreview && clientSignaturePreview) ||
+                                      userRol === "Cliente"
+                                    }
+                                  >
+                                    +
+                                  </button>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })
+                  ) : (
+                    // Vista de tabla para tablet y computadora
+                    <table className="table table-bordered">
+                      <tbody>
+                        {stations
+                          .filter((station) => {
+                            console.log("Evaluando estación:", station);
+
+                            // Verificar categoría
+                            if (station.category !== "Empresarial") {
+                              console.log(
+                                `Estación ${station.name || `ID: ${station.id}`} excluida por categoría:`,
+                                station.category
+                              );
+                              return false;
+                            }
+
+                            // Normalizamos el término de búsqueda
+                            const search = searchTermEmpresarial.trim().toLowerCase();
+                            const stationPrefix = "station-";
+                            const isStationSearch = search.startsWith(stationPrefix);
+
+                            // Verificar si coincide con el término de búsqueda
+                            let matchesSearch = false;
+                            if (search) {
+                              if (isStationSearch) {
+                                const stationId = Number(search.replace(stationPrefix, ""));
+                                matchesSearch = !isNaN(stationId) && station.id === stationId;
+                              } else {
+                                const stationName = station.name ? station.name.toLowerCase() : "";
+                                const stationDescription = station.description
+                                  ? station.description.toLowerCase()
+                                  : "";
+                                matchesSearch =
+                                  stationName.includes(search) || stationDescription.includes(search);
+                              }
+                            }
+
+                            // Verificar si tiene hallazgos
+                            const hasFindings = !!clientStations[station.id];
+
+                            // Mostrar si tiene hallazgos o coincide con el término de búsqueda
+                            return hasFindings || matchesSearch;
+                          })
+                          .sort((a, b) => b.type.localeCompare(a.type)) // Ordenar por `type` alfabéticamente inverso
+                          .map((station) => (
+                            <tr key={station.id}>
+                              <td className="align-middle">
+                                {station.name || `Estación ${station.description}`}
+                              </td>
+                              {clientStations[station.id] ? (
+                                <>
+                                  <td className="align-middle">
+                                    {clientStations[station.id].description || "-"}
+                                  </td>
+                                  <td className="align-middle mx-1 px-1">
+                                    {clientStations[station.id].photo ? (
+                                      <img
+                                        src={clientStations[station.id].photo}
+                                        alt="Foto"
+                                        style={{
+                                          width: "250px",
+                                          objectFit: "cover",
+                                          margin: "0px",
+                                          padding: "0px",
+                                        }}
+                                      />
+                                    ) : (
+                                      "-"
+                                    )}
+                                  </td>
+                                  <td className="align-middle">
+                                    {!isMobile && (
+                                      <button
+                                        className="btn btn-link p-0"
+                                        onClick={() => handleViewStationEmpresarial(station.id)}
+                                        style={{ border: "none", background: "none" }}
+                                      >
+                                        <Eye
+                                          className="mx-2"
+                                          size={"25px"}
+                                          color="blue"
+                                          type="button"
+                                        />
+                                      </button>
+                                    )}
+                                    <button
+                                      className="btn btn-link p-0"
+                                      onClick={() => handleOpenStationModal(station.id)}
+                                      disabled={
+                                        (techSignaturePreview && clientSignaturePreview) ||
+                                        userRol === "Cliente" || station.type === 'Localización'
+                                      }
+                                      style={{ border: "none", background: "none" }}
+                                    >
+                                      <PencilSquare
+                                        className="mx-2"
+                                        size={"20px"}
+                                        color={
+                                          (techSignaturePreview && clientSignaturePreview) ||
+                                          userRol === "Cliente"
+                                            ? "gray"
+                                            : "green"
+                                        }
+                                        type="button"
+                                        title={
+                                          (techSignaturePreview && clientSignaturePreview) ||
+                                          userRol === "Cliente"
+                                            ? "Inspección firmada, edición bloqueada"
+                                            : "Editar"
+                                        }
+                                      />
+                                    </button>
+                                  </td>
+                                </>
+                              ) : (
+                                <>
+                                  <td colSpan="2">Sin hallazgo reportado</td>
+                                  <td>
+                                    <button
+                                      className="btn btn-outline-success"
+                                      onClick={() => handleOpenStationModal(station.id)}
+                                      disabled={
+                                        (techSignaturePreview && clientSignaturePreview) ||
+                                        userRol === "Cliente"
+                                      }
+                                    >
+                                      +
+                                    </button>
+                                  </td>
+                                </>
+                              )}
+                            </tr>
+                          ))}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+              </div>
+            )}
+
+
+            {type === 'Horizontal' && stations.length > 0 && (
+              <div className="mt-1">
+                <div style={{ display: 'none' }}>
+                  <input
+                    type="text"
+                    className="form-control me-2"
+                    placeholder="Buscar estación por descripción"
+                    value={searchTermHorizontal}
+                    onChange={(e) => setSearchTermHorizontal(e.target.value)}
+                  />
+                </div>
+                <QrCodeScan
+                  size={40}
+                  className="btn p-0 mx-4"
+                  onClick={() => handleOpenQrScanner("Horizontal")}
+                />
+                <div className="table-responsive mt-3">
+                  {isMobile ? (
+                    // Vista móvil con colapso
+                    stations
+                      .filter((station) => {
+                        // Validar primero que la categoría sea "Horizontal"
+                        if (station.category !== "Horizontal") {
+                          return false;
+                        }
+
+                        // Normalizamos el término de búsqueda
+                        const search = searchTermHorizontal.trim().toLowerCase();
+                        const stationPrefix = "station-";
+                        const isStationSearch = search.startsWith(stationPrefix);
+
+                        // Verificar si coincide con el término de búsqueda
+                        let matchesSearch = false;
+                        if (search) {
+                          if (isStationSearch) {
+                            const stationId = Number(search.replace(stationPrefix, ""));
+                            matchesSearch = !isNaN(stationId) && station.id === stationId;
+                          } else {
+                            const stationName = station.name ? station.name.toLowerCase() : "";
+                            const stationDescription = station.description
+                              ? station.description.toLowerCase()
+                              : "";
+                            matchesSearch =
+                              stationName.includes(search) || stationDescription.includes(search);
+                          }
+                        }
+
+                        // Verificar si tiene hallazgos
+                        const hasFindings = !!clientStations[station.id];
+
+                        // Mostrar si tiene hallazgos o coincide con el término de búsqueda
+                        return hasFindings || matchesSearch;
+                      })
+                      .sort((a, b) => b.type.localeCompare(a.type)) // Ordenar por `type` alfabéticamente inverso
+                      .map((station) => {
+                        const currentKey = `station-${station.id}`;
+                        return (
+                          <div
+                            key={station.id}
+                            className="finding-item border mb-3 p-2"
+                            style={{ borderRadius: "5px", backgroundColor: "#f8f9fa" }}
+                          >
+                            <div className="d-flex justify-content-between align-items-center">
+                              <strong>{station.name || `Estación ${station.description}`}</strong>
+                              <div
+                                className="icon-toggle"
+                                onClick={() => handleCollapseToggle(currentKey)}
+                                style={{ cursor: "pointer" }}
+                              >
+                                {collapseStates[currentKey] ? (
+                                  <ArrowUpSquare title="Ocultar" />
+                                ) : (
+                                  <ArrowDownSquare title="Expandir" />
+                                )}
+                              </div>
+                            </div>
+                            <div
+                              className={`finding-details ${
+                                collapseStates[currentKey] ? "d-block" : "d-none"
+                              } mt-2`}
+                            >
+                              {clientStations[station.id] ? (
+                                <>
+                                  <p>
+                                    <strong>Descripción:</strong>{" "}
+                                    {clientStations[station.id].description || "-"}
+                                  </p>
+                                  <div className="mb-3">
+                                    {clientStations[station.id].photo ? (
+                                      <img
+                                        src={clientStations[station.id].photo}
+                                        alt="Foto"
+                                        style={{ width: "150px", objectFit: "cover" }}
+                                      />
+                                    ) : (
+                                      <span>Sin Foto</span>
+                                    )}
+                                  </div>
+                                  <button
+                                    className="btn btn-outline-success"
+                                    onClick={() => handleOpenStationModal(station.id)}
+                                    disabled={
+                                      (techSignaturePreview && clientSignaturePreview) ||
+                                      userRol === "Cliente"
+                                    }
+                                  >
+                                    Editar
+                                  </button>
+                                </>
+                              ) : (
+                                <>
+                                  <p>Sin hallazgo reportado</p>
+                                  <button
+                                    className="btn btn-outline-success"
+                                    onClick={() => handleOpenStationModal(station.id)}
+                                    disabled={
+                                      (techSignaturePreview && clientSignaturePreview) ||
+                                      userRol === "Cliente"
+                                    }
+                                  >
+                                    +
+                                  </button>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })
+                  ) : (
+                    // Vista de tabla para tablet y computadora
+                    <table className="table table-bordered">
+                      <tbody>
+                        {stations
+                          .filter((station) => {
+                            console.log("Evaluando estación:", station);
+
+                            // Verificar categoría
+                            if (station.category !== "Horizontal") {
+                              console.log(
+                                `Estación ${station.name || `ID: ${station.id}`} excluida por categoría:`,
+                                station.category
+                              );
+                              return false;
+                            }
+
+                            // Normalizamos el término de búsqueda
+                            const search = searchTermHorizontal.trim().toLowerCase();
+                            const stationPrefix = "station-";
+                            const isStationSearch = search.startsWith(stationPrefix);
+
+                            // Verificar si coincide con el término de búsqueda
+                            let matchesSearch = false;
+                            if (search) {
+                              if (isStationSearch) {
+                                const stationId = Number(search.replace(stationPrefix, ""));
+                                matchesSearch = !isNaN(stationId) && station.id === stationId;
+                              } else {
+                                const stationName = station.name ? station.name.toLowerCase() : "";
+                                const stationDescription = station.description
+                                  ? station.description.toLowerCase()
+                                  : "";
+                                matchesSearch =
+                                  stationName.includes(search) || stationDescription.includes(search);
+                              }
+                            }
+
+                            // Verificar si tiene hallazgos
+                            const hasFindings = !!clientStations[station.id];
+
+                            // Mostrar si tiene hallazgos o coincide con el término de búsqueda
+                            return hasFindings || matchesSearch;
+                          })
+                          .sort((a, b) => b.type.localeCompare(a.type)) // Ordenar por `type` alfabéticamente inverso
+                          .map((station) => (
+                            <tr key={station.id}>
+                              <td className="align-middle">
+                                {station.name || `Estación ${station.description}`}
+                              </td>
+                              {clientStations[station.id] ? (
+                                <>
+                                  <td className="align-middle">
+                                    {clientStations[station.id].description || "-"}
+                                  </td>
+                                  <td className="align-middle mx-1 px-1">
+                                    {clientStations[station.id].photo ? (
+                                      <img
+                                        src={clientStations[station.id].photo}
+                                        alt="Foto"
+                                        style={{
+                                          width: "250px",
+                                          objectFit: "cover",
+                                          margin: "0px",
+                                          padding: "0px",
+                                        }}
+                                      />
+                                    ) : (
+                                      "-"
+                                    )}
+                                  </td>
+                                  <td className="align-middle">
+                                    {!isMobile && (
+                                      <button
+                                        className="btn btn-link p-0"
+                                        onClick={() => handleViewStationHorizontal(station.id)}
+                                        style={{ border: "none", background: "none" }}
+                                      >
+                                        <Eye
+                                          className="mx-2"
+                                          size={"25px"}
+                                          color="blue"
+                                          type="button"
+                                        />
+                                      </button>
+                                    )}
+                                    <button
+                                      className="btn btn-link p-0"
+                                      onClick={() => handleOpenStationModal(station.id)}
+                                      disabled={
+                                        (techSignaturePreview && clientSignaturePreview) ||
+                                        userRol === "Cliente" || station.type === 'Localización'
+                                      }
+                                      style={{ border: "none", background: "none" }}
+                                    >
+                                      <PencilSquare
+                                        className="mx-2"
+                                        size={"20px"}
+                                        color={
+                                          (techSignaturePreview && clientSignaturePreview) ||
+                                          userRol === "Cliente"
+                                            ? "gray"
+                                            : "green"
+                                        }
+                                        type="button"
+                                        title={
+                                          (techSignaturePreview && clientSignaturePreview) ||
+                                          userRol === "Cliente"
+                                            ? "Inspección firmada, edición bloqueada"
+                                            : "Editar"
+                                        }
+                                      />
+                                    </button>
+                                  </td>
+                                </>
+                              ) : (
+                                <>
+                                  <td colSpan="2">Sin hallazgo reportado</td>
+                                  <td>
+                                    <button
+                                      className="btn btn-outline-success"
+                                      onClick={() => handleOpenStationModal(station.id)}
+                                      disabled={
+                                        (techSignaturePreview && clientSignaturePreview) ||
+                                        userRol === "Cliente"
+                                      }
                                     >
                                       +
                                     </button>
@@ -1920,6 +2085,26 @@ const handleDeleteFinding = () => {
                           collapseStates[currentKey] ? "d-block" : "d-none"
                         }`} 
                       >
+                        <div className="col-md-2 mt-3 mb-0 ms-auto text-end">
+                      <XCircle
+                        size={"18px"}
+                        color={(techSignaturePreview && clientSignaturePreview && userRol !== 'Cliente' ) || (userRol !== 'Cliente' && type === 'Observaciones Cliente') || (userRol === 'Cliente' && type !== 'Observaciones Cliente') ? "gray" : "red"} // Cambiar color si está bloqueado
+                        onClick={() => {
+                          if ((techSignaturePreview && clientSignaturePreview && userRol !== 'Cliente' ) || (userRol !== 'Cliente' && type === 'Observaciones Cliente') || (userRol === 'Cliente' && type !== 'Observaciones Cliente')) {
+                            return;
+                          }
+                          handleShowConfirmDelete(type, idx);
+                        }}
+                        style={{
+                          cursor: (techSignaturePreview && clientSignaturePreview && userRol !== 'Cliente' ) || (userRol !== 'Cliente' && type === 'Observaciones Cliente') || (userRol === 'Cliente' && type !== 'Observaciones Cliente') ? "not-allowed" : "pointer", // Cambiar cursor si está bloqueado
+                        }}
+                        title={
+                          (techSignaturePreview && clientSignaturePreview && userRol !== 'Cliente' ) || (userRol !== 'Cliente' && type === 'Observaciones Cliente') || (userRol === 'Cliente' && type !== 'Observaciones Cliente')
+                            ? "Inspección firmada, acción bloqueada"
+                            : "Eliminar hallazgo"
+                        }
+                      />
+                      </div>
                         <div className="row mt-3" style={{ minHeight: 0, height: 'auto' }}>
                           <div className="col-md-2" >
                             <label htmlFor={`place-${type}-${idx}`} className="form-label">
@@ -1934,7 +2119,7 @@ const handleDeleteFinding = () => {
                                 handleFindingChange(type, idx, "place", e.target.value)
                               }
                               placeholder="Lugar"
-                              disabled={techSignaturePreview && clientSignaturePreview}
+                              disabled={(techSignaturePreview && clientSignaturePreview && userRol !== 'Cliente' ) || (userRol !== 'Cliente' && type === 'Observaciones Cliente') || (userRol === 'Cliente' && type !== 'Observaciones Cliente')}
                             />
                           </div>
                           <div className="col-md-8">
@@ -1953,7 +2138,7 @@ const handleDeleteFinding = () => {
                                 handleFindingChange(type, idx, "description", e.target.value)
                               }
                               placeholder="Descripción"
-                              disabled={techSignaturePreview && clientSignaturePreview}
+                              disabled={(techSignaturePreview && clientSignaturePreview && userRol !== 'Cliente' ) || (userRol !== 'Cliente' && type === 'Observaciones Cliente') || (userRol === 'Cliente' && type !== 'Observaciones Cliente')}
                             ></textarea>
                           </div>
                           <div className="col-md-2">
@@ -1973,7 +2158,7 @@ const handleDeleteFinding = () => {
                               <input
                                 type="file"
                                 className="image-input"
-                                disabled={techSignaturePreview && clientSignaturePreview}
+                                disabled={(techSignaturePreview && clientSignaturePreview && userRol !== 'Cliente' ) || (userRol !== 'Cliente' && type === 'Observaciones Cliente') || (userRol === 'Cliente' && type !== 'Observaciones Cliente')}
                                 onChange={(e) =>
                                   handleFindingPhotoChange(type, idx, e.target.files[0])
                                 }
@@ -1989,18 +2174,18 @@ const handleDeleteFinding = () => {
                       <div className="col-md-2 mt-0 mb-0 ms-auto text-end">
                       <XCircle
                         size={"20px"}
-                        color={techSignaturePreview && clientSignaturePreview ? "gray" : "red"} // Cambiar color si está bloqueado
+                        color={(techSignaturePreview && clientSignaturePreview && userRol !== 'Cliente' ) || (userRol !== 'Cliente' && type === 'Observaciones Cliente') || (userRol === 'Cliente' && type !== 'Observaciones Cliente') ? "gray" : "red"} // Cambiar color si está bloqueado
                         onClick={() => {
-                          if (techSignaturePreview && clientSignaturePreview) {
+                          if ((techSignaturePreview && clientSignaturePreview && userRol !== 'Cliente' ) || (userRol !== 'Cliente' && type === 'Observaciones Cliente') || (userRol === 'Cliente' && type !== 'Observaciones Cliente')) {
                             return;
                           }
                           handleShowConfirmDelete(type, idx);
                         }}
                         style={{
-                          cursor: techSignaturePreview && clientSignaturePreview ? "not-allowed" : "pointer", // Cambiar cursor si está bloqueado
+                          cursor: (techSignaturePreview && clientSignaturePreview && userRol !== 'Cliente' ) || (userRol !== 'Cliente' && type === 'Observaciones Cliente') || (userRol === 'Cliente' && type !== 'Observaciones Cliente') ? "not-allowed" : "pointer", // Cambiar cursor si está bloqueado
                         }}
                         title={
-                          techSignaturePreview && clientSignaturePreview
+                          (techSignaturePreview && clientSignaturePreview && userRol !== 'Cliente' ) || (userRol !== 'Cliente' && type === 'Observaciones Cliente') || (userRol === 'Cliente' && type !== 'Observaciones Cliente')
                             ? "Inspección firmada, acción bloqueada"
                             : "Eliminar hallazgo"
                         }
@@ -2020,7 +2205,7 @@ const handleDeleteFinding = () => {
                               handleFindingChange(type, idx, "place", e.target.value)
                             }
                             placeholder="Lugar"
-                            disabled={techSignaturePreview && clientSignaturePreview}
+                            disabled={(techSignaturePreview && clientSignaturePreview && userRol !== 'Cliente' ) || (userRol !== 'Cliente' && type === 'Observaciones Cliente') || (userRol === 'Cliente' && type !== 'Observaciones Cliente')}
                           />
                         </div>
                         <div className="col-md-8">
@@ -2039,7 +2224,7 @@ const handleDeleteFinding = () => {
                               handleFindingChange(type, idx, "description", e.target.value)
                             }
                             placeholder="Descripción"
-                            disabled={techSignaturePreview && clientSignaturePreview}
+                            disabled={(techSignaturePreview && clientSignaturePreview && userRol !== 'Cliente' ) || (userRol !== 'Cliente' && type === 'Observaciones Cliente') || (userRol === 'Cliente' && type !== 'Observaciones Cliente')}
                           ></textarea>
                         </div>
                         <div className="col-md-2">
@@ -2059,7 +2244,7 @@ const handleDeleteFinding = () => {
                             <input
                               type="file"
                               className="image-input"
-                              disabled={techSignaturePreview && clientSignaturePreview}
+                              disabled={(techSignaturePreview && clientSignaturePreview && userRol !== 'Cliente' ) || (userRol !== 'Cliente' && type === 'Observaciones Cliente') || (userRol === 'Cliente' && type !== 'Observaciones Cliente')}
                               onChange={(e) =>
                                 handleFindingPhotoChange(type, idx, e.target.files[0])
                               }
@@ -2077,22 +2262,24 @@ const handleDeleteFinding = () => {
             <button
               className="btn btn-outline-success mb-3"
               onClick={() => handleAddFinding(type)}
-              disabled={techSignaturePreview && clientSignaturePreview}
+              disabled={(techSignaturePreview && clientSignaturePreview && userRol !== 'Cliente' ) || (userRol !== 'Cliente' && type === 'Observaciones Cliente') || (userRol === 'Cliente' && type !== 'Observaciones Cliente')}
             >
               + Agregar Hallazgo
             </button>
 
+            {type !== 'Observaciones Cliente' && (
+              <>
             {/* Producto */}
             <hr></hr>
             <h6 className='mt-2'>Producto</h6>
             <div className="row" style={{ minHeight: 0, height: 'auto' }}>
-              <div className="col-md-6 mb-3">
+              <div className="col-md-12 mb-3">
                 <select
                   id={`product-${type}`}
                   className="form-select"
                   value={productsByType[type]?.product || ''}
                   onChange={(e) => handleProductChange(type, 'product', e.target.value)}
-                  disabled={techSignaturePreview && clientSignaturePreview}
+                  disabled={techSignaturePreview && clientSignaturePreview || userRol === 'Cliente'}
                 >
                   <option value="">Seleccione un producto</option>
                   {getFilteredProducts(type).map((product) => (
@@ -2102,18 +2289,9 @@ const handleDeleteFinding = () => {
                   ))}
                 </select>
               </div>
-              <div className="col-md-6 mb-3">
-                <input
-                  id={`dosage-${type}`}
-                  type="number"
-                  className="form-control"
-                  value={productsByType[type]?.dosage || ''}
-                  onChange={(e) => handleProductChange(type, 'dosage', e.target.value)}
-                  placeholder="Ingrese la dosificación en gr/ml"
-                  disabled={techSignaturePreview && clientSignaturePreview}
-                />
-              </div>
             </div>
+            </>
+           )}
           </div>
         </div>
       ))}
@@ -2123,12 +2301,14 @@ const handleDeleteFinding = () => {
         <div className="card-header">Firmas</div>
         <div className="card-body">
           {/* Mostrar solo el botón si no hay firmas */}
-          {!techSignaturePreview || !clientSignaturePreview ? (
+          {!techSignaturePreview || !clientSignaturePreview? (
+            userRol !== 'Cliente' && (
             <div className="text-center">
               <button className="btn btn-outline-success" onClick={() => setSignModalOpen(true)}>
                 Firmar
               </button>
             </div>
+          )
           ) : (
             <>
               {/* Mostrar la información completa si hay firmas */}
@@ -2177,108 +2357,6 @@ const handleDeleteFinding = () => {
         </Modal.Header>
         <Modal.Body>
             <div className="mb-3">
-            <label className="form-label">Finalidad</label>
-            <select
-                className="form-select"
-                value={stationFinding.purpose}
-                onChange={(e) => handleStationFindingChange('purpose', e.target.value)}
-            >
-                <option value="Consumo">Consumo</option>
-                <option value="Captura">Captura</option>
-            </select>
-            </div>
-            {stationFinding.purpose === 'Consumo' && (
-            <div className="mb-3">
-                <label className="form-label">Cantidad de Consumo</label>
-                <select
-                className="form-select"
-                value={stationFinding.consumptionAmount}
-                onChange={(e) => handleStationFindingChange('consumptionAmount', e.target.value)}
-                >
-                <option value="Nada">Nada</option>
-                <option value="1/4">1/4</option>
-                <option value="1/2">1/2</option>
-                <option value="3/4">3/4</option>
-                <option value="Todo">Todo</option>
-                </select>
-            </div>
-            )}
-            {stationFinding.purpose === 'Captura' && (
-            <div className="mb-3">
-                <label className="form-label">Cantidad de Capturas</label>
-                <input
-                type="number"
-                className="form-control"
-                value={stationFinding.captureQuantity}
-                onChange={(e) => handleStationFindingChange('captureQuantity', e.target.value)}
-                />
-            </div>
-            )}
-            <div className="mb-3">
-            <label className="form-label">Señalizada</label>
-            <select
-                className="form-select"
-                value={stationFinding.marked}
-                onChange={(e) => handleStationFindingChange('marked', e.target.value)}
-            >
-                <option value="Si">Si</option>
-                <option value="No">No</option>
-            </select>
-            </div>
-            <div className="mb-3">
-            <label className="form-label">Estado Físico</label>
-            <select
-                className="form-select"
-                value={stationFinding.physicalState}
-                onChange={(e) => handleStationFindingChange('physicalState', e.target.value)}
-            >
-                <option value="Buena">Buena</option>
-                <option value="Dañada">Dañada</option>
-                <option value="Faltante">Faltante</option>
-            </select>
-            </div>
-            {stationFinding.physicalState === 'Dañada' && (
-            <>
-                <div className="mb-3">
-                <label className="form-label">Lugar del Daño</label>
-                <select
-                    className="form-select"
-                    value={stationFinding.damageLocation}
-                    onChange={(e) => handleStationFindingChange('damageLocation', e.target.value)}
-                >
-                    <option value="Cuerpo">Cuerpo</option>
-                    <option value="Tapa">Tapa</option>
-                    <option value="Sticker">Sticker</option>
-                    <option value="Tablero">Tablero</option>
-                </select>
-                </div>
-                <div className="mb-3">
-                <label className="form-label">Requiere Cambio</label>
-                <select
-                    className="form-select"
-                    value={stationFinding.requiresChange}
-                    onChange={(e) => handleStationFindingChange('requiresChange', e.target.value)}
-                >
-                    <option value="Si">Si</option>
-                    <option value="No">No</option>
-                </select>
-                </div>
-                {stationFinding.requiresChange === 'Si' && (
-                <div className="mb-3">
-                    <label className="form-label">Prioridad de Cambio</label>
-                    <select
-                    className="form-select"
-                    value={stationFinding.changePriority}
-                    onChange={(e) => handleStationFindingChange('changePriority', e.target.value)}
-                    >
-                    <option value="Si">Si</option>
-                    <option value="No">No</option>
-                    </select>
-                </div>
-                )}
-            </>
-            )}
-            <div className="mb-3">
             <label className="form-label">Descripción</label>
             <textarea
                 className="form-control"
@@ -2287,7 +2365,7 @@ const handleDeleteFinding = () => {
                 
                 onChange={(e) => handleStationFindingChange('description', e.target.value)}
                 placeholder="Ingrese una descripción del hallazgo"
-                disabled={techSignaturePreview && clientSignaturePreview}
+                disabled={techSignaturePreview && clientSignaturePreview || userRol === 'Cliente'}
             ></textarea>
             </div>
             <div className="mb-3">
@@ -2307,7 +2385,7 @@ const handleDeleteFinding = () => {
               <input
                 type="file"
                 className="image-input"
-                disabled={techSignaturePreview && clientSignaturePreview}
+                disabled={techSignaturePreview && clientSignaturePreview || userRol === 'Cliente'}
                 onChange={(e) => {
                   const file = e.target.files[0];
                   if (file) {
@@ -2328,153 +2406,13 @@ const handleDeleteFinding = () => {
         </Modal.Footer>
         </Modal>
 
-        <Modal show={stationModalOpenHorizontal} onHide={handleCloseStationModalHorizontal} size="lg">
-        <Modal.Header closeButton>
-            <Modal.Title>Agregar Hallazgo para la Estación</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-            <div className="mb-3">
-            <label className="form-label">Cantidad de Capturas</label>
-            <input
-                type="number"
-                className="form-control"
-                value={stationFindingHorizontal.captureQuantity}
-                onChange={(e) => handleStationFindingChangeHorizontal('captureQuantity', e.target.value)}
-                placeholder="Ingrese la cantidad de capturas"
-            />
-            </div>
-            <div className="mb-3">
-            <label className="form-label">Estado Físico</label>
-            <select
-                className="form-select"
-                value={stationFindingHorizontal.physicalState}
-                onChange={(e) => handleStationFindingChangeHorizontal('physicalState', e.target.value)}
-            >
-                <option value="Buena">Buena</option>
-                <option value="Dañada">Dañada</option>
-                <option value="Faltante">Faltante</option>
-            </select>
-            </div>
-            {stationFindingHorizontal.physicalState === 'Dañada' && (
-            <>
-                <div className="mb-3">
-                <label className="form-label">Lugar del Daño</label>
-                <select
-                    className="form-select"
-                    value={stationFindingHorizontal.damageLocation}
-                    onChange={(e) => handleStationFindingChangeHorizontal('damageLocation', e.target.value)}
-                >
-                    <option value="Marco">Marco</option>
-                    <option value="Estacas">Estacas</option>
-                    <option value="Lamina">Lámina</option>
-                </select>
-                </div>
-                <div className="mb-3">
-                <label className="form-label">Requiere Cambio</label>
-                <select
-                    className="form-select"
-                    value={stationFindingHorizontal.requiresChange}
-                    onChange={(e) => handleStationFindingChangeHorizontal('requiresChange', e.target.value)}
-                >
-                    <option value="Si">Si</option>
-                    <option value="No">No</option>
-                </select>
-                </div>
-                {stationFindingHorizontal.requiresChange === 'Si' && (
-                <div className="mb-3">
-                    <label className="form-label">Prioridad de Cambio</label>
-                    <select
-                    className="form-select"
-                    value={stationFindingHorizontal.changePriority}
-                    onChange={(e) => handleStationFindingChangeHorizontal('changePriority', e.target.value)}
-                    >
-                    <option value="Si">Si</option>
-                    <option value="No">No</option>
-                    </select>
-                </div>
-                )}
-            </>
-            )}
-            <div className="mb-3">
-            <label className="form-label">Descripción</label>
-            <textarea
-                className="form-control"
-                rows="3"
-                value={stationFindingHorizontal.description}
-                onChange={(e) => handleStationFindingChangeHorizontal('description', e.target.value)}
-                placeholder="Ingrese una descripción del hallazgo"
-                disabled={techSignaturePreview && clientSignaturePreview}
-            ></textarea>
-            </div>
-            <div className="mb-3">
-            <label className="form-label">Fotografía</label>
-            <div className="image-upload-container">
-              {stationFindingHorizontal.photo ? (
-                <img
-                  src={stationFindingHorizontal.photo}
-                  alt="Preview"
-                  className="image-preview"
-                />
-              ) : (
-                <div className="drag-drop-area">
-                  <span>Arrastra o selecciona una imagen</span>
-                </div>
-              )}
-              <input
-                type="file"
-                className="image-input"
-                disabled={techSignaturePreview && clientSignaturePreview}
-                onChange={(e) => {
-                  const file = e.target.files[0];
-                  if (file) {
-                    handleStationFindingPhotoChangeHorizontal(file); // Mantiene la lógica original
-                  }
-                }}
-              />
-            </div>
-          </div>
-        </Modal.Body>
-        <Modal.Footer>
-            <button className="btn btn-secondary" onClick={handleCloseStationModalHorizontal}>
-            Cancelar
-            </button>
-            <button className="btn btn-success" onClick={handleSaveStationFindingHorizontal}>
-            Guardar Hallazgo
-            </button>
-        </Modal.Footer>
-        </Modal>
+        
 
         <Modal show={viewStationModalOpen} onHide={() => setViewStationModalOpen(false)} size="lg">
         <Modal.Header closeButton>
           <Modal.Title>Detalles de la Estación</Modal.Title>
         </Modal.Header>
         <Modal.Body>
-          {stationType === 'Jardineria' && (
-            <>
-              <p><strong>Finalidad:</strong> {viewStationData.purpose || '-'}</p>
-              {viewStationData.purpose === 'Consumo' && (
-                <p><strong>Cantidad Consumida:</strong> {viewStationData.consumptionAmount || '-'}</p>
-              )}
-              {viewStationData.purpose === 'Captura' && (
-                <p><strong>Cantidad Capturada:</strong> {viewStationData.captureQuantity || '-'}</p>
-              )}
-            </>
-          )}
-          {stationType === 'Horizontal' && (
-            <>
-              <p><strong>Capturas:</strong> {viewStationData.captureQuantity || '-'}</p>
-            </>
-          )}
-          <p><strong>Estado Físico:</strong> {viewStationData.physicalState || '-'}</p>
-          {viewStationData.physicalState === 'Dañada' && (
-            <>
-              <p><strong>Lugar del Daño:</strong> {viewStationData.damageLocation || '-'}</p>
-              <p><strong>Requiere Cambio:</strong> {viewStationData.requiresChange || '-'}</p>
-              {viewStationData.requiresChange === 'Si' && (
-                <p><strong>Prioridad de Cambio:</strong> {viewStationData.changePriority || '-'}</p>
-              )}
-            </>
-          )}
           <p><strong>Descripción:</strong> {viewStationData.description || '-'}</p>
           <div className="mb-3">
             {viewStationData.photo ? (
@@ -2495,107 +2433,7 @@ const handleDeleteFinding = () => {
         </Modal.Footer>
       </Modal>
 
-      <Modal show={viewStationModalOpen} onHide={() => setViewStationModalOpen(false)} size="lg">
-        <Modal.Header closeButton>
-          <Modal.Title>Detalles de la Estación</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          {stationType === 'Hogar' && (
-            <>
-              <p><strong>Finalidad:</strong> {viewStationData.purpose || '-'}</p>
-              {viewStationData.purpose === 'Consumo' && (
-                <p><strong>Cantidad Consumida:</strong> {viewStationData.consumptionAmount || '-'}</p>
-              )}
-              {viewStationData.purpose === 'Captura' && (
-                <p><strong>Cantidad Capturada:</strong> {viewStationData.captureQuantity || '-'}</p>
-              )}
-            </>
-          )}
-          {stationType === 'Horizontal' && (
-            <>
-              <p><strong>Capturas:</strong> {viewStationData.captureQuantity || '-'}</p>
-            </>
-          )}
-          <p><strong>Estado Físico:</strong> {viewStationData.physicalState || '-'}</p>
-          {viewStationData.physicalState === 'Dañada' && (
-            <>
-              <p><strong>Lugar del Daño:</strong> {viewStationData.damageLocation || '-'}</p>
-              <p><strong>Requiere Cambio:</strong> {viewStationData.requiresChange || '-'}</p>
-              {viewStationData.requiresChange === 'Si' && (
-                <p><strong>Prioridad de Cambio:</strong> {viewStationData.changePriority || '-'}</p>
-              )}
-            </>
-          )}
-          <p><strong>Descripción:</strong> {viewStationData.description || '-'}</p>
-          <div className="mb-3">
-            {viewStationData.photo ? (
-              <img
-                src={viewStationData.photo}
-                alt="Foto"
-                style={{ width: '300px', objectFit: 'cover' }}
-              />
-            ) : (
-              <span>Sin Foto</span>
-            )}
-          </div>
-        </Modal.Body>
-        <Modal.Footer>
-          <button className="btn btn-secondary" onClick={() => setViewStationModalOpen(false)}>
-            Cerrar
-          </button>
-        </Modal.Footer>
-      </Modal>
-
-      <Modal show={viewStationModalOpen} onHide={() => setViewStationModalOpen(false)} size="lg">
-        <Modal.Header closeButton>
-          <Modal.Title>Detalles de la Estación</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          {stationType === 'Empresarial' && (
-            <>
-              <p><strong>Finalidad:</strong> {viewStationData.purpose || '-'}</p>
-              {viewStationData.purpose === 'Consumo' && (
-                <p><strong>Cantidad Consumida:</strong> {viewStationData.consumptionAmount || '-'}</p>
-              )}
-              {viewStationData.purpose === 'Captura' && (
-                <p><strong>Cantidad Capturada:</strong> {viewStationData.captureQuantity || '-'}</p>
-              )}
-            </>
-          )}
-          {stationType === 'Horizontal' && (
-            <>
-              <p><strong>Capturas:</strong> {viewStationData.captureQuantity || '-'}</p>
-            </>
-          )}
-          <p><strong>Estado Físico:</strong> {viewStationData.physicalState || '-'}</p>
-          {viewStationData.physicalState === 'Dañada' && (
-            <>
-              <p><strong>Lugar del Daño:</strong> {viewStationData.damageLocation || '-'}</p>
-              <p><strong>Requiere Cambio:</strong> {viewStationData.requiresChange || '-'}</p>
-              {viewStationData.requiresChange === 'Si' && (
-                <p><strong>Prioridad de Cambio:</strong> {viewStationData.changePriority || '-'}</p>
-              )}
-            </>
-          )}
-          <p><strong>Descripción:</strong> {viewStationData.description || '-'}</p>
-          <div className="mb-3">
-            {viewStationData.photo ? (
-              <img
-                src={viewStationData.photo}
-                alt="Foto"
-                style={{ width: '300px', objectFit: 'cover' }}
-              />
-            ) : (
-              <span>Sin Foto</span>
-            )}
-          </div>
-        </Modal.Body>
-        <Modal.Footer>
-          <button className="btn btn-secondary" onClick={() => setViewStationModalOpen(false)}>
-            Cerrar
-          </button>
-        </Modal.Footer>
-      </Modal>
+      
 
        {/* Modal de firma */}
        <Modal show={signModalOpen} onHide={handleSignModalCancel} size="lg">
@@ -2622,7 +2460,7 @@ const handleDeleteFinding = () => {
                 style={{ cursor: "pointer" }}
                 title="Limpiar Firma Técnico"
                 onClick={handleClearTechSignature}
-                disabled={techSignaturePreview && clientSignaturePreview}
+                disabled={techSignaturePreview && clientSignaturePreview || userRol === 'Cliente'}
               />
             </div>
           </div>
@@ -2646,7 +2484,7 @@ const handleDeleteFinding = () => {
                 style={{ cursor: "pointer" }}
                 title="Limpiar Firma Cliente"
                 onClick={handleClearClientSignature}
-                disabled={techSignaturePreview && clientSignaturePreview}
+                disabled={techSignaturePreview && clientSignaturePreview || userRol === 'Cliente'}
               />
             </div>
           </div>

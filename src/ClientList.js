@@ -29,6 +29,8 @@ function ClientList() {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [stations, setStations] = useState([]); // Estado único para todas las estaciones
+  const [showAddStationModal, setShowAddStationModal] = useState(false);
   const [editingClient, setEditingClient] = useState(null);
   const [selectedClient, setSelectedClient] = useState(null);
   const [showConfirmationModal, setShowConfirmationModal] = useState(false);
@@ -37,9 +39,9 @@ function ClientList() {
   const [showNotificationModal, setShowNotificationModal] = useState(false);
   const [showActionModal, setShowActionModal] = useState(false);
   const [actionType, setActionType] = useState(""); // "call" o "whatsapp"
-  const [showAddStationModal, setShowAddStationModal] = useState(false);
   const [selectedNumber, setSelectedNumber] = useState(null);
-  const [stations, setStations] = useState([]); // Estado único para todas las estaciones
+  const [airStations, setAirStations] = useState([]);
+  const [rodentStations, setRodentStations] = useState([]);
   const [showImageModal, setShowImageModal] = useState(false); // Controla la visualización del modal
   const [selectedImage, setSelectedImage] = useState(null); // Almacena la URL de la imagen seleccionada
   const [maps, setMaps] = useState([]);
@@ -60,23 +62,27 @@ function ClientList() {
     category: ''
   });
 
+  const [showAddAirStationModal, setShowAddAirStationModal] = useState(false);
   const [newStation, setNewStation] = useState({
     description: '',
     type: 'Control', // Tipo predeterminado
     category: '', // Nueva propiedad para categoría
     client_id: null, // Se llenará automáticamente con el cliente seleccionado
-  });  
+    latitude: '', // Nueva propiedad
+    longitude: '', // Nueva propiedad
+    altitude: '', // Nueva propiedad (opcional)
+  }); 
 
   const navigate = useNavigate();
 
   useEffect(() => {
     const fetchClientsAndCategories = async () => {
       try {
-        const response = await axios.get('http://localhost:10000/api/clients');
+        const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/clients`);
         setClients(response.data);
         setFilteredClients(response.data); // Inicialmente muestra todos los clientes
         setLoading(false);
-        const categoriesResponse = await axios.get('http://localhost:10000/api/rules/categories'); // Ruta para categorías
+        const categoriesResponse = await axios.get(`${process.env.REACT_APP_API_URL}/api/rules/categories`); // Ruta para categorías
       setCategories(categoriesResponse.data); // Guardar las categorías en el estado        
       } catch (error) {
         console.error("Error fetching clients:", error);
@@ -87,17 +93,17 @@ function ClientList() {
   }, []);
 
   // Función para manejar el cambio en el campo de búsqueda
-const handleSearch = (e) => {
-  const text = e.target.value.toLowerCase();
-  setSearchText(text);
-  
-  const filtered = clients.filter(client => 
-    client.name.toLowerCase().includes(text) ||
-    client.document_number.toLowerCase().includes(text) ||
-    client.contact_name.toLowerCase().includes(text)
-  );
-  setFilteredClients(filtered);
-};
+  const handleSearch = (e) => {
+    const text = e.target.value.toLowerCase();
+    setSearchText(text);
+    
+    const filtered = clients.filter(client => 
+      client.name.toLowerCase().includes(text) ||
+      client.document_number.toLowerCase().includes(text) ||
+      client.contact_name.toLowerCase().includes(text)
+    );
+    setFilteredClients(filtered);
+  };
 
   const [rutFile, setRutFile] = useState(null);
   const handleRutFileChange = (e) => {
@@ -137,28 +143,45 @@ const handleSearch = (e) => {
     const { name, value } = e.target;
     setNewClient({ ...newClient, [name]: value });
   };
+ 
 
-const handleSaveNewStation = async () => {
-  try {
-    const { description, type, category } = newStation;
-    const response = await axios.post('http://localhost:10000/api/stations', {
-      description,
-      type,
-      category,
-      client_id: selectedClient.id, // Asociar con el cliente seleccionado
-    });
+  const getSignedUrl = async (url) => {
+    try {
+      const response = await axios.post(`${process.env.REACT_APP_API_URL}/api/PrefirmarArchivos`, { url });
+      return response.data.signedUrl; // Devuelve la URL prefirmada
+    } catch (error) {
+      console.error("Error al obtener la URL prefirmada:", error);
+      throw new Error("No se pudo obtener la URL prefirmada.");
+    }
+  };
 
-    const addedStation = response.data.station;
-    setStations([...stations, addedStation]); // Actualiza la lista de estaciones
-
-    handleShowNotification('Estación agregada exitosamente');
-    setShowAddStationModal(false);
-    setNewStation({ description: '', type: 'Control', category }); // Reiniciar formulario
-  } catch (error) {
-    console.error('Error al guardar la estación:', error);
-    handleShowNotification('Hubo un error al guardar la estación');
-  }
-};
+  const handleSaveNewStation = async () => {
+    try {
+      const { description, type, category, latitude, longitude, altitude } = newStation;
+      const response = await axios.post(`${process.env.REACT_APP_API_URL}/api/stations`, {
+        description,
+        type,
+        category,
+        client_id: selectedClient.id, // Asociar con el cliente seleccionado
+        latitude, // Enviar latitud
+        longitude, // Enviar longitud
+        altitude, // Enviar altitud
+      });
+  
+      const addedStation = response.data.station;
+  
+      // Actualizar la lista de estaciones en tiempo real
+      setStations((prevStations) => [...prevStations, addedStation]);
+  
+      // Reiniciar el formulario y cerrar el modal
+      setNewStation({ description: '', type: 'Control', category: '', latitude: '', longitude: '', altitude: '' });
+      handleShowNotification('Estación agregada exitosamente');
+      setShowAddStationModal(false);
+    } catch (error) {
+      console.error('Error al guardar la estación:', error);
+      handleShowNotification('Hubo un error al guardar la estación');
+    }
+  };  
 
   const handleShowActionModal = (type) => {
     setActionType(type);
@@ -192,7 +215,7 @@ const handleSaveNewStation = async () => {
 
   const fetchStationsByClient = async (clientId) => {
     try {
-      const response = await axios.get(`http://localhost:10000/api/stations/client/${clientId}`);
+      const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/stations/client/${clientId}`);
       const stations = response.data;
   
       setStations(stations); // Guarda todas las estaciones en un solo estado
@@ -200,11 +223,12 @@ const handleSaveNewStation = async () => {
       console.error("Error fetching stations by client:", error);
       setStations([]); // Reinicia el estado si hay un error
     }
-  };    
+  }; 
+
   
   const fetchMapsByClient = async (clientId) => {
     try {
-      const response = await axios.get(`http://localhost:10000/api/maps/${clientId}`);
+      const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/maps/${clientId}`);
       const { maps } = response.data; // Ajusta la estructura según el backend
       console.log("mapas encontrados: ", maps);
       setMaps(maps);
@@ -221,7 +245,7 @@ const handleSaveNewStation = async () => {
     formData.append('rut', rutFile);
   
     try {
-      const response = await axios.post('http://localhost:10000/api/clients/upload-rut', formData, {
+      const response = await axios.post(`${process.env.REACT_APP_API_URL}/api/clients/upload-rut`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
       return response.data.fileUrl; // Devuelve la URL del archivo
@@ -240,7 +264,7 @@ const handleSaveNewStation = async () => {
         const formData = new FormData();
         formData.append('rut', rutFile);
   
-        const uploadResponse = await axios.post('http://localhost:10000/api/clients/upload-rut', formData, {
+        const uploadResponse = await axios.post(`${process.env.REACT_APP_API_URL}/api/clients/upload-rut`, formData, {
           headers: {
             'Content-Type': 'multipart/form-data',
           },
@@ -253,7 +277,7 @@ const handleSaveNewStation = async () => {
       if (editingClient) {
         // Actualizar cliente existente
         const response = await axios.put(
-          `http://localhost:10000/api/clients/${editingClient.id}`,
+          `${process.env.REACT_APP_API_URL}/api/clients/${editingClient.id}`,
           { ...newClient, rut: rutFileUrl || newClient.rut } // Usar la URL nueva si está disponible
         );
   
@@ -265,7 +289,7 @@ const handleSaveNewStation = async () => {
         handleShowNotification("Cliente actualizado exitosamente");
       } else {
         // Crear nuevo cliente
-        const response = await axios.post('http://localhost:10000/api/clients', {
+        const response = await axios.post(`${process.env.REACT_APP_API_URL}/api/clients`, {
           ...newClient,
           rut: rutFileUrl, // Agregar la URL del archivo RUT
           category: newClient.category, // Asegúrate de incluir la categoría seleccionada
@@ -289,7 +313,7 @@ const handleSaveNewStation = async () => {
 
   const deleteClient = async (id) => {
     try {
-      await axios.delete(`http://localhost:10000/api/clients/${id}`);
+      await axios.delete(`${process.env.REACT_APP_API_URL}/api/clients/${id}`);
       setClients(clients.filter(client => client.id !== id));
       setFilteredClients(filteredClients.filter(client => client.id !== id)); // Asegura actualizar el listado filtrado
       handleShowNotification("Cliente eliminado exitosamente.");
@@ -297,6 +321,31 @@ const handleSaveNewStation = async () => {
       console.error("Error al eliminar cliente:", error);
       handleShowNotification("Hubo un error al eliminar el cliente.");
     }
+  };  
+
+  const handleShowAddStationModal = () => {
+    const newDescription = stations.length + 1; // Generar el número incremental
+    // Intentar obtener la geolocalización del dispositivo
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const { latitude, longitude, altitude } = position.coords;
+        setNewStation({
+          description: newDescription.toString(), // Establecer la descripción como texto
+          type: 'Control',
+          category: '',
+          client_id: selectedClient.id, // Asociar cliente
+          latitude: latitude || '',
+          longitude: longitude || '',
+          altitude: altitude || '', // Altitud opcional
+        });
+      },
+      (error) => {
+        console.error("Error obteniendo la geolocalización:", error);
+        alert("No se pudo obtener la ubicación del dispositivo.");
+      }
+    );
+  
+    setShowAddStationModal(true);
   };  
 
   // Función para manejar la visualización del modal de detalles
@@ -345,7 +394,7 @@ const handleSaveNewStation = async () => {
       formData.append('image', newMap.imageFile); // Archivo de imagen
       formData.append('client_id', selectedClient.id); // ID del cliente
   
-      const response = await axios.post("http://localhost:10000/api/maps", formData, {
+      const response = await axios.post(`${process.env.REACT_APP_API_URL}/api/maps`, formData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
   
@@ -593,47 +642,47 @@ const handleSaveNewStation = async () => {
               />
             </Form.Group>
               {/* Nueva casilla para categoría */}
-  <Form.Group controlId="formClientCategory" className="mb-3">
-    <Form.Label>Categoría</Form.Label>
-    <Form.Control
-      as="select"
-      value={newClient.category}
-      onChange={(e) => setNewClient({ ...newClient, category: e.target.value })}
-    >
-      <option value="">Seleccione una categoría</option>
-      {categories.map((category) => (
-        <option key={category.id} value={category.id}>
-          {category.name}
-        </option>
-      ))}
-    </Form.Control>
-  </Form.Group>
-            <Form.Group controlId="formClientContactName" className="mb-3">
-              <Form.Label>Nombre de Contacto</Form.Label>
-              <Form.Control
-                type="text"
-                name="contact_name"
-                value={newClient.contact_name || ""}
-                onChange={handleInputChange}
-              />
-            </Form.Group>
-            <Form.Group controlId="formClientContactPhone" className="mb-3">
-              <Form.Label>Teléfono de Contacto</Form.Label>
-              <Form.Control
-                type="text"
-                name="contact_phone"
-                value={newClient.contact_phone || ""}
-                onChange={handleInputChange}
-              />
-            </Form.Group>
-            <Form.Group controlId="formClientRUT" className="mb-3">
-  <Form.Label>RUT</Form.Label>
-  <Form.Control
-    type="file"
-    accept=".pdf,.jpg,.jpeg,.png"
-    onChange={(e) => setRutFile(e.target.files[0])}
-  />
-</Form.Group>
+          <Form.Group controlId="formClientCategory" className="mb-3">
+            <Form.Label>Categoría</Form.Label>
+            <Form.Control
+              as="select"
+              value={newClient.category}
+              onChange={(e) => setNewClient({ ...newClient, category: e.target.value })}
+            >
+              <option value="">Seleccione una categoría</option>
+              {categories.map((category) => (
+                <option key={category.id} value={category.id}>
+                  {category.name}
+                </option>
+              ))}
+            </Form.Control>
+          </Form.Group>
+                    <Form.Group controlId="formClientContactName" className="mb-3">
+                      <Form.Label>Nombre de Contacto</Form.Label>
+                      <Form.Control
+                        type="text"
+                        name="contact_name"
+                        value={newClient.contact_name || ""}
+                        onChange={handleInputChange}
+                      />
+                    </Form.Group>
+                    <Form.Group controlId="formClientContactPhone" className="mb-3">
+                      <Form.Label>Teléfono de Contacto</Form.Label>
+                      <Form.Control
+                        type="text"
+                        name="contact_phone"
+                        value={newClient.contact_phone || ""}
+                        onChange={handleInputChange}
+                      />
+                    </Form.Group>
+                    <Form.Group controlId="formClientRUT" className="mb-3">
+          <Form.Label>RUT</Form.Label>
+          <Form.Control
+            type="file"
+            accept=".pdf,.jpg,.jpeg,.png"
+            onChange={(e) => setRutFile(e.target.files[0])}
+          />
+        </Form.Group>
           </Form>
         </Modal.Body>
         <Modal.Footer>
@@ -684,7 +733,7 @@ const handleSaveNewStation = async () => {
                   <strong>RUT:</strong>{" "}
                   {selectedClient?.rut ? (
                     <a
-                      href={`http://localhost:10000${selectedClient.rut}`}
+                      href={`${selectedClient.rut}`}
                       target="_blank"
                       rel="noopener noreferrer"
                     >
@@ -708,104 +757,74 @@ const handleSaveNewStation = async () => {
                 <p><strong>Correo:</strong> {selectedClient.email || "No disponible"}</p>
               </div>
             </div>
+
             {/* Nuevo contenedor unificado de Estaciones */}
-<div className="col-md-12 mb-4">
-  <div className="bg-white shadow-sm rounded p-3 station-container">
-    <h5 className="text-secondary mb-3">
-      <BuildingFill className="me-2" /> Estaciones
-    </h5>
-    <div className="table-container">
-    {stations.length > 0 ? (
-  <table className="table table-bordered table-hover">
-    <thead className="table-light">
-      <tr>
-        <th>#</th>
-        <th>Tipo</th>
-        <th>Categoría</th>
-        <th>QR</th>
-      </tr>
-    </thead>
-    <tbody>
-  {stations.map((station, index) => (
-    <tr key={station.id}>
-      <td>{station.description}</td>
-      <td>{station.type || "No disponible"}</td>
-      <td>{station.category || "No disponible"}</td> {/* Nueva columna */}
-      <td>
-        {station.qr_code ? (
-          <img
-            src={`http://localhost:10000${station.qr_code}`}
-            alt={`QR de estación ${station.description}`}
-            style={{ maxWidth: "100px" }}
-          />
-        ) : (
-          "No disponible"
-        )}
-      </td>
-    </tr>
-  ))}
-</tbody>
-  </table>
-) : (
-  <p className="text-center">No hay estaciones registradas.</p>
-)}
-    </div>
-    <div className="d-flex justify-content-end mt-3">
-    <Button
-  variant="outline-success"
-  className="px-3 py-1"
-  onClick={() => {
-    setNewStation({
-      description: '',
-      type: 'Control',
-      client_id: selectedClient.id, // Asociar cliente
-    });
-    setNewStation((prevState) => ({
-      ...prevState,
-      description: stations.length + 1, // Número incremental automático
-    }));
-    setShowAddStationModal(true);
-  }}
->
-  <i className="fas fa-plus"></i> Agregar Estación
-</Button>
-
-    </div>
-  </div>
-</div>
-
-        {/* Parte inferior central: Mapas */}
-        <div className="col-md-12 mb-4">
-          <div className="bg-white shadow-sm rounded p-3">
-            <h5 className="text-secondary mb-3">
-              <GeoAltFill className="me-2" /> Mapas
-            </h5>
-            <div>
-            <div className="map-card-container">
-            {maps.length > 0 ? (
-              maps.map((map) => (
-                <div
-                  key={map.id} // Usa `id` como clave única
-                  className="map-card"
-                  onClick={() => handleShowImageModal(map.image)}
-                  style={{ cursor: "pointer" }}
-                >
-                  <img src={map.image} alt={map.description} className="map-image" />
-                  <p>{map.description}</p>
-                </div>
-              ))
+            <div className="col-md-12 mb-4">
+              <div className="bg-white shadow-sm rounded p-3 station-container">
+                <h5 className="text-secondary mb-3">
+                  <BuildingFill className="me-2" /> Estaciones
+                </h5>
+                <div className="table-container">
+                {stations.length > 0 ? (
+              <table className="table table-bordered table-hover">
+                <thead className="table-light">
+                  <tr>
+                    <th>#</th>
+                    <th>Tipo</th>
+                    <th>Categoría</th>
+                    <th>QR</th>
+                  </tr>
+                </thead>
+                <tbody>
+              {stations.map((station, index) => (
+                <tr key={station.id}>
+                  <td>{station.description}</td>
+                  <td>{station.type || "No disponible"}</td>
+                  <td>{station.category || "No disponible"}</td> {/* Nueva columna */}
+                  <td>
+                    {station.qr_code ? (
+                      <img
+                        src={`${station.qr_code}`}
+                        alt={`QR de estación ${station.description}`}
+                        style={{ maxWidth: "100px" }}
+                      />
+                    ) : (
+                      "No disponible"
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+              </table>
             ) : (
-              <p className="text-center text-muted">No hay mapas registrados.</p>
+              <p className="text-center">No hay estaciones registradas.</p>
             )}
-          </div>
-              <div className="d-flex justify-content-end mt-3">
-                <Button variant="outline-success" className="px-3 py-1" onClick={handleShowAddMapModal}>
-                  <i className="fas fa-plus"></i> Agregar
-                </Button>
+                </div>
+                <div className="d-flex justify-content-end mt-3">
+                <Button
+              variant="outline-success"
+              className="px-3 py-1"
+              onClick={() => {
+                setNewStation({
+                  description: '',
+                  type: 'Control',
+                  client_id: selectedClient.id, // Asociar cliente
+                });
+                setNewStation((prevState) => ({
+                  ...prevState,
+                  description: stations.length + 1, // Número incremental automático
+                }));
+                handleShowAddStationModal();
+              }}
+            >
+              <i className="fas fa-plus"></i> Agregar Estación
+            </Button>
+
+                </div>
               </div>
             </div>
-              </div>
-            </div>
+
+                    
               </div>
             ) : (
               <p>Cargando datos del cliente...</p>
@@ -968,22 +987,23 @@ const handleSaveNewStation = async () => {
           </Button>
         </Modal.Footer>
       </Modal>
+
       <Modal show={showAddStationModal} onHide={() => setShowAddStationModal(false)}>
-  <Modal.Header closeButton>
-    <Modal.Title>Agregar Estación</Modal.Title>
-  </Modal.Header>
-  <Modal.Body>
-    <Form>
-    <Form.Group controlId="formStationDescription" className="mb-3">
-  <Form.Label>#</Form.Label>
-  <Form.Control
-    type="text"
-    name="description"
-    value={stations.length + 1} // Valor autoincrementado
-    readOnly // Deshabilita la edición
-    style={{ backgroundColor: '#e9ecef', color: '#495057' }} // Color gris
-  />
-</Form.Group>
+        <Modal.Header closeButton>
+          <Modal.Title>Agregar Estación</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <Form>
+          <Form.Group controlId="formStationDescription" className="mb-3">
+        <Form.Label>#</Form.Label>
+        <Form.Control
+          type="text"
+          name="description"
+          value={stations.length + 1} // Valor autoincrementado
+          readOnly // Deshabilita la edición
+          style={{ backgroundColor: '#e9ecef', color: '#495057' }} // Color gris
+        />
+      </Form.Group>
 
       <Form.Group controlId="formStationType" className="mb-3">
         <Form.Label>Tipo</Form.Label>
@@ -998,107 +1018,136 @@ const handleSaveNewStation = async () => {
           <option value="Localización">Localización</option>
           <option value="Jardineria">Jardineria</option>
         </Form.Select>
+        </Form.Group>
+        <Form.Group controlId="formStationCategory" className="mb-3">
+        <Form.Label>Categoría</Form.Label>
+        <Form.Select
+          name="category"
+          value={newStation.category}
+          onChange={(e) =>
+            setNewStation({ ...newStation, category: e.target.value })
+          }
+        >
+          <option value="">Seleccione una categoría</option>
+          <option value="Hogar">Hogar</option>
+          <option value="Empresarial">Empresarial</option>
+          <option value="Horizontal">Horizontal</option>
+          <option value="Jardineria">Jardineria</option>
+        </Form.Select>
       </Form.Group>
-      <Form.Group controlId="formStationCategory" className="mb-3">
-  <Form.Label>Categoría</Form.Label>
-  <Form.Select
-    name="category"
-    value={newStation.category}
-    onChange={(e) =>
-      setNewStation({ ...newStation, category: e.target.value })
-    }
-  >
-    <option value="">Seleccione una categoría</option>
-    <option value="Hogar">Hogar</option>
-    <option value="Empresarial">Empresarial</option>
-    <option value="Horizontal">Horizontal</option>
-    <option value="Jardineria">Jardineria</option>
-  </Form.Select>
-</Form.Group>
-    </Form>
-  </Modal.Body>
-  <Modal.Footer>
-    <Button variant="secondary" onClick={() => setShowAddStationModal(false)}>
-      Cancelar
-    </Button>
-    <Button variant="success" onClick={handleSaveNewStation}>
-      Guardar
-    </Button>
-  </Modal.Footer>
-</Modal>
+      <Form.Group controlId="formStationLatitude" className="mb-3">
+      <Form.Label>Latitud</Form.Label>
+      <Form.Control
+        type="text"
+        name="latitude"
+        value={newStation.latitude}
+        onChange={(e) => setNewStation({ ...newStation, latitude: e.target.value })}
+        required
+      />
+    </Form.Group>
+    <Form.Group controlId="formStationLongitude" className="mb-3">
+      <Form.Label>Longitud</Form.Label>
+      <Form.Control
+        type="text"
+        name="longitude"
+        value={newStation.longitude}
+        onChange={(e) => setNewStation({ ...newStation, longitude: e.target.value })}
+        required
+      />
+    </Form.Group>
+    <Form.Group controlId="formStationAltitude" className="mb-3">
+      <Form.Label>Altitud (Opcional)</Form.Label>
+      <Form.Control
+        type="text"
+        name="altitude"
+        value={newStation.altitude}
+        onChange={(e) => setNewStation({ ...newStation, altitude: e.target.value })}
+      />
+    </Form.Group>
+        </Form>
+      </Modal.Body>
+      <Modal.Footer>
+        <Button variant="secondary" onClick={() => setShowAddStationModal(false)}>
+          Cancelar
+        </Button>
+        <Button variant="success" onClick={handleSaveNewStation}>
+          Guardar
+        </Button>
+      </Modal.Footer>
+    </Modal>
 
       <Modal show={showAddMapModal} onHide={handleCloseAddMapModal}>
-  <Modal.Header closeButton>
-    <Modal.Title>Agregar Mapa</Modal.Title>
-  </Modal.Header>
-  <Modal.Body>
-    <Form>
-      {/* Campo de descripción */}
-      <Form.Group controlId="formMapDescription" className="mb-3">
-        <Form.Label>Descripción</Form.Label>
-        <Form.Control
-          as="textarea"
-          name="description"
-          value={newMap.description}
-          onChange={handleNewMapChange}
-          placeholder="Ejemplo: Descripción del mapa..."
-          rows={3}
-          required
-        />
-      </Form.Group>
+        <Modal.Header closeButton>
+          <Modal.Title>Agregar Mapa</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <Form>
+            {/* Campo de descripción */}
+            <Form.Group controlId="formMapDescription" className="mb-3">
+              <Form.Label>Descripción</Form.Label>
+              <Form.Control
+                as="textarea"
+                name="description"
+                value={newMap.description}
+                onChange={handleNewMapChange}
+                placeholder="Ejemplo: Descripción del mapa..."
+                rows={3}
+                required
+              />
+            </Form.Group>
 
-      {/* Campo para cargar imagen */}
-      <Form.Group controlId="formMapImage" className="mb-3">
-        <Form.Label>Seleccionar Imagen</Form.Label>
-        <Form.Control
-  type="file"
-  accept="image/*"
-  onChange={(e) => {
-    const file = e.target.files[0];
-    if (file) {
-      setNewMap({ ...newMap, image: URL.createObjectURL(file), imageFile: file });
-    }
-  }}
-/>
-      </Form.Group>
+            {/* Campo para cargar imagen */}
+            <Form.Group controlId="formMapImage" className="mb-3">
+              <Form.Label>Seleccionar Imagen</Form.Label>
+              <Form.Control
+                type="file"
+                accept="image/*"
+                onChange={(e) => {
+                  const file = e.target.files[0];
+                  if (file) {
+                    setNewMap({ ...newMap, image: URL.createObjectURL(file), imageFile: file });
+                  }
+                }}
+              />
+                    </Form.Group>
 
-      {/* Vista previa de la imagen cargada */}
-      {newMap.image && (
-        <div className="text-center mt-3">
-          <img
-            src={newMap.image}
-            alt="Vista previa del mapa"
-            style={{ maxWidth: "100%", maxHeight: "200px", borderRadius: "8px" }}
-          />
-        </div>
-      )}
-    </Form>
-  </Modal.Body>
-  <Modal.Footer>
-    <Button variant="secondary" onClick={handleCloseAddMapModal}>
-      Cancelar
-    </Button>
-    <Button variant="success" onClick={handleSaveNewMap}>
-      Guardar
-    </Button>
-  </Modal.Footer>
-</Modal>
-<Modal
-  show={showImageModal}
-  onHide={handleCloseImageModal}
-  centered
-  dialogClassName="image-modal" /* Clase personalizada para estilos */
->
-  <Modal.Body className="d-flex justify-content-center align-items-center">
-    {selectedImage && (
-      <img
-        src={selectedImage}
-        alt="Vista previa del mapa"
-        style={{ borderRadius: "8px" }}
-      />
-    )}
-  </Modal.Body>
-</Modal>
+                    {/* Vista previa de la imagen cargada */}
+                    {newMap.image && (
+                      <div className="text-center mt-3">
+                        <img
+                          src={newMap.image}
+                          alt="Vista previa del mapa"
+                          style={{ maxWidth: "100%", maxHeight: "200px", borderRadius: "8px" }}
+                        />
+                      </div>
+                    )}
+                  </Form>
+                </Modal.Body>
+                <Modal.Footer>
+                  <Button variant="secondary" onClick={handleCloseAddMapModal}>
+                    Cancelar
+                  </Button>
+                  <Button variant="success" onClick={handleSaveNewMap}>
+                    Guardar
+                  </Button>
+                </Modal.Footer>
+              </Modal>
+              <Modal
+                show={showImageModal}
+                onHide={handleCloseImageModal}
+                centered
+                dialogClassName="image-modal" /* Clase personalizada para estilos */
+              >
+                <Modal.Body className="d-flex justify-content-center align-items-center">
+                  {selectedImage && (
+                    <img
+                      src={selectedImage}
+                      alt="Vista previa del mapa"
+                      style={{ borderRadius: "8px" }}
+                    />
+                  )}
+                </Modal.Body>
+              </Modal>
     </div>
   );  
 }

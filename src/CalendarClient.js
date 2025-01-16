@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useLocation } from 'react-router-dom'; // Asegúrate de importar useLocation
 import axios from 'axios';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
@@ -16,8 +15,9 @@ import Tooltip from 'react-bootstrap/Tooltip';
 import OverlayTrigger from 'react-bootstrap/OverlayTrigger';
 import { useNavigate } from 'react-router-dom';
 import { useSocket } from './SocketContext';
+import { useLocation } from 'react-router-dom'; // Asegúrate de importar useLocation
 
-const InspectionCalendar = () => {
+const CalendarClient = () => {
     const [events, setEvents] = useState([]);
     const [allEvents, setAllEvents] = useState([]); // Todos los eventos cargados
     const [services, setServices] = useState([]);
@@ -39,6 +39,8 @@ const InspectionCalendar = () => {
     const [showClientModal, setShowClientModal] = useState(false);
     const [selectedClientId, setSelectedClientId] = useState(null);
     const [showAddInspectionModal, setShowAddInspectionModal] = useState(false);
+    const storedUserInfo = JSON.parse(localStorage.getItem("user_info"));
+    const userId = storedUserInfo?.id_usuario || '';
     const [newInspection, setNewInspection] = useState({
         inspection_type: [],
         inspection_sub_type: '',
@@ -46,10 +48,6 @@ const InspectionCalendar = () => {
     const [editEventModalOpen, setEditEventModalOpen] = useState(false);
     const [deleteEventModalOpen, setDeleteEventModalOpen] = useState(false);
     const [editingEvent, setEditingEvent] = useState(null);
-    const [showRepetitiveOptions, setShowRepetitiveOptions] = useState(false);
-    const [repetitiveStartDate, setRepetitiveStartDate] = useState('');
-    const [repetitiveEndDate, setRepetitiveEndDate] = useState('');
-    const [repetitionOption, setRepetitionOption] = useState('');
     const userTimeZone = moment.tz.guess();
     const navigate = useNavigate();
     const socket = useSocket();
@@ -116,7 +114,7 @@ const InspectionCalendar = () => {
     // Efecto para filtrar eventos al cambiar los usuarios seleccionados
     useEffect(() => {
         filterEvents();
-    }, [selectedUsers]);
+    }, [selectedUsers, allEvents, userId]); // Agrega `userId` y `allEvents` como dependencias
 
     useEffect(() => {
         const calendarApi = calendarRef.current?.getApi();
@@ -139,12 +137,18 @@ const InspectionCalendar = () => {
     
 
     const filterEvents = (updatedAllEvents = allEvents) => {
-        const filteredEvents = selectedUsers.length
-            ? updatedAllEvents.filter((event) => selectedUsers.includes(event.responsibleId))
-            : updatedAllEvents; // Si no hay usuarios seleccionados, muestra todos
+        const filteredEvents = updatedAllEvents.filter((event) => {
+            const isUserSelected = selectedUsers.length ? selectedUsers.includes(event.responsibleId) : false;
+            const isClientOwner = event.clientId === userId;
+            console.log("id del clinte en filter: ", event.clientId);
+    
+            // Mostrar eventos del cliente y de usuarios seleccionados simultáneamente
+            return isUserSelected || isClientOwner;
+        });
+    
         setEvents(filteredEvents);
-    };    
-
+    };
+    
     useEffect(() => {
         if (selectedEvent?.title) {
             console.log(`Servicio seleccionado ${selectedEvent.title}`);
@@ -234,7 +238,6 @@ const InspectionCalendar = () => {
             if (!response.ok) throw new Error('Error al cargar usuarios');
             const data = await response.json();
             setUsers(data); // Guardar usuarios en el estado
-            setSelectedUsers(data.map((user) => user.id));
         } catch (error) {
             console.error('Error al cargar usuarios:', error);
         }
@@ -253,40 +256,47 @@ const InspectionCalendar = () => {
                 return;
             }
     
-            // Realiza la petición DELETE al backend
+            console.log('Intentando eliminar el evento:', selectedEvent);
+    
+            // Elimina el evento en el backend
             const response = await fetch(`${process.env.REACT_APP_API_URL}/api/service-schedule/${selectedEvent.id}`, {
                 method: 'DELETE',
                 headers: { 'Content-Type': 'application/json' },
             });
     
-            if (!response.ok) throw new Error('Error eliminando el evento');
+            if (!response.ok) throw new Error('Error eliminando el evento en el backend');
     
             console.log('Evento eliminado en el backend:', selectedEvent);
     
-            // Actualiza el estado global eliminando el evento
-            setAllEvents((prevEvents) =>
-                prevEvents.filter((event) => event.id !== selectedEvent.id)
-            );
-    
-            // Refleja el cambio en FullCalendar directamente
+            // Elimina directamente del calendario
             const calendarApi = calendarRef.current?.getApi();
             if (calendarApi) {
                 const calendarEvent = calendarApi.getEventById(selectedEvent.id);
                 if (calendarEvent) {
-                    calendarEvent.remove(); // Elimina el evento directamente del calendario
-                    console.log('Evento eliminado del calendario:', selectedEvent.id);
+                    calendarEvent.remove(); // Elimina el evento del calendario
+                    console.log('Evento eliminado de FullCalendar:', selectedEvent.id);
                 }
             }
     
+            // Actualiza el estado global
+            setAllEvents((prevEvents) => {
+                const updatedEvents = prevEvents.filter((event) => event.id !== selectedEvent.id);
+                filterEvents(updatedEvents); // Filtra los eventos visibles
+                return updatedEvents;
+            });
+    
             // Cierra los modales relacionados
-            setDeleteEventModalOpen(false); // Cierra el modal de confirmación
-            setShowEventModal(false); // Cierra el modal de detalles del evento
+            setDeleteEventModalOpen(false);
+            setShowEventModal(false);
     
             console.log('Evento eliminado correctamente y calendario actualizado.');
+
+            // Recarga la página después de eliminar el evento
+            window.location.reload();
         } catch (error) {
             console.error('Error eliminando el evento:', error);
         }
-    };     
+    };    
 
     const handleEditEventClick = (event) => {
         console.log("Evento recibido para edición:", event);
@@ -364,8 +374,11 @@ const InspectionCalendar = () => {
                         : event
                 )
             );
-    
+            
             setEditEventModalOpen(false); // Cierra el modal
+
+            // Recarga la página después de editar evento
+            window.location.reload();
         } catch (error) {
             console.error('Error al guardar el evento editado:', error);
         }
@@ -420,6 +433,9 @@ const InspectionCalendar = () => {
                         : evt
                 )
             );
+
+            // Recarga la página después de eliminar el evento
+            window.location.reload();
         } catch (error) {
             console.error('Error al mover el evento:', error);
             info.revert(); // Revertir el cambio si ocurre un error
@@ -659,10 +675,14 @@ const InspectionCalendar = () => {
                         const end = schedule.end_time
                             ? moment(`${schedule.date.split('T')[0]}T${schedule.end_time}`).toISOString()
                             : null;
+
+                            
+                            console.log("userId: ", userId);
+                            console.log("Client_id: ", serviceData.client_id )
     
                             const formattedEvent = {
                                 id: schedule.id,
-                                title: `${serviceData.id}`,
+                                title: serviceData.client_id === userId ? `${serviceData.id}` : 'Ocupado',
                                 serviceType: serviceData.service_type || 'Sin tipo',
                                 description: serviceData.description || 'Sin descripción',
                                 category: serviceData.category || 'Sin categoría', // Nueva propiedad
@@ -781,7 +801,7 @@ const InspectionCalendar = () => {
     };
     
     const renderEventContent = (eventInfo) => {
-        const { serviceType, clientName } = eventInfo.event.extendedProps;
+        const { serviceType, clientName, clientId } = eventInfo.event.extendedProps;
         const { start, end } = eventInfo.event;
         const serviceId = eventInfo.event.title;
         const eventId = eventInfo.event.id;
@@ -794,11 +814,20 @@ const InspectionCalendar = () => {
                 placement="top"
                 overlay={
                     <Tooltip>
-                        <div>ID Evento: {eventId}</div>
-                        <div>ID Servicio: {serviceId}</div>
-                        <div>{serviceType.replace(/[\{\}"]/g, '').replace(/,/g, ', ')}</div>
-                        <div>{clientName}</div>
-                    </Tooltip>
+                    {clientId === userId ? (
+                        // Mostrar detalles solo si el cliente coincide
+                        <>
+                            <div>ID Evento: {eventId}</div>
+                            <div>ID Servicio: {serviceId}</div>
+                            <div>{serviceType.replace(/[\{\}"]/g, '').replace(/,/g, ', ')}</div>
+                            <div>{clientName}</div>
+                            <div>{`${startTime} – ${endTime}`}</div>
+                        </>
+                    ) : (
+                        // Mensaje genérico si no pertenece al cliente
+                        <div>Espacio Ocupado</div>
+                    )}
+                </Tooltip>
                 }
             >
                 <div className="event-container">
@@ -824,6 +853,9 @@ const InspectionCalendar = () => {
 
     const handleEventClick = (clickInfo) => {
         const { extendedProps, title, start, end } = clickInfo.event;
+
+        // Verifica si el evento pertenece al usuario actual
+        if (extendedProps.clientId === userId) {
         const currentMonth = moment().format('YYYY-MM'); // Mes actual en formato 'YYYY-MM'
 
         // Extraer y formatear fecha, hora de inicio y fin
@@ -864,6 +896,7 @@ const InspectionCalendar = () => {
         };
         setSelectedEvent(eventData);
         setShowEventModal(true);
+     }
     };        
 
     const handleScheduleModalClose = () => {
@@ -894,7 +927,7 @@ const InspectionCalendar = () => {
       };  
 
       const handleEditServiceClick = (serviceId) => {
-        navigate('/services', { state: { serviceId } });
+        navigate('/myservicesclient', { state: { serviceId } });
     };
 
     const handleScheduleService = async () => {
@@ -904,90 +937,96 @@ const InspectionCalendar = () => {
                 return;
             }
     
-            if (showRepetitiveOptions && (!repetitiveStartDate || !repetitiveEndDate || !repetitionOption)) {
-                alert('Por favor completa todas las opciones de agendamiento repetitivo.');
+            const selectedServiceData = services.find(service => service.id === selectedService);
+
+            // Validar que la fecha y hora seleccionadas estén al menos 24 horas en el futuro
+            const now = moment();
+            const selectedStart = moment(`${scheduleDate}T${scheduleStartTime}`);
+
+            if (selectedStart.diff(now, 'hours') < 24) {
+                alert('No puedes agendar servicios con menos de 24 horas de anticipación.');
                 return;
             }
     
-            let eventsToSchedule = [];
-    
-            if (showRepetitiveOptions) {
-                // Generar eventos repetitivos
-                const start = moment(repetitiveStartDate);
-                const end = moment(repetitiveEndDate);
-    
-                while (start.isSameOrBefore(end)) {
-                    switch (repetitionOption) {
-                        case 'allWeekdays':
-                            if (![0].includes(start.day())) {
-                                eventsToSchedule.push(start.clone());
-                            }
-                            break;
-                        case 'specificDay':
-                            if (start.format('dddd') === moment(scheduleDate).format('dddd')) {
-                                eventsToSchedule.push(start.clone());
-                            }
-                            break;
-                        case 'firstWeekday':
-                            if (
-                                start.format('dddd') === moment(scheduleDate).format('dddd') &&
-                                start.date() <= 7
-                            ) {
-                                eventsToSchedule.push(start.clone());
-                            }
-                            break;
-                        case 'biweekly':
-                            if (
-                                start.format('dddd') === moment(scheduleDate).format('dddd') &&
-                                start.diff(moment(repetitiveStartDate), 'weeks') % 2 === 0
-                            ) {
-                                eventsToSchedule.push(start.clone());
-                            }
-                            break;
-                        case 'lastWeekday':
-                            if (
-                                start.format('dddd') === moment(scheduleDate).format('dddd') &&
-                                start.isSame(start.clone().endOf('month').day(moment(scheduleDate).day()))
-                            ) {
-                                eventsToSchedule.push(start.clone());
-                            }
-                            break;
-                        default:
-                            break;
-                    }
-                    start.add(1, 'day');
-                }
-            } else {
-                // Evento único
-                eventsToSchedule.push(moment(`${scheduleDate}T${scheduleStartTime}`));
-            }
-    
-            // Procesar eventos para el backend
-            const newEvents = eventsToSchedule.map((date) => ({
+            // Crear el objeto del nuevo horario
+            const newSchedule = {
                 service_id: selectedService,
-                date: date.format('YYYY-MM-DD'),
+                date: scheduleDate,
                 start_time: scheduleStartTime,
                 end_time: scheduleEndTime,
-            }));
+            };
     
-            console.log('Eventos a agendar:', newEvents);
+            // Enviar el nuevo horario al backend
+            const response = await fetch(`${process.env.REACT_APP_API_URL}/api/service-schedule`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(newSchedule),
+            });
     
-            // Aquí puedes enviar los datos al backend
-            for (const event of newEvents) {
-                await fetch(`${process.env.REACT_APP_API_URL}/api/service-schedule`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(event),
-                });
+            if (!response.ok) {
+                throw new Error('Failed to schedule service');
             }
     
-            alert('Eventos agendados con éxito.');
+            const createdSchedule = await response.json();
+            console.log('New schedule created:', createdSchedule);
+    
+            // Obtener datos del responsable
+            let responsibleColor = '#fdd835'; // Color predeterminado
+            let responsibleName
+            if (selectedServiceData.responsible) {
+                try {
+                    const responsibleResponse = await fetch(`${process.env.REACT_APP_API_URL}/api/users/${selectedServiceData.responsible}`);
+                    if (responsibleResponse.ok) {
+                        const responsibleData = await responsibleResponse.json();
+                        responsibleColor = responsibleData.color || '#fdd835';
+                        responsibleName = `${responsibleData.name || 'Sin nombre'} ${responsibleData.lastname || ''}`.trim();
+                    } else {
+                        console.warn(`Failed to fetch responsible for ID: ${selectedServiceData.responsible}`);
+                    }
+                } catch (error) {
+                    console.error(`Error fetching responsible for ID: ${selectedServiceData.responsible}`, error);
+                }
+            }
+
+            console.log('Selected Service Data:', selectedServiceData);
+    
+            // Formatear el evento para incluir el color
+            const formattedEvent = {
+                id: createdSchedule.data.id,
+                title: `${selectedServiceData.id}`,
+                serviceType: selectedServiceData.service_type || 'Sin tipo',
+                clientName: selectedServiceData.clientName || 'Sin empresa',
+                clientId: userId,
+                description: selectedServiceData.description || 'Sin descripción',
+                color: responsibleColor, // Agregar el color del responsable
+                backgroundColor: responsibleColor,
+                category: selectedServiceData.category || 'Sin categoría', // Asegurarse de que la categoría esté presente
+                quantyPerMonth: selectedServiceData.quantity_per_month || null, // Cantidad por mes si es periódico
+                pestToControl: selectedServiceData.pest_to_control,
+                interventionAreas: selectedServiceData.intervention_areas,
+                value: selectedServiceData.value,
+                companion: selectedServiceData.companion,
+                start: moment(`${scheduleDate}T${scheduleStartTime}`).toISOString(),
+                end: moment(`${scheduleDate}T${scheduleEndTime}`).toISOString(),
+                allDay: false,
+                responsibleId: selectedServiceData.responsible, // Asegúrate de incluir el responsable
+                responsibleName,
+            };
+    
+            // Actualiza el estado de forma segura
+            setAllEvents((prevAllEvents) => {
+                const updatedAllEvents = [...prevAllEvents, formattedEvent];
+                console.log('Updated All Events:', updatedAllEvents);
+                filterEvents(updatedAllEvents);
+                return updatedAllEvents;
+            });
+    
+            // Cerrar el modal y limpiar los campos
             handleScheduleModalClose();
-            window.location.reload();
         } catch (error) {
             console.error('Error scheduling service:', error);
         }
-    };
+    };        
 
     return (
         <div className="d-flex">
@@ -1032,7 +1071,16 @@ const InspectionCalendar = () => {
                             editable={true}
                             selectable={true}
                             select={handleDateSelect}
-                            eventDrop={handleEventDrop}
+                            eventDrop={(info) => {
+                                // Validar si el evento pertenece al cliente
+                                if (info.event.extendedProps.clientId !== userId) {
+                                    info.revert(); // Revertir el movimiento
+                                    console.warn("No tienes permiso para mover este evento.");
+                                } else {
+                                    // Lógica para guardar el evento si el cliente es válido
+                                    handleEventDrop(info);
+                                }
+                            }}
                             eventResize={handleEventResize}
                             timeZone="local"
                             height="70vh"
@@ -1140,10 +1188,12 @@ const InspectionCalendar = () => {
                                 onChange={(e) => handleServiceSelect(e.target.value)}
                             >
                                 <option value="">Selecciona un servicio</option>
-                                {services.map((service) => (
-                                    <option key={service.id} value={service.id}>
-                                        {`${service.id} - ${service.service_type.replace(/[{}"]/g, '').split(',').join(', ') || 'Sin tipo'} - ${service.clientName || 'Sin empresa'}`}
-                                    </option>
+                                {services
+                                    .filter((service) => service.client_id === userId) // Filtra los servicios
+                                    .map((service) => (
+                                        <option key={service.id} value={service.id}>
+                                            {`${service.id} - ${service.service_type.replace(/[{}"]/g, '').split(',').join(', ') || 'Sin tipo'} - ${service.clientName || 'Sin empresa'}`}
+                                        </option>
                                 ))}
                             </Form.Select>
                         </Form.Group>
@@ -1188,66 +1238,6 @@ const InspectionCalendar = () => {
                             />
                         </Form.Group>
                     </Form>
-
-                    {services.find(service => service.id === selectedService)?.category === 'Periódico' && (
-                    <>
-                        <Button
-                            variant="outline-success"
-                            className="mt-3 w-100"
-                            onClick={() => setShowRepetitiveOptions(!showRepetitiveOptions)}
-                        >
-                            {showRepetitiveOptions ? "Ocultar Opciones Repetitivas" : "Mostrar Opciones Repetitivas"}
-                        </Button>
-
-                        {showRepetitiveOptions && (
-                            <div className="mt-3">
-                                {/* Fecha de inicio */}
-                                <Form.Group controlId="formRepetitiveStartDate" className="mb-3">
-                                    <Form.Label>Fecha de Inicio</Form.Label>
-                                    <Form.Control
-                                        type="date"
-                                        value={repetitiveStartDate}
-                                        onChange={(e) => setRepetitiveStartDate(e.target.value)}
-                                    />
-                                </Form.Group>
-
-                                {/* Fecha de finalización */}
-                                <Form.Group controlId="formRepetitiveEndDate" className="mb-3">
-                                    <Form.Label>Fecha de Finalización</Form.Label>
-                                    <Form.Control
-                                        type="date"
-                                        value={repetitiveEndDate}
-                                        onChange={(e) => setRepetitiveEndDate(e.target.value)}
-                                    />
-                                </Form.Group>
-
-                                {/* Opciones de repetición */}
-                                <Form.Group controlId="formRepetitionOption" className="mb-3">
-                                    <Form.Label>Repetir</Form.Label>
-                                    <Form.Select
-                                        value={repetitionOption}
-                                        onChange={(e) => setRepetitionOption(e.target.value)}
-                                    >
-                                        <option value="">Selecciona una opción</option>
-                                        <option value="allWeekdays">Todos los días hábiles</option>
-                                        <option value="specificDay">
-                                            Todos los {moment(scheduleDate).format('dddd')}
-                                        </option>
-                                        <option value="firstWeekday">
-                                            Primer {moment(scheduleDate).format('dddd')} del mes
-                                        </option>
-                                        <option value="biweekly">
-                                            {moment(scheduleDate).format('dddd')} cada 2 semanas
-                                        </option>
-                                        <option value="lastWeekday">
-                                            Último {moment(scheduleDate).format('dddd')} del mes
-                                        </option>
-                                    </Form.Select>
-                                </Form.Group>
-                            </div>
-                        )}
-                    </>
-                )}
                 </Modal.Body>
                 <Modal.Footer>
                     <Button variant="secondary" onClick={handleScheduleModalClose}>Cancelar</Button>
@@ -1311,17 +1301,6 @@ const InspectionCalendar = () => {
                                     <p><strong>Tipo de Servicio:</strong> {selectedEvent.serviceType.replace(/[\{\}"]/g, '').split(',').join(', ')}</p>
                                     <div className='p-0 m-0 d-flex'>
                                         <p className="my-1"><strong>Empresa:</strong> {selectedEvent.clientName || "Cliente Desconocido"}</p>
-                                        {selectedEvent.clientId && (
-                                        <Building
-                                            className='ms-2 mt-1'
-                                            style={{cursor: "pointer"}}
-                                            size={22}
-                                            onClick={(e) => {
-                                            e.stopPropagation(); // Evita que se activen otros eventos del Card
-                                            handleShowClientModal(selectedEvent.clientId);
-                                            }}
-                                        />
-                                        )}
                                     </div>
                                     <p><strong>Responsable:</strong> {selectedEvent.responsibleName}</p>
                                     {selectedEvent.companion && selectedEvent.companion !== "{}" && selectedEvent.companion !== '{""}' && (
@@ -1418,14 +1397,6 @@ const InspectionCalendar = () => {
                                     <p>No hay inspecciones registradas para este servicio.</p>
                                 )}
                             </div>
-
-                            {/* Botón para añadir inspección */}
-                            <div className="text-center">
-                                <Button variant="outline-success" onClick={handleShowAddInspectionModal}>
-                                    <PlusCircle className="me-2" />
-                                    Añadir Inspección
-                                </Button>
-                            </div>
                         </div>
                     )}
                 </Modal.Body>
@@ -1512,10 +1483,12 @@ const InspectionCalendar = () => {
                                 onChange={(e) => handleServiceSelect(e.target.value)}
                             >
                                 <option value="">Selecciona un servicio</option>
-                                {services.map((service) => (
-                                    <option key={service.id} value={service.id}>
-                                        {`${service.id} - ${service.service_type.replace(/[{}"]/g, '').split(',').join(', ') || 'Sin tipo'} - ${service.clientName || 'Sin empresa'}`}
-                                    </option>
+                                {services
+                                    .filter((service) => service.client_id === userId) // Filtra los servicios
+                                    .map((service) => (
+                                        <option key={service.id} value={service.id}>
+                                            {`${service.id} - ${service.service_type.replace(/[{}"]/g, '').split(',').join(', ') || 'Sin tipo'} - ${service.clientName || 'Sin empresa'}`}
+                                        </option>
                                 ))}
                             </Form.Select>
                         </Form.Group>
@@ -1567,8 +1540,9 @@ const InspectionCalendar = () => {
                 </Modal.Header>
                 <Modal.Body>
                     <p>¿Estás seguro de que deseas eliminar este evento?</p>
-                    <p><strong>ID:</strong> {selectedEvent?.id}</p>
-                    <p><strong>Servicio:</strong> {selectedEvent?.serviceType}</p>
+                    <p><strong>Servicio:</strong> {selectedEvent?.title}</p>
+                    <p><strong>Tipo de servicio:</strong> {selectedEvent?.serviceType.replace(/[\{\}"]/g, '').replace(/,/g, ', ')}</p>
+                    <p><strong>Fecha:</strong> {selectedEvent?.date} de {selectedEvent?.startTime} a {selectedEvent?.endTime}</p>
                 </Modal.Body>
                 <Modal.Footer>
                     <Button variant="secondary" onClick={() => setDeleteEventModalOpen(false)}>
@@ -1590,4 +1564,4 @@ const InspectionCalendar = () => {
     );
 };
 
-export default InspectionCalendar;
+export default CalendarClient;

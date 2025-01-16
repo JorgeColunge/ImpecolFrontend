@@ -1,11 +1,13 @@
-import React, { useEffect, useState, useRef  } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import axios from 'axios';
 import moment from 'moment-timezone';
 import { Card, Col, Row, Button, Table, Modal, Form, ModalTitle } from 'react-bootstrap';
 import 'bootstrap/dist/css/bootstrap.min.css';
-import { Calendar, Person, Bag, Building, PencilSquare, Trash, Bug, Diagram3, GearFill, Clipboard, PlusCircle, InfoCircle, FileText, GeoAlt } from 'react-bootstrap-icons';
-import { useNavigate } from 'react-router-dom';
+import { Calendar, Person, Bag, Building, PencilSquare, Trash, Bug, Diagram3, GearFill, Clipboard, PlusCircle, InfoCircle, FileText, GeoAlt, PersonFill, Stopwatch, ArrowRepeat, Bullseye } from 'react-bootstrap-icons';
+import { useNavigate, useLocation } from 'react-router-dom';
+import ClientInfoModal from './ClientInfoModal'; // Ajusta la ruta según la ubicación del componente
 import './ServiceList.css'
+import { useSocket } from './SocketContext';
 
 function MyServices() {
   const [services, setServices] = useState([]);
@@ -20,6 +22,8 @@ function MyServices() {
   const userId = storedUserInfo?.id_usuario || '';
   const [technicians, setTechnicians] = useState([]);
   const [expandedCardId, setExpandedCardId] = useState(null);
+  const [showClientModal, setShowClientModal] = useState(false);
+  const [selectedClientId, setSelectedClientId] = useState(null);
   const [newInspection, setNewInspection] = useState({
     inspection_type: [],
     inspection_sub_type: "",
@@ -36,6 +40,7 @@ function MyServices() {
     message: '',
   });
   const dropdownRef = useRef(null);
+  const socket = useSocket();
 
   const toggleActions = (uniqueKey) => {
     setExpandedCardId((prevKey) => (prevKey === uniqueKey ? null : uniqueKey)); // Alterna el estado abierto/cerrado del menú
@@ -47,6 +52,22 @@ function MyServices() {
       setExpandedCardId(null);
     }
   };
+
+  // Dentro de tu componente MyServices
+  const location = useLocation();
+  const serviceIdFromState = location.state?.serviceId;
+
+  // Si el estado contiene un serviceId, selecciona automáticamente ese servicio y abre el modal.
+  useEffect(() => {
+      if (serviceIdFromState) {
+          const service = services.find(s => s.id === serviceIdFromState);
+          if (service) {
+              setSelectedService(service);
+              fetchInspections(service.id);
+              setShowServiceModal(true);
+          }
+      }
+  }, [serviceIdFromState, services]);
   
   useEffect(() => {
     // Agregar evento de clic al documento cuando hay un menú desplegable abierto
@@ -61,12 +82,58 @@ function MyServices() {
       document.removeEventListener("mousedown", handleClickOutside);
     };
   }, [expandedCardId]);
+
+  useEffect(() => {
+    if (socket) {
+        socket.on("newEvent", async (newEvent) => {
+            console.log("Nuevo evento recibido:", newEvent);
+
+            try {
+                // Consultar los detalles del evento si no están completos en `newEvent`
+                const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/service-schedule/${newEvent.id}`);
+                const detailedEvent = response.data;
+
+                // Formatea el evento y actualiza el estado
+                setScheduledEvents((prevEvents) => [
+                    ...prevEvents,
+                    {
+                        ...detailedEvent,
+                        start: detailedEvent.start,
+                        end: detailedEvent.end,
+                        color: detailedEvent.color || '#007bff',
+                    },
+                ]);
+
+                // Opcional: Mostrar notificación o alerta
+                showNotification("Nuevo Evento", "Se ha añadido un nuevo evento al calendario.");
+            } catch (error) {
+                console.error("Error al obtener detalles del evento:", error);
+            }
+        });
+    }
+
+    // Limpieza al desmontar
+    return () => {
+        if (socket) {
+            socket.off("newEvent");
+        }
+    };
+}, [socket]);
+
+  const handleShowClientModal = (clientId) => {
+    setSelectedClientId(clientId);
+    setShowClientModal(true);
+  };
   
+  const handleCloseClientModal = () => {
+    setShowClientModal(false);
+    setSelectedClientId(null);
+  };  
 
   useEffect(() => {
     const fetchMyServices = async () => {
       try {
-        const response = await axios.get(`http://localhost:10000/api/services`);
+        const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/services`);
         // Filtrar servicios donde el usuario es responsable o está en companions
         const userServices = response.data.filter(service => {
           const isResponsible = service.responsible === userId;
@@ -84,7 +151,7 @@ function MyServices() {
         for (const service of userServices) {
           if (service.client_id && !clientData[service.client_id]) {
             try {
-              const clientResponse = await axios.get(`http://localhost:10000/api/clients/${service.client_id}`);
+              const clientResponse = await axios.get(`${process.env.REACT_APP_API_URL}/api/clients/${service.client_id}`);
               clientData[service.client_id] = clientResponse.data.name;
             } catch (error) {
               console.error(`Error fetching client ${service.client_id}:`, error);
@@ -105,7 +172,7 @@ function MyServices() {
   useEffect(() => {
     const fetchScheduledEvents = async () => {
       try {
-        const response = await axios.get('http://localhost:10000/api/service-schedule');
+        const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/service-schedule`);
         setScheduledEvents(response.data);
       } catch (error) {
         console.error("Error fetching scheduled events:", error);
@@ -117,7 +184,7 @@ function MyServices() {
   useEffect(() => {
     const fetchTechnicians = async () => {
       try {
-        const response = await axios.get('http://localhost:10000/api/users?role=Technician');
+        const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/users?role=Technician`);
         setTechnicians(response.data);
         console.log("Técnicos:", response.data);
       } catch (error) {
@@ -162,7 +229,7 @@ function MyServices() {
 
   const fetchInspections = async (serviceId) => {
     try {
-      const response = await axios.get(`http://localhost:10000/api/inspections?service_id=${serviceId}`);
+      const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/inspections?service_id=${serviceId}`);
       const formattedInspections = response.data
         .filter((inspection) => inspection.service_id === serviceId) // Filtra por `service_id`
         .map((inspection) => ({
@@ -246,7 +313,7 @@ function MyServices() {
     };
 
     try {
-        const response = await axios.post("http://localhost:10000/api/inspections", inspectionData);
+        const response = await axios.post(`${process.env.REACT_APP_API_URL}/api/inspections`, inspectionData);
 
         if (response.data.success) {
         showNotification("Exito","Inspección guardada exitosamente");
@@ -322,27 +389,21 @@ function MyServices() {
                         </div>
                         <hr />
 
-                        {/* Plagas a Controlar */}
-                        <div>
-                          <Bug className="text-success me-2" />
+                        <div className="mt-2">
+                          <Stopwatch className="text-primary me-2" /> 
                           <span className="text-secondary">
-                            {(() => {
-                              const pestMatches = service.pest_to_control?.match(/"([^"]+)"/g);
-                              const pests = pestMatches ? pestMatches.map((item) => item.replace(/"/g, "")).join(", ") : "No especificado";
-                              return pests.length > 20 ? `${pests.slice(0, 20)}...` : pests;
-                            })()}
+                            {service.duration} Horas
                           </span>
                         </div>
 
-                        {/* Áreas de Intervención */}
                         <div className="mt-2">
-                          <Diagram3 className="text-warning me-2" />
+                          {service.category === "Puntual" ? (
+                            <Bullseye className="text-danger me-2" />
+                          ) : (
+                            <ArrowRepeat className="text-success me-2" />
+                          )}
                           <span className="text-secondary">
-                            {(() => {
-                              const areaMatches = service.intervention_areas?.match(/"([^"]+)"/g);
-                              const areas = areaMatches ? areaMatches.map((item) => item.replace(/"/g, "")).join(", ") : "No especificadas";
-                              return areas.length > 20 ? `${areas.slice(0, 20)}...` : areas;
-                            })()}
+                            {service.category}
                           </span>
                         </div>
 
@@ -434,7 +495,20 @@ function MyServices() {
                     {selectedService.service_type.replace(/[\{\}"]/g, "").split(",").join(", ")}
                   </p>
                   <p className="my-1"><strong>Categoría:</strong> {selectedService.category}</p>
-                  <p className="my-1"><strong>Empresa:</strong> {clientNames[selectedService.client_id] || "Cliente Desconocido"}</p>
+                  <div className='p-0 m-0 d-flex'>
+                    <p className="my-1"><strong>Empresa:</strong> {clientNames[selectedService.client_id] || "Cliente Desconocido"}</p>
+                    {selectedService.client_id && (
+                      <Building
+                        className='ms-2 mt-1'
+                        style={{cursor: "pointer"}}
+                        size={22}
+                        onClick={(e) => {
+                          e.stopPropagation(); // Evita que se activen otros eventos del Card
+                          handleShowClientModal(selectedService.client_id);
+                        }}
+                      />
+                    )}
+                  </div>
                   <p className="my-1"><strong>Responsable:</strong> {technicians.find((tech) => tech.id === selectedService.responsible)?.name || "No asignado"}</p>
                   {selectedService.category === "Periódico" && (
                     <p><strong>Cantidad al Mes:</strong> {selectedService.quantity_per_month}</p>
@@ -451,38 +525,27 @@ function MyServices() {
                 <p className="text-muted">{selectedService.description || "No especificada"}</p>
               </div>
 
-              {/* Plagas y Áreas */}
-              <div className="d-flex gap-3">
-                {/* Plagas */}
-                <div className="flex-fill bg-white shadow-sm rounded p-3 w-50">
-                  <h5 className="text-secondary mb-3">
-                    <Bug className="me-2" /> Plagas
-                  </h5>
-                  <p>
-                    {(() => {
-                      const pestMatches = selectedService.pest_to_control?.match(/"([^"]+)"/g);
-                      return pestMatches
-                        ? pestMatches.map((item) => item.replace(/"/g, "")).join(", ")
-                        : "No especificado";
-                    })()}
-                  </p>
-                </div>
-
                 {/* Áreas */}
-                <div className="flex-fill bg-white shadow-sm rounded p-3 w-50">
-                  <h5 className="text-secondary mb-3">
-                    <GeoAlt className="me-2" /> Áreas de Intervención
-                  </h5>
-                  <p>
-                    {(() => {
-                      const areaMatches = selectedService.intervention_areas?.match(/"([^"]+)"/g);
-                      return areaMatches
-                        ? areaMatches.map((item) => item.replace(/"/g, "")).join(", ")
-                        : "No especificadas";
-                    })()}
-                  </p>
+                {selectedService.intervention_areas && (() => {
+                const areasMatches = selectedService.intervention_areas.match(/"([^"]+)"/g);
+                return areasMatches && areasMatches.length > 0;
+                })() && (
+                <div className="d-flex gap-3">
+                  <div className="flex-fill bg-white shadow-sm rounded p-3 w-50">
+                    <h5 className="text-secondary mb-3">
+                      <GeoAlt className="me-2" /> Áreas de Intervención
+                    </h5>
+                    <p>
+                      {(() => {
+                        const areaMatches = selectedService.intervention_areas.match(/"([^"]+)"/g);
+                        return areaMatches
+                          ? areaMatches.map((item) => item.replace(/"/g, "")).join(", ")
+                          : "No especificadas";
+                      })()}
+                    </p>
+                  </div>
                 </div>
-              </div>
+                )}
 
               {/* Tabla de inspecciones */}
               <div className="bg-white shadow-sm rounded p-3">
@@ -614,6 +677,12 @@ function MyServices() {
           <p className="m-0">{notification.message}</p>
         </Modal.Body>
       </Modal>
+
+      <ClientInfoModal
+        clientId={selectedClientId}
+        show={showClientModal}
+        onClose={handleCloseClientModal}
+      />
 
     </div>
   );

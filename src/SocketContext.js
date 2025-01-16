@@ -13,7 +13,7 @@ export const SocketProvider = ({ children }) => {
 
     useEffect(() => {
         // Inicializa el socket y guarda la referencia
-        socketRef.current = io("http://localhost:10000");
+        socketRef.current = io(`${process.env.REACT_APP_API_URL}`);
 
         // Log para depuración
         socketRef.current.on('connect', () => {

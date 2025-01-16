@@ -21,8 +21,8 @@ const Rules = () => {
     const fetchRulesAndCategories = async () => {
         setLoading(true);
         try {
-          const rulesResponse = await axios.get('http://localhost:10000/api/rules');
-          const categoriesResponse = await axios.get('http://localhost:10000/api/rules/categories');
+          const rulesResponse = await axios.get(`${process.env.REACT_APP_API_URL}/api/rules`);
+          const categoriesResponse = await axios.get(`${process.env.REACT_APP_API_URL}/api/rules/categories`);
           console.log('Rules:', rulesResponse.data); // Verifica si las normas tienen categorías correctas
           console.log('Categories:', categoriesResponse.data); // Verifica los datos de categorías
           setRules(rulesResponse.data);
@@ -61,7 +61,7 @@ const Rules = () => {
 
   const handleEditRule = async () => {
     try {
-      const response = await axios.put(`http://localhost:10000/api/rules/${selectedRule.id}`, newRule);
+      const response = await axios.put(`${process.env.REACT_APP_API_URL}/api/rules/${selectedRule.id}`, newRule);
       setRules((prevRules) => prevRules.map((rule) => (rule.id === selectedRule.id ? response.data : rule)));
       setShowModal(false);
       setSelectedRule(null);
@@ -78,7 +78,7 @@ const Rules = () => {
 
   const handleAddRule = async () => {
     try {
-      const response = await axios.post('http://localhost:10000/api/rules', {
+      const response = await axios.post(`${process.env.REACT_APP_API_URL}/api/rules`, {
         rule: newRule.rule || 'Norma',
         description: newRule.description || 'Descripción',
         categoryId: newRule.category, // Enviar el ID de la categoría
@@ -93,7 +93,7 @@ const Rules = () => {
 
   const deleteRule = async (id) => {
     try {
-      await axios.delete(`http://localhost:10000/api/rules/${id}`);
+      await axios.delete(`${process.env.REACT_APP_API_URL}/api/rules/${id}`);
       setRules((prevRules) => prevRules.filter((rule) => rule.id !== id));
       alert('Norma eliminada exitosamente.');
     } catch (error) {
@@ -136,7 +136,7 @@ const Rules = () => {
   
   const handleAddCategory = async () => {
     try {
-      const response = await axios.post('http://localhost:10000/api/rules/categories', {
+      const response = await axios.post(`${process.env.REACT_APP_API_URL}/api/rules/categories`, {
         category: newCategory.trim(),
       });
   
@@ -157,7 +157,7 @@ const Rules = () => {
 
   const fetchCategories = async () => {
     try {
-      const response = await axios.get('http://localhost:10000/api/rules/categories');
+      const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/rules/categories`);
       setCategories(response.data || []);
     } catch (error) {
       console.error('Error al cargar las categorías:', error);

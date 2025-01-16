@@ -59,10 +59,85 @@ function ProductList() {
     product.category.some(cat => (cat || '').toLowerCase().includes(searchText.toLowerCase()))
   );  
 
+  const prefirmarArchivo = async (fileUrl) => {
+    console.log('Iniciando proceso para prefirmar archivo...');
+    try {
+      if (!fileUrl) {
+        console.error('Error: La URL del archivo es inválida o no se proporcionó.');
+        return null;
+      }
+      console.log('URL recibida para prefirmar:', fileUrl);
+
+          // Decodificar la URL antes de enviarla
+    const decodedUrl = decodeURIComponent(fileUrl);
+    console.log('URL decodificada para prefirmar:', decodedUrl);
+  
+      const response = await axios.post(`${process.env.REACT_APP_API_URL}/api/PrefirmarArchivos`, { url: fileUrl });
+      
+      if (response.data && response.data.signedUrl) {
+        console.log('URL prefirmada generada con éxito:', response.data.signedUrl);
+        return response.data.signedUrl;
+      } else {
+        console.error('Error: Respuesta inesperada del servidor al generar la URL prefirmada.', response.data);
+        return null;
+      }
+    } catch (error) {
+      console.error('Error al prefirmar archivo:', error.message, error.response?.data || error);
+      alert('No se pudo generar la URL prefirmada. Por favor, verifica el archivo.');
+      return null;
+    }
+  };
+
+  const uploadFileToS3 = async (file, preSignedUrl) => {
+    console.log('Iniciando subida de archivo a S3...');
+    console.log('Archivo a cargar:', file?.name);
+    console.log('URL prefirmada proporcionada:', preSignedUrl);
+  
+    if (!file || !preSignedUrl) {
+      console.error('Error: Archivo o URL prefirmada no proporcionados.');
+      return false;
+    }
+  
+    try {
+      const response = await axios.put(preSignedUrl, file, {
+        headers: {
+          'Content-Type': file.type || 'application/octet-stream',
+        },
+      });
+  
+      if (response.status === 200) {
+        console.log(`Archivo ${file.name} cargado con éxito a S3.`);
+        return true;
+      } else {
+        console.error('Error: Respuesta inesperada al cargar archivo a S3.', response.status, response.data);
+        return false;
+      }
+    } catch (error) {
+      console.error(`Error al cargar el archivo ${file.name} a S3:`, error.message, error.response?.data || error);
+      return false;
+    }
+  };  
+  
+  // Función para manejar la vista de archivos con URL prefirmada
+  const verArchivoPrefirmado = async (fileUrl) => {
+    console.log('Intentando abrir archivo con URL prefirmada...');
+    try {
+      const signedUrl = await prefirmarArchivo(fileUrl);
+      if (signedUrl) {
+        console.log('Abriendo archivo en una nueva pestaña...');
+        window.open(signedUrl, '_blank');
+      } else {
+        console.error('Error: No se pudo obtener la URL prefirmada para el archivo.');
+      }
+    } catch (error) {
+      console.error('Error al intentar abrir archivo con URL prefirmada:', error.message);
+    }
+  }; 
+
   useEffect(() => {
     const fetchProducts = async () => {
       try {
-        const response = await axios.get('http://localhost:10000/api/products');
+        const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/products`);
         const productsWithCategories = response.data.map(product => ({
           ...product,
           category: Array.isArray(product.category)
@@ -178,11 +253,11 @@ function ProductList() {
   
       response = editingProduct
         ? await axios.put(
-            `http://localhost:10000/api/products/${editingProduct.id}`,
+            `${process.env.REACT_APP_API_URL}/api/products/${editingProduct.id}`,
             formData,
             { headers: { 'Content-Type': 'multipart/form-data' } }
           )
-        : await axios.post('http://localhost:10000/api/products', formData, {
+        : await axios.post(`${process.env.REACT_APP_API_URL}/api/products`, formData, {
             headers: { 'Content-Type': 'multipart/form-data' },
           });
   
@@ -234,7 +309,7 @@ function ProductList() {
   const deleteProduct = async (id) => {
     if (window.confirm("¿Estás seguro de que deseas eliminar este producto?")) {
       try {
-        await axios.delete(`http://localhost:10000/api/products/${id}`);
+        await axios.delete(`${process.env.REACT_APP_API_URL}/api/products/${id}`);
         setProducts(products.filter(product => product.id !== id));
         alert("Producto eliminado exitosamente.");
       } catch (error) {
@@ -601,14 +676,18 @@ function ProductList() {
           </p>
           {selectedProduct.safety_data_sheet ? (
             <Button
-              variant="link"
-              size="sm"
-              onClick={() =>
-                window.open(selectedProduct.safety_data_sheet, "_blank")
-              }
-            >
-              <BsEye style={{ color: "orange", fontSize: "1.2em" }} />
-            </Button>
+  variant="link"
+  size="sm"
+  onClick={() => {
+    if (selectedProduct.safety_data_sheet) {
+      verArchivoPrefirmado(selectedProduct.safety_data_sheet);
+    } else {
+      alert("No hay Hoja de Datos de Seguridad disponible.");
+    }
+  }}
+>
+  <BsEye style={{ color: "orange", fontSize: "1.2em" }} />
+</Button>
           ) : null}
         </div>
 
@@ -621,14 +700,18 @@ function ProductList() {
           </p>
           {selectedProduct.technical_sheet ? (
             <Button
-              variant="link"
-              size="sm"
-              onClick={() =>
-                window.open(selectedProduct.technical_sheet, "_blank")
-              }
-            >
-              <BsEye style={{ color: "orange", fontSize: "1.2em" }} />
-            </Button>
+  variant="link"
+  size="sm"
+  onClick={() => {
+    if (selectedProduct.technical_sheet) {
+      verArchivoPrefirmado(selectedProduct.technical_sheet);
+    } else {
+      alert("No hay Ficha Técnica disponible.");
+    }
+  }}
+>
+  <BsEye style={{ color: "orange", fontSize: "1.2em" }} />
+</Button>
           ) : null}
         </div>
 
@@ -641,14 +724,18 @@ function ProductList() {
           </p>
           {selectedProduct.health_registration ? (
             <Button
-              variant="link"
-              size="sm"
-              onClick={() =>
-                window.open(selectedProduct.health_registration, "_blank")
-              }
-            >
-              <BsEye style={{ color: "orange", fontSize: "1.2em" }} />
-            </Button>
+  variant="link"
+  size="sm"
+  onClick={() => {
+    if (selectedProduct.health_registration) {
+      verArchivoPrefirmado(selectedProduct.health_registration);
+    } else {
+      alert("No hay Registro Sanitario disponible.");
+    }
+  }}
+>
+  <BsEye style={{ color: "orange", fontSize: "1.2em" }} />
+</Button>
           ) : null}
         </div>
 
@@ -661,14 +748,18 @@ function ProductList() {
           </p>
           {selectedProduct.emergency_card ? (
             <Button
-              variant="link"
-              size="sm"
-              onClick={() =>
-                window.open(selectedProduct.emergency_card, "_blank")
-              }
-            >
-              <BsEye style={{ color: "orange", fontSize: "1.2em" }} />
-            </Button>
+  variant="link"
+  size="sm"
+  onClick={() => {
+    if (selectedProduct.emergency_card) {
+      verArchivoPrefirmado(selectedProduct.emergency_card);
+    } else {
+      alert("No hay Tarjeta de Emergencia disponible.");
+    }
+  }}
+>
+  <BsEye style={{ color: "orange", fontSize: "1.2em" }} />
+</Button>
           ) : null}
         </div>
       </>

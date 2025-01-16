@@ -1,9 +1,10 @@
   import React, { useEffect, useState, useRef } from 'react';
   import axios from 'axios';
-  import moment from 'moment-timezone';
-  import { useNavigate } from 'react-router-dom'; // Asegúrate de tener configurado react-router
-  import { Calendar, Person, Bag, Building, PencilSquare, Trash, Bug, Diagram3, GearFill, Clipboard, PlusCircle, InfoCircle, FileText, GeoAlt } from 'react-bootstrap-icons';
+  import moment, { duration } from 'moment-timezone';
+  import { useNavigate, useLocation } from 'react-router-dom'; // Asegúrate de tener configurado react-router
+  import { Calendar, Person, Bag, Building, PencilSquare, Trash, Bug, Diagram3, GearFill, Clipboard, PlusCircle, InfoCircle, FileText, GeoAlt, Stopwatch, Bullseye, ArrowRepeat } from 'react-bootstrap-icons';
   import { Card, Col, Row, Collapse, Button, Table, Modal, Form, CardFooter, ModalTitle } from 'react-bootstrap';
+  import ClientInfoModal from './ClientInfoModal';
   import 'bootstrap/dist/css/bootstrap.min.css';
   import './ServiceList.css'
 
@@ -41,6 +42,7 @@
       category: '',
       quantity_per_month: '',
       client_id: '',
+      duration: '',
       value: '',
       companion: [],
       created_by: userId,
@@ -69,6 +71,8 @@
     const [showEditModal, setShowEditModal] = useState(false);
     const [showServiceType, setShowServiceType] = useState(false);
     const [showCompanionOptions, setShowCompanionOptions] = useState(false);
+    const [selectedClientId, setSelectedClientId] = useState(null);
+    const [showClientModal, setShowClientModal] = useState(false);
     const [searchText, setSearchText] = useState(''); // Estado para la búsqueda
     const [filteredClients, setFilteredClients] = useState([]); // Clientes filtrados para la búsqueda
     const [showSuggestions, setShowSuggestions] = useState(false); // Controla si se muestran las sugerencias
@@ -84,6 +88,7 @@
       date: '',
       time: '',
       client_id: '',
+      duration: '4',
       value: '',
       companion: [],
       created_by: userId,
@@ -108,6 +113,59 @@
       }
     };
 
+    const handleShowClientModal = (clientId) => {
+      setSelectedClientId(clientId);
+      setShowClientModal(true);
+    };
+    
+    const handleCloseClientModal = () => {
+      setShowClientModal(false);
+      setSelectedClientId(null);
+    };    
+
+    useEffect(() => {
+      const calculateValue = () => {
+        const duration = parseInt(newService.duration, 10);
+    
+        // Validar que la duración esté dentro del rango permitido
+        if (duration < 4 || duration > 8) {
+          setNewService((prevService) => ({
+            ...prevService,
+            value: 0, // Si está fuera del rango, resetea el valor
+          }));
+          return;
+        }
+    
+        let calculatedValue = 0;
+    
+        // Cálculo para tipo "Hogar"
+        if (newService.service_type.includes("Hogar")) {
+          if (duration === 4) {
+            calculatedValue = 65000;
+          } else if (duration === 8) {
+            calculatedValue = 125000;
+          } else {
+            // Calcular para duraciones entre 5 y 7
+            calculatedValue = 65000 + (duration - 4) * 15000;
+          }
+        }
+    
+        // Ajuste adicional para categoría "Periódico"
+        if (newService.category === "Periódico") {
+          const quantityPerMonth = parseInt(newService.quantity_per_month, 10) || 1;
+          calculatedValue *= quantityPerMonth; // Multiplicar por la cantidad al mes
+        }
+    
+        // Actualizar el estado con el valor calculado
+        setNewService((prevService) => ({
+          ...prevService,
+          value: calculatedValue,
+        }));
+      };
+    
+      calculateValue();
+    }, [newService.service_type, newService.duration, newService.category, newService.quantity_per_month]); // Recalcular cuando cambien estos valores       
+
     useEffect(() => {
       // Agregar evento de clic al documento cuando hay un menú desplegable abierto
       if (expandedCardId !== null) {
@@ -128,6 +186,41 @@
         setNotification({ show: false, title, message: '' });
       }, 2500); // 2.5 segundos
     };
+
+    const fetchInspections = async (serviceId) => {
+      try {
+        const response = await axios.get(`http://localhost:10000/api/inspections?service_id=${serviceId}`);
+        const formattedInspections = response.data
+          .filter((inspection) => inspection.service_id === serviceId) // Filtra por `service_id`
+          .map((inspection) => ({
+            ...inspection,
+            date: moment(inspection.date).format("DD/MM/YYYY"), // Formato legible para la fecha
+            time: inspection.time ? moment(inspection.time, "HH:mm:ss").format("HH:mm") : "--",
+            exit_time: inspection.exit_time ? moment(inspection.exit_time, "HH:mm:ss").format("HH:mm") : "--",
+            observations: inspection.observations || "Sin observaciones",
+          }))
+          .sort((a, b) => b.datetime - a.datetime); // Ordena por fecha y hora
+        setInspections(formattedInspections);
+      } catch (error) {
+        console.error("Error fetching inspections:", error);
+      }
+    }; 
+
+    // Dentro de tu componente MyServices
+    const location = useLocation();
+    const serviceIdFromState = location.state?.serviceId;
+
+    // Si el estado contiene un serviceId, selecciona automáticamente ese servicio y abre el modal.
+    useEffect(() => {
+        if (serviceIdFromState) {
+            const service = services.find(s => s.id === serviceIdFromState);
+            if (service) {
+                setSelectedService(service);
+                fetchInspections(service.id);
+                setShowDetailsModal(true);
+            }
+        }
+    }, [serviceIdFromState, services]);
 
     const [availableServiceOptions, setAvailableServiceOptions] = useState([
       "Empresarial",
@@ -183,6 +276,37 @@
       navigate(`/inspection/${inspection.id}`);
     };
 
+
+  useEffect(() => {
+    const queryParams = new URLSearchParams(location.search);
+    const serviceId = queryParams.get('serviceId');
+    const dataParam = queryParams.get("data");
+
+    if (serviceId) {
+      const service = services.find((s) => s.id === parseInt(serviceId));
+      if (service) {
+        setSelectedService(service);
+        fetchInspections(service.id);
+        setShowDetailsModal(true);
+      }
+    }
+
+    if (dataParam) {
+      try {
+        const serviceData = JSON.parse(decodeURIComponent(dataParam));
+        setNewService((prevService) => ({
+          ...prevService,
+          ...serviceData,
+          created_by: serviceData.created_by || prevService.created_by,
+        }));
+        setShowAddServiceModal(true);
+      } catch (error) {
+        console.error("Error procesando datos de la URL:", error);
+      }
+    }
+  }, [location.search, services]);
+
+
   const handleDropdownToggle = (isOpen, event) => {
     // Verificar si el evento es un clic en un checkbox
     if (event && event.target && event.target.tagName === 'INPUT') {
@@ -209,7 +333,7 @@
     setEditService({
       ...service,
       service_type: parseField(service.service_type),
-      pest_to_control: parseField(service.pest_to_control),
+      duration: parseField(service.duration),
       intervention_areas: parseField(service.intervention_areas),
       companion: parseField(service.companion),
     });
@@ -268,7 +392,6 @@
         const formattedEditService = {
           ...editService,
           service_type: `{${editService.service_type.map((type) => `"${type}"`).join(",")}}`, // Formato {"Tipo1","Tipo2"}
-          pest_to_control: `{${editService.pest_to_control.map((pest) => `"${pest}"`).join(",")}}`,
           intervention_areas: `{${editService.intervention_areas.map((area) => `"${area}"`).join(",")}}`,
           companion: `{${editService.companion.map((id) => `"${id}"`).join(",")}}`,
         };
@@ -451,26 +574,7 @@
       }
     
       setFilteredServices(filtered);
-    };  
-
-    const fetchInspections = async (serviceId) => {
-      try {
-        const response = await axios.get(`http://localhost:10000/api/inspections?service_id=${serviceId}`);
-        const formattedInspections = response.data
-          .filter((inspection) => inspection.service_id === serviceId) // Filtra por `service_id`
-          .map((inspection) => ({
-            ...inspection,
-            date: moment(inspection.date).format("DD/MM/YYYY"), // Formato legible para la fecha
-            time: inspection.time ? moment(inspection.time, "HH:mm:ss").format("HH:mm") : "--",
-            exit_time: inspection.exit_time ? moment(inspection.exit_time, "HH:mm:ss").format("HH:mm") : "--",
-            observations: inspection.observations || "Sin observaciones",
-          }))
-          .sort((a, b) => b.datetime - a.datetime); // Ordena por fecha y hora
-        setInspections(formattedInspections);
-      } catch (error) {
-        console.error("Error fetching inspections:", error);
-      }
-    };  
+    };   
 
     const handleSearchChange = (e) => {
       const input = e.target.value;
@@ -584,6 +688,14 @@
     };
 
     const handleSaveNewService = async () => {
+      if (newService.service_type.includes("Hogar")) {
+        const duration = parseInt(newService.duration, 10);
+        if (duration < 4 || duration > 8) {
+          showNotification("Error", "La duración debe estar entre 4 y 8 horas para servicios de tipo Hogar.");
+          return;
+        }
+      }
+      
       const serviceData = {
         ...newService,
         quantity_per_month: newService.quantity_per_month || null,
@@ -608,18 +720,7 @@
         showNotification("Error","Error: Hubo un problema al guardar el servicio");
       }
     };
-    
-
-    const handlePestToControlChange = (e) => {
-      const { value, checked } = e.target;
-      setNewService((prevService) => ({
-        ...prevService,
-        pest_to_control: checked
-          ? [...prevService.pest_to_control, value]
-          : prevService.pest_to_control.filter((pest) => pest !== value),
-      }));
-    };
-    
+       
 
     if (loading) return <div>Cargando servicios...</div>;
 
@@ -720,14 +821,20 @@
                         </div>
                         <hr />
                         <div className="mt-2">
-                    <Diagram3 className="text-warning me-2" /> 
-                    <span className="text-secondary">
-                      {(() => {
-                        const areaMatches = service.intervention_areas.match(/"([^"]+)"/g);
-                        const areas = areaMatches ? areaMatches.map(item => item.replace(/"/g, '')).join(', ') : "No especificadas";
-                        return areas.length > 20 ? `${areas.slice(0, 20)}...` : areas;
-                      })()}
-                    </span>
+                        <Stopwatch className="text-primary me-2" /> 
+                        <span className="text-secondary">
+                          {service.duration} Horas
+                        </span>
+                        </div>
+                        <div className="mt-2">
+                          {service.category === "Puntual" ? (
+                            <Bullseye className="text-danger me-2" />
+                          ) : (
+                            <ArrowRepeat className="text-success me-2" />
+                          )}
+                          <span className="text-secondary">
+                            {service.category}
+                          </span>
                         </div>
                         <div className="mt-3">
                           <h6 >
@@ -853,23 +960,23 @@
           <Modal.Body>
             <Form>
               {/* Tipo de Servicio */}
-  <Form.Group className="mt-3">
-    <Form.Label style={{ fontWeight: "bold" }}>Tipo de Servicio</Form.Label>
-    <div className="d-flex flex-wrap">
-    {availableServiceOptions.map((option, index) => (
-  <div key={index} className="col-4 mb-2">
-    <Form.Check
-      type="checkbox"
-      label={<span style={{ fontSize: "0.8rem" }}>{option}</span>}
-      value={option}
-      checked={newService.service_type.includes(option)}
-      onChange={(e) => handleServiceTypeChange(e)}
-    />
-  </div>
-))}
+              <Form.Group className="mt-3">
+                <Form.Label style={{ fontWeight: "bold" }}>Tipo de Servicio</Form.Label>
+                <div className="d-flex flex-wrap">
+                {availableServiceOptions.map((option, index) => (
+              <div key={index} className="col-4 mb-2">
+                <Form.Check
+                  type="checkbox"
+                  label={<span style={{ fontSize: "0.8rem" }}>{option}</span>}
+                  value={option}
+                  checked={newService.service_type.includes(option)}
+                  onChange={(e) => handleServiceTypeChange(e)}
+                />
+              </div>
+            ))}
 
-    </div>
-  </Form.Group>
+                </div>
+              </Form.Group>
 
               {/* Descripción */}
               <Form.Group className="mt-3">
@@ -883,29 +990,29 @@
                 />
               </Form.Group>
 
-  {/* Áreas de Intervención */}
-  {newService.service_type.length > 0 && // Verifica que haya al menos un tipo seleccionado
-    !newService.service_type.includes("Hogar") && ( // Asegúrate de que no sea "Hogar"
-      <Form.Group className="mt-3">
-        <Form.Label style={{ fontWeight: "bold" }}>Áreas de Intervención</Form.Label>
-        <div className="d-flex flex-wrap">
-          {newService.service_type
-            .flatMap((type) => serviceAreaMapping[type] || []) // Obtiene las áreas correspondientes
-            .filter((area, index, self) => self.indexOf(area) === index) // Elimina duplicados
-            .map((area, index) => (
-              <div key={index} className="col-4 mb-2">
-                <Form.Check
-                  type="checkbox"
-                  label={<span style={{ fontSize: "0.8rem" }}>{area}</span>}
-                  value={area}
-                  checked={newService.intervention_areas.includes(area)}
-                  onChange={handleInterventionAreasChange}
-                />
-              </div>
-            ))}
-        </div>
-      </Form.Group>
-    )}
+            {/* Áreas de Intervención */}
+            {newService.service_type.length > 0 && // Verifica que haya al menos un tipo seleccionado
+              !newService.service_type.includes("Hogar") && ( // Asegúrate de que no sea "Hogar"
+                <Form.Group className="mt-3">
+                  <Form.Label style={{ fontWeight: "bold" }}>Áreas de Intervención</Form.Label>
+                  <div className="d-flex flex-wrap">
+                    {newService.service_type
+                      .flatMap((type) => serviceAreaMapping[type] || []) // Obtiene las áreas correspondientes
+                      .filter((area, index, self) => self.indexOf(area) === index) // Elimina duplicados
+                      .map((area, index) => (
+                        <div key={index} className="col-4 mb-2">
+                          <Form.Check
+                            type="checkbox"
+                            label={<span style={{ fontSize: "0.8rem" }}>{area}</span>}
+                            value={area}
+                            checked={newService.intervention_areas.includes(area)}
+                            onChange={handleInterventionAreasChange}
+                          />
+                        </div>
+                      ))}
+                  </div>
+                </Form.Group>
+              )}
 
               {/* Responsable */}
               <Form.Group className="mt-3">
@@ -972,6 +1079,21 @@
                     </option>
                   ))}
                 </Form.Control>
+              </Form.Group>
+
+              <Form.Group className="mt-3">
+                <Form.Label style={{ fontWeight: "bold" }}>Duración</Form.Label>
+                <Form.Control
+                  type="number"
+                  name="duration"
+                  value={newService.duration}
+                  min="4" // Mínimo permitido
+                  max="8" // Máximo permitido
+                  onChange={(e) => {
+                    const value = Math.max(4, Math.min(8, parseInt(e.target.value, 10))); // Restringir entre 4 y 8
+                    setNewService({ ...newService, duration: value });
+                  }}
+                />
               </Form.Group>
 
               {/* Valor */}
@@ -1143,6 +1265,21 @@
                   </Form.Group>
                 )}
 
+              <Form.Group className="mt-3">
+                <Form.Label style={{ fontWeight: "bold" }}>Duración</Form.Label>
+                <Form.Control
+                  type="number"
+                  name="duration"
+                  value={newService.duration}
+                  min="4" // Mínimo permitido
+                  max="8" // Máximo permitido
+                  onChange={(e) => {
+                    const value = Math.max(4, Math.min(8, parseInt(e.target.value, 10))); // Restringir entre 4 y 8
+                    setNewService({ ...newService, duration: value });
+                  }}
+                />
+              </Form.Group>
+
                 {/* Valor */}
                 <Form.Group className="mt-3">
                   <Form.Label style={{ fontWeight: "bold" }}>Valor</Form.Label>
@@ -1225,7 +1362,20 @@
                         .join(", ")}
                     </p>
                     <p className='my-1'><strong>Categoría:</strong> {selectedService.category}</p>
-                    <p className='my-1'><strong>Empresa:</strong> {clientNames[selectedService.client_id] || "Cliente Desconocido"}</p>
+                    <div className='p-0 m-0 d-flex'>
+                    <p className="my-1"><strong>Empresa:</strong> {clientNames[selectedService.client_id] || "Cliente Desconocido"}</p>
+                    {selectedService.client_id && (
+                      <Building
+                        className='ms-2 mt-1'
+                        style={{cursor: "pointer"}}
+                        size={22}
+                        onClick={(e) => {
+                          e.stopPropagation(); // Evita que se activen otros eventos del Card
+                          handleShowClientModal(selectedService.client_id);
+                        }}
+                      />
+                    )}
+                  </div>
                     <p className='my-1'><strong>Responsable:</strong> {technicians.find((tech) => tech.id === selectedService.responsible)?.name || "No asignado"}</p>
                     {selectedService.category === "Periódico" && (
                       <p><strong>Cantidad al Mes:</strong> {selectedService.quantity_per_month}</p>
@@ -1243,8 +1393,11 @@
                 </div>
 
                 {/* Áreas */}
+                {selectedService.intervention_areas && (() => {
+                const areasMatches = selectedService.intervention_areas.match(/"([^"]+)"/g);
+                return areasMatches && areasMatches.length > 0;
+                })() && (
                 <div className="d-flex gap-3">
-                  {/* Áreas */}
                   <div className="flex-fill bg-white shadow-sm rounded p-3 w-50">
                     <h5 className="text-secondary mb-3">
                       <GeoAlt className="me-2" /> Áreas de Intervención
@@ -1259,6 +1412,7 @@
                     </p>
                   </div>
                 </div>
+                )}
 
                 {/* Tabla de inspecciones */}
                 <div className="bg-white shadow-sm rounded p-3">
@@ -1327,6 +1481,11 @@
           </Modal.Body>
         </Modal>
 
+        <ClientInfoModal
+        clientId={selectedClientId}
+        show={showClientModal}
+        onClose={handleCloseClientModal}
+      />
 
       </div>
       

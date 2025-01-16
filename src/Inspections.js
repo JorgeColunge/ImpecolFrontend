@@ -56,7 +56,7 @@ function Inspections() {
 
   const fetchInspections = async () => {
     try {
-      const response = await axios.get('http://localhost:10000/api/inspections');
+      const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/inspections`);
       console.log("Inspecciones obtenidas:", response.data);
       setInspections(response.data);
     } catch (error) {
@@ -66,7 +66,7 @@ function Inspections() {
 
   const fetchServices = async () => {
     try {
-      const response = await axios.get('http://localhost:10000/api/services');
+      const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/services`);
       console.log("Servicios obtenidos:", response.data);
       setServices(response.data);
     } catch (error) {
@@ -76,7 +76,7 @@ function Inspections() {
 
   const fetchClients = async () => {
     try {
-      const response = await axios.get('http://localhost:10000/api/clients');
+      const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/clients`);
       console.log("Clientes obtenidos:", response.data);
       setClients(response.data);
     } catch (error) {
@@ -86,7 +86,7 @@ function Inspections() {
 
   const fetchUsers = async () => {
     try {
-      const response = await axios.get('http://localhost:10000/api/users');
+      const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/users`);
       console.log("Usuarios obtenidos:", response.data);
       setUsers(response.data);
     } catch (error) {
@@ -191,7 +191,7 @@ function Inspections() {
     console.log("Payload enviado al backend:", payload);
   
     try {
-      const response = await axios.post("http://localhost:10000/api/inspections", payload);
+      const response = await axios.post(`${process.env.REACT_APP_API_URL}/api/inspections`, payload);
       console.log("Respuesta del backend:", response.data);
   
       if (response.data.success) {
@@ -261,9 +261,9 @@ function Inspections() {
       };
 
       if (editing) {
-        await axios.put(`http://localhost:10000/api/inspections/${selectedId}`, payload);
+        await axios.put(`${process.env.REACT_APP_API_URL}/api/inspections/${selectedId}`, payload);
       } else {
-        await axios.post('http://localhost:10000/api/inspections', payload);
+        await axios.post(`${process.env.REACT_APP_API_URL}/api/inspections`, payload);
       }
       fetchInspections();
       handleCloseModal();
@@ -278,7 +278,7 @@ function Inspections() {
     }
   
     try {
-      await axios.delete(`http://localhost:10000/api/inspections/${inspectionId}`);
+      await axios.delete(`${process.env.REACT_APP_API_URL}/api/inspections/${inspectionId}`);
       showNotification("Éxito", "Inspección eliminada con éxito.");
       
       // Actualizar el estado para eliminar la inspección del frontend

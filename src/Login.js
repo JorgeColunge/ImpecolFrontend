@@ -13,7 +13,7 @@ function Login({ onLogin }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const response = await axios.post('http://localhost:10000/api/login', { email, password });
+      const response = await axios.post(`${process.env.REACT_APP_API_URL}/api/login`, { email, password });
   
       if (response.data.success) {
         const userData = response.data.user;

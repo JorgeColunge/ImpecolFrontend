@@ -13,7 +13,7 @@ const inspectFormData = (formData) => {
 };
 
 const api = axios.create({
-  baseURL: 'http://localhost:10000/api',
+  baseURL: `${process.env.REACT_APP_API_URL}/api`,
 });
 
 api.interceptors.request.use(async (config) => {

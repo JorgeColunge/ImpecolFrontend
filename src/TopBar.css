@@ -13,7 +13,7 @@
 } 
 
 .topbar-logo {
-  width: 70px; /* Tamaño aún más reducido del logo */
+  width: 45px; /* Tamaño aún más reducido del logo */
 }
 
   
@@ -143,7 +143,7 @@
   }
 
   .topbar-logo {
-    width: 75px;
+    width: 47px;
     display: none;
   }
 
@@ -201,7 +201,7 @@
   }
 
   .topbar-logo {
-    width: 70px; /* Tamaño aún más reducido del logo */
+    width: 40px; /* Tamaño aún más reducido del logo */
     display: none;
   }
 
@@ -238,7 +238,7 @@
   }
 
   .topbar-logo {
-    width: 70px; /* Tamaño aún más reducido del logo */
+    width: 38px; /* Tamaño aún más reducido del logo */
     display: none;
   }
 
