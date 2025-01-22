@@ -26,6 +26,11 @@ const QrScannerComponent = ({ onScan = () => {} }) => {
           style={{ width: '100%' }}
           onError={handleError}
           onScan={handleScan}
+          constraints={{
+            video: {
+              facingMode: 'environment' // Usar la cámara trasera
+            }
+          }}
         />
       </div>
     );
