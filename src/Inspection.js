@@ -1,12 +1,13 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useParams,useLocation } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { Button, Table, InputGroup, FormControl, Modal, Form } from 'react-bootstrap';
 import api from './Api'; // Usa el archivo de API con lógica offline integrada
 import { saveRequest, isOffline } from './offlineHandler';
 import { initDB, initUsersDB, saveUsers, getUsers } from './indexedDBHandler';
 import SignatureCanvas from 'react-signature-canvas';
 import "./Inspection.css";
-import { ArrowDownSquare, ArrowUpSquare, Eye, FileEarmarkArrowDown, FileEarmarkExcel, FileEarmarkImage, FileEarmarkPdf, FileEarmarkWord, PencilSquare, QrCodeScan, XCircle } from 'react-bootstrap-icons';
+import { ArrowDownSquare, ArrowUpSquare, Eye, FileEarmarkArrowDown, FileEarmarkPlus, EnvelopePaper, Whatsapp, Radioactive, FileEarmarkExcel, FileEarmarkImage, FileEarmarkPdf, FileEarmarkWord, PencilSquare, QrCodeScan, XCircle } from 'react-bootstrap-icons';
 import  {useUnsavedChanges} from './UnsavedChangesContext'
 import QrScannerComponent from './QrScannerComponent';
 import moment from 'moment';
@@ -64,6 +65,169 @@ function Inspection() {
   const [searchTermHorizontal, setSearchTermHorizontal] = useState('');
   const [qrScannerOpen, setQrScannerOpen] = useState(false);
   const [currentQrStationType, setCurrentQrStationType] = useState(null);
+  const [selectedDocument, setSelectedDocument] = useState(null);
+  const [documentModalOpen, setDocumentModalOpen] = useState(false);
+  const [loadingGoogleDrive, setLoadingGoogleDrive] = useState(false);
+  const [convertToPdfModalOpen, setConvertToPdfModalOpen] = useState(false);
+  const [selectedDocForPdf, setSelectedDocForPdf] = useState(null);
+  const [loadingConvertToPdf, setLoadingConvertToPdf] = useState(false);
+  const [isExecuting, setIsExecuting] = useState(false);
+  const [actions, setActions] = useState([]);
+  const navigate = useNavigate();
+
+  // Abrir el modal
+  const handleOpenConvertToPdfModal = () => {
+    setConvertToPdfModalOpen(true);
+  };
+
+  // Cerrar el modal
+  const handleCloseConvertToPdfModal = () => {
+    setConvertToPdfModalOpen(false);
+    setSelectedDocForPdf(null);
+  };
+
+  // Realizar la conversión a PDF
+  const handleConvertToPdf = async () => {
+    setLoadingConvertToPdf(true); // Mostrar spinner
+    try {
+      console.log("Enviando solicitud para convertir a PDF...");
+      const response = await api.post("/convert-to-pdf", {
+        generatedDocumentId: selectedDocForPdf.id,
+      });
+  
+      console.log("Respuesta recibida del backend:", response.data);
+  
+      if (response.data.success) {
+        console.log("Conversión exitosa. Datos del nuevo documento:", response.data.newDocument);
+        setConvertToPdfModalOpen(false);
+        console.log("Actualizando lista de documentos...");
+        await fetchDocuments();
+      } else {
+        console.error("Error en la conversión del documento:", response.data.message);
+        alert(response.data.message || "Ocurrió un error al convertir el documento.");
+      }
+    } catch (error) {
+      console.error("Error al conectar con el servidor:", error);
+      alert("Error de conexión con el servidor al intentar convertir el documento.");
+    } finally {
+      setLoadingConvertToPdf(false); // Ocultar spinner
+    }
+  };
+  
+  const handleActionClick = async (configurationId) => {
+    if (isExecuting) return;
+    setIsExecuting(true);
+  
+    try {
+      const payload = { idEntity: inspectionId, id: configurationId, uniqueId: Date.now() };
+      const response = await api.post(
+        `${process.env.REACT_APP_API_URL}/api/create-document-inspeccion`,
+        payload
+      );
+  
+      if (response.data.success) {
+        showNotification("Acción ejecutada con éxito.");
+        await fetchDocuments();
+      } else {
+        showNotification("Error al ejecutar la acción.");
+      }
+    } catch (error) {
+      console.error("Error al ejecutar la acción:", error);
+      showNotification("Error al ejecutar la acción.");
+    } finally {
+      setIsExecuting(false);
+    }
+  }; 
+
+  const handleDownload = async () => {
+    try {
+      const response = await api.post('/PrefirmarArchivos', { url: selectedDocument.document_url });
+      if (response.data.signedUrl) {
+        const preSignedUrl = response.data.signedUrl;
+        const link = document.createElement('a');
+        link.href = preSignedUrl;
+        link.download = 'document'; // Cambia el nombre del archivo si es necesario
+        link.click();
+      } else {
+        alert('No se pudo obtener la URL prefirmada.');
+      }
+    } catch (error) {
+      console.error('Error al obtener la URL prefirmada para descargar:', error);
+      alert('Hubo un error al procesar la solicitud.');
+    }
+  };
+
+  const handleEditGoogleDrive = async () => {
+    setLoadingGoogleDrive(true); // Mostrar el spinner
+    try {
+      console.log("Iniciando pre-firmado del documento:", selectedDocument);
+  
+      const response = await api.post("/PrefirmarArchivos", { url: selectedDocument.document_url });
+      console.log("Respuesta de pre-firmado:", response.data);
+  
+      if (response.data.signedUrl) {
+        const preSignedUrl = response.data.signedUrl;
+        console.log("URL prefirmada obtenida:", preSignedUrl);
+  
+        console.log("Enviando solicitud para editar en Google Drive...");
+        const googleDriveResponse = await api.post("/edit-googledrive", { s3Url: preSignedUrl });
+        console.log("Respuesta de edición en Google Drive:", googleDriveResponse.data);
+  
+        if (googleDriveResponse.data.success && googleDriveResponse.data.fileId) {
+          const googleDriveEditUrl = `https://docs.google.com/document/d/${googleDriveResponse.data.fileId}/edit`;
+          console.log("URL de edición en Google Drive:", googleDriveEditUrl);
+  
+          // Abrir Google Drive en una nueva pestaña
+          window.open(googleDriveEditUrl, "_blank", "noopener,noreferrer");
+  
+          // Pasar información al nuevo componente
+          const documentInfo = {
+            id: selectedDocument.id,
+            entity_id: selectedDocument.entity_id,
+            document_url: selectedDocument.document_url,
+            google_drive_url: googleDriveEditUrl,
+            google_drive_id: googleDriveResponse.data.fileId,
+          };
+  
+          console.log("Información del documento que se pasa al componente:", documentInfo);
+  
+          navigate("/edit-google-drive", {
+            state: {
+              documentInfo,
+            },
+          });
+        } else {
+          console.error("No se pudo obtener el archivo en Google Drive:", googleDriveResponse.data);
+          alert("No se pudo obtener el archivo en Google Drive.");
+        }
+      } else {
+        console.error("No se pudo obtener la URL prefirmada.");
+        alert("No se pudo obtener la URL prefirmada.");
+      }
+    } catch (error) {
+      console.error("Error al procesar la solicitud de Google Drive:", error);
+      alert("Hubo un error al procesar la solicitud.");
+    } finally {
+      setLoadingGoogleDrive(false); // Ocultar el spinner
+    }
+  };
+  
+
+  const handleEditLocal = () => {
+    navigate("/edit-local-file", { state: {documentId: selectedDocument.id}});
+  };
+
+  const handleDocumentClick = (documentUrl) => {
+    setSelectedDocument(documentUrl);
+    setDocumentModalOpen(true);
+  };
+
+  const closeDocumentModal = () => {
+    setSelectedDocument(null);
+    setDocumentModalOpen(false);
+  };
+
+  console.log("user rol", userRol);
 
   const showNotification = (message) => {
     setNotification({ show: true, message });
@@ -272,20 +436,33 @@ function Inspection() {
       }
     };
     
-    const fetchDocuments = async () => {
+    const fetchActions = async () => {
       try {
-        const response = await api.get(`${process.env.REACT_APP_API_URL}/api/get-documents`, {
-          params: { entity_type: 'inspection', entity_id: inspectionId },
+        const response = await api.get(`${process.env.REACT_APP_API_URL}/api/actions-inspections`, {
+          params: { inspection_id: inspectionId }, // Consulta con el ID de inspección
         });
-        setDocuments(response.data.documents || []);
+        setActions(response.data.actions || []); // Asume que el backend devuelve un array de acciones
       } catch (error) {
-        console.error('Error fetching documents:', error);
+        console.error('Error fetching actions:', error);
       }
     };
+
     fetchDocuments();
+    fetchActions();
   
     fetchInspectionData();
   }, [inspectionId]); 
+
+  const fetchDocuments = async () => {
+    try {
+      const response = await api.get(`${process.env.REACT_APP_API_URL}/api/get-documents`, {
+        params: { entity_type: 'inspections', entity_id: inspectionId },
+      });
+      setDocuments(response.data.documents || []);
+    } catch (error) {
+      console.error('Error fetching documents:', error);
+    }
+  };
 
   const handleQrScan = (scannedValue) => {
     console.log("Valor recibido del escáner QR:", scannedValue);
@@ -366,6 +543,9 @@ const handleSaveChanges = async () => {
     formData.append("inspectionId", inspectionId);
     formData.append("generalObservations", generalObservations);
 
+    // Incluir el ID del usuario explícitamente
+    formData.append("userId", storedUserInfo?.id_usuario || null);
+
     // Procesar findingsByType
     const findingsByTypeProcessed = {};
     Object.keys(findingsByType).forEach((type) => {
@@ -416,7 +596,9 @@ const handleSaveChanges = async () => {
         signature: clientSignature instanceof Blob ? null : removePrefix(clientSignaturePreview), // Usar la URL si no hay nueva firma
       },
       technician: {
-        name: "Técnico",
+        id: storedUserInfo?.id_usuario || null,
+        name: `${storedUserInfo?.name || ""} ${storedUserInfo?.lastname || ""}`.trim(),
+        role: userRol || "No disponible",
         signature: techSignature instanceof Blob ? null : removePrefix(techSignaturePreview), // Usar la URL si no hay nueva firma
       },
     };
@@ -905,43 +1087,7 @@ const handleDeleteFinding = () => {
               <p><strong>Hora de Inicio:</strong> {moment(time, "HH:mm:ss").format("HH:mm")}</p>
               <p><strong>Hora de Finalización:</strong> {moment(exit_time, "HH:mm:ss").format("HH:mm")}</p>
               <p><strong>Servicio:</strong> {service_id}</p>
-            </div>
-
-            {/* Columna 2: Documentos */}
-            <div className="col-md-6">
-              <h5>Documentos</h5>
-              {documents.length > 0 ? (
-                <div className="row" style={{ minHeight: 0, height: 'auto' }}>
-                  {documents.map((doc, index) => (
-                    <div className="col-6 col-md-3 text-center mb-3" key={index}>
-                      <a href={doc.signed_url} target="_blank" rel="noopener noreferrer" className="text-decoration-none text-dark">
-                        {doc.document_type === "doc" ? (
-                          <FileEarmarkWord size={40} color="blue" title="Documento Word" />
-                        ) : doc.document_type === "xlsx" ? (
-                          <FileEarmarkExcel size={40} color="green" title="Hoja de cálculo Excel" />
-                        ) : doc.document_type === "pdf" ? (
-                          <FileEarmarkPdf size={40} color="red" title="Documento PDF" />
-                        ) : ["jpg", "jpeg", "png"].includes(doc.document_type) ? (
-                          <FileEarmarkImage size={40} color="orange" title="Imagen" />
-                        ) : (
-                          <FileEarmarkArrowDown size={40} color="gray" title="Archivo" />
-                        )}
-                        <div className="mt-2">
-                          <small>{doc.document_name}</small>
-                        </div>
-                      </a>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p>No se encontraron documentos relacionados con esta inspección.</p>
-              )}
-            </div>
-          </div>
-
-          {/* Segunda fila: Observaciones */}
-          <div className="row mt-4" style={{ minHeight: 0, height: 'auto' }}>
-            <div className="col-12">
+              <br></br>
               <textarea
                 id="generalObservations"
                 className="form-control"
@@ -960,6 +1106,109 @@ const handleDeleteFinding = () => {
                 placeholder="Ingrese sus observaciones generales aquí"
                 disabled={techSignaturePreview && clientSignaturePreview || userRol === 'Cliente'}
               ></textarea>
+            </div>
+
+            {/* Columna 2: Documentos */}
+            <div className="col-md-6">
+            <h5>Documentos</h5>
+            {documents.length > 0 ? (
+              <div className="row" style={{ minHeight: 0, height: 'auto' }}>
+                {documents.map((doc, index) => (
+                  <div className="col-6 col-md-3 text-center mb-3" key={index}>
+                    <button
+                      className="btn p-0"
+                      style={{ background: "none", border: "none", cursor: "pointer" }}
+                      onClick={() => handleDocumentClick(doc)}
+                    >
+                      {doc.document_type === "doc" ? (
+                        <FileEarmarkWord size={40} color="blue" title="Documento Word" />
+                      ) : doc.document_type === "xlsx" ? (
+                        <FileEarmarkExcel size={40} color="green" title="Hoja de cálculo Excel" />
+                      ) : doc.document_type === "pdf" ? (
+                        <FileEarmarkPdf size={40} color="red" title="Documento PDF" />
+                      ) : ["jpg", "jpeg", "png"].includes(doc.document_type) ? (
+                        <FileEarmarkImage size={40} color="orange" title="Imagen" />
+                      ) : (
+                        <FileEarmarkArrowDown size={40} color="gray" title="Archivo" />
+                      )}
+                      <div className="mt-2">
+                        <small>{doc.document_name}</small>
+                      </div>
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p>No se encontraron documentos relacionados con esta inspección.</p>
+            )}
+
+              {/* Mostrar las acciones debajo de los documentos */}
+              <div className="mt-3">
+                <h5>Acciones</h5>
+                {actions.length > 0 ? (
+                  <div className="row" style={{ minHeight: 0, height: 'auto' }}>
+                    {actions.map((action, index) => {
+                      // Determinar el ícono y color según el action_type
+                      let IconComponent;
+                      let color;
+
+                      switch (action.action_type) {
+                        case "generate_doc":
+                          IconComponent = FileEarmarkWord;
+                          color = "blue";
+                          break;
+                        case "generate_xlsm":
+                          IconComponent = FileEarmarkExcel;
+                          color = "green";
+                          break;
+                        case "generate_pdf":
+                          IconComponent = FileEarmarkPdf;
+                          color = "red";
+                          break;
+                        case "generate_img":
+                          IconComponent = FileEarmarkImage;
+                          color = "orange";
+                          break;
+                        case "send_email":
+                          IconComponent = EnvelopePaper;
+                          color = "black";
+                          break;
+                        case "send_whatsapp":
+                          IconComponent = Whatsapp;
+                          color = "green";
+                          break;
+                        default:
+                          IconComponent = Radioactive;
+                          color = "gray";
+                          break;
+                      }
+
+                      return (
+                        <div className="col-6 col-md-3 text-center mb-3" key={index}>
+                          <button
+                            className="btn p-0"
+                            style={{ background: "none", border: "none", cursor: "pointer" }}
+                            onClick={() => {
+                              if (action.action_type === "generate_pdf" && action.configuration_id === 0) {
+                                handleOpenConvertToPdfModal();
+                              } else {
+                                handleActionClick(action.configuration_id);
+                              }
+                            }}
+                          >
+                            <IconComponent size={40} color={color} title={action.action_name} />
+                            <div className="mt-2">
+                              <small>{action.action_name}</small>
+                            </div>
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <p>No se encontraron acciones relacionadas con esta inspección.</p>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -2433,8 +2682,6 @@ const handleDeleteFinding = () => {
         </Modal.Footer>
       </Modal>
 
-      
-
        {/* Modal de firma */}
        <Modal show={signModalOpen} onHide={handleSignModalCancel} size="lg">
         <Modal.Header closeButton>
@@ -2463,6 +2710,12 @@ const handleDeleteFinding = () => {
                 disabled={techSignaturePreview && clientSignaturePreview || userRol === 'Cliente'}
               />
             </div>
+            <div className="mt-4 text-center">
+              <h6>Datos del Técnico</h6>
+              <p><strong>Nombre:</strong> {storedUserInfo?.name || 'No disponible'} {storedUserInfo?.lastname}</p>
+              <p><strong>Cédula:</strong> {storedUserInfo?.id_usuario || 'No disponible'}</p>
+              <p><strong>Cargo:</strong> {userRol || 'No disponible'}</p>
+            </div>
           </div>
 
           {/* Firma del Cliente */}
@@ -2490,29 +2743,25 @@ const handleDeleteFinding = () => {
           </div>
 
           {/* Datos adicionales */}
-          <div className="row" style={{ minHeight: 0, height: 'auto' }}>
+          <div className="row justify-content-center" style={{ minHeight: 0, height: 'auto' }}>
             <div className="col-md-4 mt-1 text-center">
-            <h5 className="mb-3">Datos del Cliente</h5>
+              <h5 className="mb-3">Datos del Cliente</h5>
               <input
                 type="text"
-                className="form-control"
+                className="form-control mb-3"
                 value={signData.name}
                 onChange={(e) => handleSignDataChange("name", e.target.value)}
                 placeholder="Nombre del cliente"
                 required
               />
-            </div>
-            <div className="col-md-4 mt-1">
               <input
                 type="number"
-                className="form-control"
+                className="form-control mb-3"
                 value={signData.id}
                 onChange={(e) => handleSignDataChange("id", e.target.value)}
                 placeholder="Cédula"
                 required
               />
-            </div>
-            <div className="col-md-4 mt-1">
               <input
                 type="text"
                 className="form-control"
@@ -2596,6 +2845,114 @@ const handleDeleteFinding = () => {
         <Modal.Body>
           <QrScannerComponent onScan={handleQrScan} />
         </Modal.Body>
+      </Modal>
+
+      <Modal show={documentModalOpen} onHide={closeDocumentModal}>
+        <Modal.Header closeButton>
+          <Modal.Title>Acciones del Documento</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <Button
+            variant="primary"
+            className="mb-3 w-100"
+            onClick={async () => {
+              try {
+                const response = await api.post("/PrefirmarArchivos", { url: selectedDocument.document_url });
+                if (response.data.signedUrl) {
+                  const preSignedUrl = response.data.signedUrl;
+
+                  if (selectedDocument.document_type === "pdf") {
+                    // Abrir la URL prefirmada en una nueva pestaña si es un PDF
+                    window.open(preSignedUrl, "_blank", "noopener,noreferrer");
+                  } else {
+                    // Navegar a la lógica actual para otros tipos de documentos
+                    navigate(`/view-document?url=${encodeURIComponent(preSignedUrl)}`);
+                  }
+                } else {
+                  alert("No se pudo obtener la URL prefirmada.");
+                }
+              } catch (error) {
+                console.error("Error al obtener la URL prefirmada:", error);
+                alert("Hubo un error al procesar la solicitud.");
+              }
+            }}
+          >
+            Ver
+          </Button>
+          <Button variant="secondary" className="mb-3 w-100" onClick={handleDownload}>
+            Descargar
+          </Button>
+          <Button
+            variant="success"
+            className="mb-3 w-100"
+            onClick={handleEditGoogleDrive}
+            disabled={loadingGoogleDrive} // Deshabilitar el botón mientras se procesa
+          >
+            {loadingGoogleDrive ? (
+              <>
+                <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                Procesando...
+              </>
+            ) : (
+              "Editar en Google Drive"
+            )}
+          </Button>
+          <Button variant="warning" className="w-100" onClick={handleEditLocal}>
+            Editar Localmente
+          </Button>
+        </Modal.Body>
+      </Modal>
+
+      <Modal
+        show={convertToPdfModalOpen}
+        onHide={handleCloseConvertToPdfModal}
+        centered
+      >
+        <Modal.Header closeButton>
+          <Modal.Title>Convertir Documento a PDF</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <p>Selecciona un documento en formato DOC para convertirlo a PDF:</p>
+          <ul className="list-group">
+            {documents
+              .filter((doc) => doc.document_type === "doc")
+              .map((doc) => (
+                <li
+                  key={doc.id}
+                  className={`list-group-item ${
+                    selectedDocForPdf?.id === doc.id ? "active" : ""
+                  }`}
+                  onClick={() => setSelectedDocForPdf(doc)}
+                  style={{ cursor: "pointer" }}
+                >
+                  {doc.document_name}
+                </li>
+              ))}
+          </ul>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="dark" onClick={handleCloseConvertToPdfModal}>
+            Cancelar
+          </Button>
+          <Button
+            variant="success"
+            onClick={handleConvertToPdf}
+            disabled={!selectedDocForPdf || loadingConvertToPdf} // Deshabilitado si está cargando
+          >
+            {loadingConvertToPdf ? (
+              <>
+                <span
+                  className="spinner-border spinner-border-sm me-2"
+                  role="status"
+                  aria-hidden="true"
+                ></span>
+                Convirtiendo...
+              </>
+            ) : (
+              "Convertir a PDF"
+            )}
+          </Button>
+        </Modal.Footer>
       </Modal>
 
     </div>

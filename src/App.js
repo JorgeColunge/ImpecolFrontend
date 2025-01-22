@@ -27,6 +27,9 @@ import Billing from './Billing';
 import Rules from './Rules'
 import DocumentUploader from './DocumentUploader';
 import DocumentAutomation from './DocumentAutomation';
+import ViewDocument from './ViewDocument';
+import EditGoogleDrive from './EditGoogleDrive';
+import EditLocalFile from './EditLocalFile';
 import WordEditor from './WordEditor';
 import CompanyStations from './CompanyStations';
 import UnsavedChangesModal from './UnsavedChangesModal';
@@ -213,6 +216,9 @@ function App() {
                 <Route path="/upload-document" element={isAuthorized(["Técnico", "Supervisor Técnico", "Administrador", "Superadministrador"]) ? <DocumentUploader /> : <Navigate to="/login" />} />
                 <Route path="/document-automation" element={isAuthorized(["Técnico", "Supervisor Técnico", "Administrador", "Superadministrador"]) ? <DocumentAutomation /> : <Navigate to="/login" />} />
                 <Route path="/word-editor" element={isAuthorized(["Técnico", "Supervisor Técnico", "Administrador", "Superadministrador"]) ? <WordEditor /> : <Navigate to="/login" />} />
+                <Route path="/view-document" element={isAuthorized(["Técnico", "Supervisor Técnico", "Administrador", "Superadministrador"]) ? <ViewDocument /> : <Navigate to="/login" />} />
+                <Route path="/edit-google-drive" element={isAuthorized(["Técnico", "Supervisor Técnico", "Administrador", "Superadministrador"]) ? <EditGoogleDrive /> : <Navigate to="/login" />} />
+                <Route path="/edit-local-file" element={isAuthorized(["Técnico", "Supervisor Técnico", "Administrador", "Superadministrador"]) ? <EditLocalFile /> : <Navigate to="/login" />} />
                 <Route path="/stations/client/:client_id" element={isAuthorized(["Supervisor Técnico", "Administrador", "Superadministrador"]) ? <CompanyStations /> : <Navigate to="/login" />} />
                 <Route path="/rules" element={isAuthorized(["Supervisor Técnico", "Administrador", "Superadministrador"]) ? <Rules /> : <Navigate to="/login" />} />
               </Routes>
