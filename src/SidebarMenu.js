@@ -94,7 +94,7 @@ function SidebarMenu({ onLogout, userInfo, isSidebarVisible, onToggle }) {
       label: "Perfil",
       icon: <Person size={20} />,
       path: "/profile",
-      roles: ["Técnico", "Comercial", "Supervisor Técnico", "Administrador", "Superadministrador"],
+      roles: ["Operario Hogar","Operario", "Comercial", "Supervisor Técnico", "Administrador", "Superadministrador"],
     },
     {
       label: "Perfil",
@@ -124,7 +124,7 @@ function SidebarMenu({ onLogout, userInfo, isSidebarVisible, onToggle }) {
       label: "Mi Calendario",
       icon: <CalendarEvent size={20} />,
       path: "/myservices-calendar",
-      roles: ["Técnico", "Supervisor Técnico", "Administrador", "Superadministrador"],
+      roles: ["Operario Hogar","Operario", "Supervisor Técnico", "Administrador", "Superadministrador"],
     },
     {
       label: "Agenda",
@@ -148,7 +148,7 @@ function SidebarMenu({ onLogout, userInfo, isSidebarVisible, onToggle }) {
       label: "Mis Servicios",
       icon: <BoxArrowInUpRight size={20} />,
       path: "/myservices",
-      roles: ["Técnico", "Supervisor Técnico", "Administrador", "Superadministrador"],
+      roles: ["Operario Hogar","Operario", "Supervisor Técnico", "Administrador", "Superadministrador"],
     },
     {
       label: "Inspecciones",
@@ -184,7 +184,7 @@ function SidebarMenu({ onLogout, userInfo, isSidebarVisible, onToggle }) {
       label: "Cerrar Sesión",
       icon: <BoxArrowRight size={20} />,
       action: handleLogout,
-      roles: ["Técnico", "Cliente", "Comercial", "Supervisor Técnico", "Administrador", "Superadministrador"],
+      roles: ["Operario Hogar","Operario", "Cliente", "Comercial", "Supervisor Técnico", "Administrador", "Superadministrador"],
     },
   ];
 
