@@ -6,9 +6,9 @@ import axios from 'axios';
 import './TopBar.css';
 import { useSocket } from './SocketContext';
 import { useNavigate } from 'react-router-dom';
-import { Arrow90degRight, ArrowLeftSquareFill, ArrowRightSquareFill } from 'react-bootstrap-icons';
+import { Arrow90degRight, ArrowLeftSquareFill, ArrowRightSquareFill, Wifi, WifiOff } from 'react-bootstrap-icons';
 
-function TopBar({ userName, onSync, notifications, setNotifications, isSidebarOpen, isSidebarVisible, toggleSidebar, syncCount }) {
+function TopBar({ userName, onSync, notifications, setNotifications, isSidebarOpen, isSidebarVisible, toggleSidebar, syncCount, isOnline }) {
   const userInitial = userName ? userName.charAt(0).toUpperCase() : '';
   const socket = useSocket();
   const navigate = useNavigate();
@@ -119,15 +119,15 @@ const handleNotificationClick = async (notificationId, route) => {
       }}>
         {/* Botón de sincronización */}
         <div className="icon-container d-flex align-items-center">
-          <Button variant="link" onClick={onSync} className="sync-icon">
-            <FaSyncAlt size={20} />
-            {syncCount > 0 && (
-              <Badge pill variant="danger" className="notification-count">
-                {syncCount}
-              </Badge>
-            )}
-          </Button>
-        </div>
+        <Button variant="link" onClick={onSync} className="sync-icon">
+          {isOnline ? <Wifi size={24} className='text-success' /> : <WifiOff size={24} className='text-secondary'/>} {/* Cambia el ícono según el estado */}
+          {syncCount > 0 && (
+            <Badge pill variant="danger" className="notification-count">
+              {syncCount}
+            </Badge>
+          )}
+        </Button>
+      </div>
 
         {/* Dropdown de notificaciones */}
         <div className="icon-container d-flex align-items-center">

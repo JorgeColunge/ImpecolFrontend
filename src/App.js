@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { SocketProvider } from './SocketContext';
 import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-dom';
+import Landing from './Landing';
 import Login from './Login';
 import Register from './Register';
 import UserProfile from './UserProfile';
@@ -43,12 +44,25 @@ function App() {
   const storedUserInfo = JSON.parse(localStorage.getItem("user_info"));
   const userId = storedUserInfo?.id_usuario || '';
   const [syncCount, setSyncCount] = useState(parseInt(localStorage.getItem('sync') || '0', 10));
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [userInfo, setUserInfo] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isSidebarVisible, setIsSidebarVisible] = useState(window.innerWidth > 768);
   const [notifications, setNotifications] = useState([]);
+
+  useEffect(() => {
+    const updateOnlineStatus = () => setIsOnline(navigator.onLine);
+  
+    window.addEventListener('online', updateOnlineStatus);
+    window.addEventListener('offline', updateOnlineStatus);
+  
+    return () => {
+      window.removeEventListener('online', updateOnlineStatus);
+      window.removeEventListener('offline', updateOnlineStatus);
+    };
+  }, []);
 
   useEffect(() => {
     const handleSyncUpdate = (event) => {
@@ -181,6 +195,7 @@ function App() {
               isSidebarVisible={isSidebarVisible}
               toggleSidebar={() => setIsSidebarVisible((prev) => !prev)} 
               syncCount={syncCount}
+              isOnline={isOnline}
             />
             </>
         )}
@@ -194,6 +209,7 @@ function App() {
               <Routes>
                 <Route path="/" element={isLoggedIn ? <Navigate to="/profile" /> : <Navigate to="/login" />} />
                 <Route path="/login" element={isLoggedIn ? <Navigate to="/profile" /> : <Login onLogin={handleLogin} />} />
+                <Route path="/app" element={ <Landing /> } />
                 <Route path="/register" element={isLoggedIn ? <Navigate to="/profile" /> : <Register />} />
                 <Route path="/profile" element={<UserProfile userInfo={userInfo} />} />
                 <Route path="/client-profile" element={isAuthorized(["Cliente"])? <ClientProfile userInfo={userInfo}/> : <Navigate to="/login" />} />
