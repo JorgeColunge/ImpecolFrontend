@@ -558,7 +558,6 @@ const MyServicesCalendar = () => {
                                     {selectedEvent.category === "Periódico" && (
                                         <p><strong>Cantidad al Mes:</strong> {selectedEvent.quantyPerMonth}</p>
                                     )}
-                                    <p><strong>Valor:</strong> ${selectedEvent.value}</p>
                                 </div>
                             </div>
 

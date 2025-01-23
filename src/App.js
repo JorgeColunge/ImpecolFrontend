@@ -207,18 +207,18 @@ function App() {
                 <Route path="/services" element={isAuthorized(["Comercial", "Supervisor Técnico", "Administrador", "Superadministrador"]) ? <ServiceList /> : <Navigate to="/login" />} />
                 <Route path="/services-calendar" element={isAuthorized(["Comercial", "Supervisor Técnico", "Administrador", "Superadministrador"]) ? <InspectionCalendar /> : <Navigate to="/login" />} />
                 <Route path="/client-calendar" element={isAuthorized(["Cliente"]) ? <CalendarClient /> : <Navigate to="/login" />} />
-                <Route path="/myservices-calendar" element={isAuthorized(["Técnico", "Supervisor Técnico", "Administrador", "Superadministrador"]) ? <MyServicesCalendar /> : <Navigate to="/login" />} />
+                <Route path="/myservices-calendar" element={isAuthorized(["Operario Hogar","Operario", "Supervisor Técnico", "Administrador", "Superadministrador"]) ? <MyServicesCalendar /> : <Navigate to="/login" />} />
                 <Route path="/inspections" element={isAuthorized(["Supervisor Técnico", "Administrador", "Superadministrador"]) ? <Inspections /> : <Navigate to="/login" />} />
-                <Route path="/inspection/:inspectionId" element={isAuthorized(["Supervisor Técnico", "Administrador", "Superadministrador", "Técnico", "Cliente"]) ? <Inspection /> : <Navigate to="/login" />} />
+                <Route path="/inspection/:inspectionId" element={isAuthorized(["Supervisor Técnico", "Administrador", "Superadministrador", "Operario Hogar","Operario", "Cliente"]) ? <Inspection /> : <Navigate to="/login" />} />
                 <Route path="/show-profile/:id" element={<ShowProfile />} />
-                <Route path="/myservices" element={isAuthorized(["Técnico", "Supervisor Técnico", "Administrador", "Superadministrador"]) ? <MyServices /> : <Navigate to="/login" />} />
+                <Route path="/myservices" element={isAuthorized(["Operario Hogar","Operario", "Supervisor Técnico", "Administrador", "Superadministrador"]) ? <MyServices /> : <Navigate to="/login" />} />
                 <Route path="/myservicesclient" element={isAuthorized(["Cliente"]) ? <MyServicesClient /> : <Navigate to="/login" />} />
-                <Route path="/upload-document" element={isAuthorized(["Técnico", "Supervisor Técnico", "Administrador", "Superadministrador"]) ? <DocumentUploader /> : <Navigate to="/login" />} />
-                <Route path="/document-automation" element={isAuthorized(["Técnico", "Supervisor Técnico", "Administrador", "Superadministrador"]) ? <DocumentAutomation /> : <Navigate to="/login" />} />
-                <Route path="/word-editor" element={isAuthorized(["Técnico", "Supervisor Técnico", "Administrador", "Superadministrador"]) ? <WordEditor /> : <Navigate to="/login" />} />
-                <Route path="/view-document" element={isAuthorized(["Técnico", "Supervisor Técnico", "Administrador", "Superadministrador"]) ? <ViewDocument /> : <Navigate to="/login" />} />
-                <Route path="/edit-google-drive" element={isAuthorized(["Técnico", "Supervisor Técnico", "Administrador", "Superadministrador"]) ? <EditGoogleDrive /> : <Navigate to="/login" />} />
-                <Route path="/edit-local-file" element={isAuthorized(["Técnico", "Supervisor Técnico", "Administrador", "Superadministrador"]) ? <EditLocalFile /> : <Navigate to="/login" />} />
+                <Route path="/upload-document" element={isAuthorized(["Operario Hogar","Operario", "Supervisor Técnico", "Administrador", "Superadministrador"]) ? <DocumentUploader /> : <Navigate to="/login" />} />
+                <Route path="/document-automation" element={isAuthorized(["Operario Hogar","Operario", "Supervisor Técnico", "Administrador", "Superadministrador"]) ? <DocumentAutomation /> : <Navigate to="/login" />} />
+                <Route path="/word-editor" element={isAuthorized(["Operario Hogar","Operario", "Supervisor Técnico", "Administrador", "Superadministrador"]) ? <WordEditor /> : <Navigate to="/login" />} />
+                <Route path="/view-document" element={isAuthorized(["Operario Hogar","Operario", "Supervisor Técnico", "Administrador", "Superadministrador"]) ? <ViewDocument /> : <Navigate to="/login" />} />
+                <Route path="/edit-google-drive" element={isAuthorized(["Operario Hogar","Operario", "Supervisor Técnico", "Administrador", "Superadministrador"]) ? <EditGoogleDrive /> : <Navigate to="/login" />} />
+                <Route path="/edit-local-file" element={isAuthorized(["Operario Hogar","Operario", "Supervisor Técnico", "Administrador", "Superadministrador"]) ? <EditLocalFile /> : <Navigate to="/login" />} />
                 <Route path="/stations/client/:client_id" element={isAuthorized(["Supervisor Técnico", "Administrador", "Superadministrador"]) ? <CompanyStations /> : <Navigate to="/login" />} />
                 <Route path="/rules" element={isAuthorized(["Supervisor Técnico", "Administrador", "Superadministrador"]) ? <Rules /> : <Navigate to="/login" />} />
               </Routes>

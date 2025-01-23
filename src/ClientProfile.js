@@ -38,7 +38,7 @@ function ClientProfile({ userInfo }) {
           <div className="position-relative">
             <div className='img-mask mx-auto'>
             <img
-              src={`${user?.photo || '/images/default-profile.png'}`}
+              src={`${user?.photo || '/images/LogoImpecol.png'}`}
               alt="Profile"
               className="rounded-img shadow-sm"
               width="150"

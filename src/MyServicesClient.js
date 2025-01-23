@@ -213,6 +213,14 @@ const interventionAreaOptions = [
           // Calcular para duraciones entre 5 y 7
           calculatedValue = 65000 + (duration - 4) * 15000;
         }
+  
+        // Multiplicar por el número de acompañantes (+1 para incluir al responsable principal)
+        const companionCount = parseInt(newService.numCompanions || newService.companion?.length || 0, 10) + 1; // +1 incluye al responsable
+        calculatedValue *= companionCount;
+  
+        console.log(
+          `Calculando valor para Hogar: Duración=${duration}, Multiplicador=${companionCount}, Valor Base=${calculatedValue}`
+        );
       }
   
       // Ajuste adicional para categoría "Periódico"
@@ -229,7 +237,14 @@ const interventionAreaOptions = [
     };
   
     calculateValue();
-  }, [newService.service_type, newService.duration, newService.category, newService.quantity_per_month]); // Recalcular cuando cambien estos valores       
+  }, [
+    newService.service_type,
+    newService.duration,
+    newService.category,
+    newService.quantity_per_month,
+    newService.companion, // Recalcular cuando cambie el número de acompañantes
+    newService.numCompanions, // Recalcular si cambia el número de acompañantes manual
+  ]);  
   
   useEffect(() => {
     // Agregar evento de clic al documento cuando hay un menú desplegable abierto
@@ -359,30 +374,92 @@ const interventionAreaOptions = [
   };
 
   const handleSaveNewService = async () => {
+    console.log("Iniciando proceso para guardar servicio...");
+  
+    // Determinar si el servicio es de tipo "Hogar"
+    const isHogar = newService.service_type.includes("Hogar");
+  
+    // Si el cliente no seleccionó un responsable, asigna uno aleatorio
+    let assignedTechnician = newService.responsible;
+    if (!assignedTechnician) {
+      const randomTechnician = technicians[Math.floor(Math.random() * technicians.length)];
+      if (randomTechnician) {
+        assignedTechnician = randomTechnician.id;
+        console.log("Responsable asignado automáticamente:", randomTechnician);
+      } else {
+        console.error("No se encontró ningún técnico disponible para asignar.");
+      }
+    } else {
+      console.log("Responsable seleccionado por el cliente:", assignedTechnician);
+    }
+  
+    // Generar acompañantes aleatorios si no están especificados
+    let companions = newService.companion;
+    if (!companions || companions.length === 0) {
+      const numCompanions = parseInt(newService.numCompanions || 0, 10); // Asume que el cliente ingresa la cantidad
+      if (numCompanions > 0) {
+        const availableTechnicians = technicians.filter(tech => tech.id !== assignedTechnician); // Excluir al responsable
+        companions = Array.from({ length: numCompanions }, () => {
+          const randomIndex = Math.floor(Math.random() * availableTechnicians.length);
+          const [selectedTechnician] = availableTechnicians.splice(randomIndex, 1); // Remover técnico seleccionado
+          return selectedTechnician?.id; // Retorna su ID
+        }).filter(Boolean); // Eliminar valores nulos/undefined
+        console.log("Acompañantes asignados automáticamente:", companions);
+      }
+    }
+  
+    // Preparar los datos del servicio para enviar al backend
     const serviceData = {
       ...newService,
+      responsible: assignedTechnician, // Responsable asignado
+      companion: companions, // Acompañantes asignados
       quantity_per_month: newService.quantity_per_month || null,
       client_id: newService.client_id || null,
       value: newService.value || null,
-      responsible: newService.responsible || null, // Asegúrate de incluir responsible
-      companion: newService.companion || [],       // Asegúrate de incluir companion
     };
   
     try {
-      const response = await axios.post(`${process.env.REACT_APP_API_URL}/api/request-services`, serviceData);
-      if (response.data.success) {
-        handleCloseAddServiceModal();
-        showNotification("Exito", "Servicio guardado exitosamente");
+      if (isHogar) {
+        console.log("El servicio es de tipo Hogar. Creando directamente...");
+        // Validar la duración para servicios de tipo "Hogar"
+        const duration = parseInt(newService.duration, 10);
+        if (duration < 4 || duration > 8) {
+          console.error("Duración inválida para el servicio Hogar:", duration);
+          showNotification("Error", "La duración debe estar entre 4 y 8 horas para servicios de tipo Hogar.");
+          return;
+        }
+  
+        // Enviar solicitud directamente a la ruta /api/services
+        const response = await axios.post(`${process.env.REACT_APP_API_URL}/api/services`, serviceData);
+        if (response.data.success) {
+          const createdService = response.data.service;
+          setServices([...services, response.data.service]);
+          handleCloseAddServiceModal();
+          showNotification("Éxito", "Servicio de tipo Hogar guardado exitosamente.");
+          // Redirigir al calendario con el ID del servicio
+          navigate(`/client-calendar?serviceId=${createdService.id}`);
+        } else {
+          console.error("Error: No se pudo guardar el servicio de tipo Hogar.", response.data.message);
+          showNotification("Error", "No se pudo guardar el servicio de tipo Hogar.");
+        }
       } else {
-        console.error("Error: No se pudo guardar el servicio.", response.data.message);
-        showNotification("Error", "Error: No se pudo guardar el servicio");
+        console.log("El servicio no es de tipo Hogar. Enviando solicitud...");
+        // Enviar solicitud a la ruta /api/request-services para otros tipos de servicios
+        const response = await axios.post(`${process.env.REACT_APP_API_URL}/api/request-services`, serviceData);
+        if (response.data.success) {
+          handleCloseAddServiceModal();
+          showNotification("Éxito", "Solicitud de servicio enviada exitosamente.");
+        } else {
+          console.error("Error: No se pudo enviar la solicitud del servicio.", response.data.message);
+          showNotification("Error", "No se pudo enviar la solicitud del servicio.");
+        }
       }
     } catch (error) {
-      console.error("Error saving new service:", error);
-      showNotification("Error", "Error: Hubo un problema al guardar el servicio");
+      console.error("Error al procesar el servicio en el backend:", error);
+      showNotification("Error", "Hubo un problema al procesar el servicio.");
     }
-  };  
-
+  };
+  
   const handleRequestSchedule = async (serviceId, clientId) => {
     try {
       // Configuración de los datos para enviar en la solicitud
@@ -462,7 +539,7 @@ const interventionAreaOptions = [
   useEffect(() => {
     const fetchTechnicians = async () => {
       try {
-        const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/users?role=Technician`);
+        const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/users?rol=Operario Hogar`);
         setTechnicians(response.data);
         console.log("Técnicos:", response.data);
       } catch (error) {
@@ -818,6 +895,25 @@ const groupedServicesByDate = filteredScheduledServices.reduce((acc, service) =>
                           )}
                         </div>
                         <p className="my-1"><strong>Responsable:</strong> {technicians.find((tech) => tech.id === selectedService.responsible)?.name || "No asignado"}</p>
+                        {selectedService.companion && selectedService.companion !== "{}" && selectedService.companion !== '{""}' && (
+                          <p>
+                              <strong>Acompañante(s):</strong>{' '}
+                              {(() => {
+                                  // Convierte la cadena de IDs en un array
+                                  const companionIds = selectedService.companion
+                                      .replace(/[\{\}"]/g, '') // Limpia los caracteres `{}`, `"`
+                                      .split(',')
+                                      .map((id) => id.trim()); // Divide y recorta espacios
+                                  // Mapea los IDs a nombres usando el estado `users`
+                                  const companionNames = companionIds.map((id) => {
+                                      const tech = technicians.find((tech) => tech.id === id); // Encuentra el usuario por ID
+                                      return tech ? `${tech.name} ${tech.lastname || ''}`.trim() : `Desconocido (${id})`;
+                                  });
+                                  // Devuelve la lista de nombres como texto
+                                  return companionNames.join(', ');
+                              })()}
+                          </p>
+                        )}
                         {selectedService.category === "Periódico" && (
                           <p><strong>Cantidad al Mes:</strong> {selectedService.quantity_per_month}</p>
                         )}
@@ -1025,14 +1121,29 @@ const groupedServicesByDate = filteredScheduledServices.reduce((acc, service) =>
                             {/* Cantidad al Mes */}
                             {newService.category === "Periódico" && (
                               <Form.Group className="mt-3">
-                                <Form.Label style={{ fontWeight: "bold" }}>Cantidad al Mes</Form.Label>
-                                <Form.Control
-                                  type="number"
-                                  name="quantity_per_month"
-                                  value={newService.quantity_per_month}
-                                  onChange={handleNewServiceChange}
-                                />
-                              </Form.Group>
+                              <Form.Label style={{ fontWeight: "bold" }}>Días por Semana</Form.Label>
+                              <Form.Control
+                                as="select"
+                                name="days_per_week"
+                                value={newService.days_per_week || ''}
+                                onChange={(e) => {
+                                  const daysPerWeek = parseInt(e.target.value, 10);
+                                  setNewService((prevService) => ({
+                                    ...prevService,
+                                    days_per_week: daysPerWeek, // Guarda la selección de días por semana
+                                    quantity_per_month: daysPerWeek * 4, // Calcula automáticamente la cantidad al mes
+                                  }));
+                                }}
+                              >
+                                <option value="">Seleccione días por semana</option>
+                                <option value="1">1 vez a la semana</option>
+                                <option value="2">2 veces a la semana</option>
+                                <option value="3">3 veces a la semana</option>
+                                <option value="4">4 veces a la semana</option>
+                                <option value="5">5 veces a la semana</option>
+                                <option value="6">6 veces a la semana</option>
+                              </Form.Control>
+                            </Form.Group>                            
                             )}
               
                             <Form.Group className="mt-3">
@@ -1064,20 +1175,14 @@ const groupedServicesByDate = filteredScheduledServices.reduce((acc, service) =>
               
                             {/* Acompañante */}
                             <Form.Group className="mt-3">
-                              <Form.Label style={{ fontWeight: "bold" }}>Acompañante (Opcional)</Form.Label>
-                              <div className="d-flex flex-wrap">
-                                {filteredTechniciansForCompanion.map((technician, index) => (
-                                  <div key={index} className="col-4 mb-2">
-                                    <Form.Check
-                                      type="checkbox"
-                                      label={<span style={{ fontSize: "0.8rem" }}>{technician.name}</span>}
-                                      value={technician.id}
-                                      checked={newService.companion.includes(technician.id)}
-                                      onChange={handleCompanionChange}
-                                    />
-                                  </div>
-                                ))}
-                              </div>
+                              <Form.Label style={{ fontWeight: "bold" }}>Cantidad de Acompañantes (Opcional)</Form.Label>
+                              <Form.Control
+                                type="number"
+                                name="numCompanions"
+                                value={newService.numCompanions || ''}
+                                min="0"
+                                onChange={(e) => setNewService({ ...newService, numCompanions: e.target.value })}
+                              />
                             </Form.Group>
               
                             {/* Campos Ocultos */}

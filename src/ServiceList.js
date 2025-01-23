@@ -148,6 +148,13 @@ function ServiceList() {
           // Calcular para duraciones entre 5 y 7
           calculatedValue = 65000 + (duration - 4) * 15000;
         }
+  
+        // Multiplicar por el número de acompañantes (+1 para incluir al responsable principal)
+        const companionMultiplier = (newService.companion?.length || 0) + 1;
+        calculatedValue *= companionMultiplier;
+        console.log(
+          `Calculando valor para Hogar: Duración=${duration}, Multiplicador=${companionMultiplier}, Valor Base=${calculatedValue}`
+        );
       }
   
       // Ajuste adicional para categoría "Periódico"
@@ -164,8 +171,14 @@ function ServiceList() {
     };
   
     calculateValue();
-  }, [newService.service_type, newService.duration, newService.category, newService.quantity_per_month]); // Recalcular cuando cambien estos valores       
-
+  }, [
+    newService.service_type,
+    newService.duration,
+    newService.category,
+    newService.quantity_per_month,
+    newService.companion, // Recalcular cuando cambie el número de acompañantes
+  ]);
+  
   useEffect(() => {
     // Agregar evento de clic al documento cuando hay un menú desplegable abierto
     if (expandedCardId !== null) {
@@ -431,7 +444,7 @@ const handleServiceTypeChange = (e) => {
 
   const fetchTechnicians = async () => {
     try {
-      const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/users?role=Technician`);
+      const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/users?rol=Operario,Operario Hogar`);
       setTechnicians(response.data);
     } catch (error) {
       console.error("Error fetching technicians:", error);
@@ -443,7 +456,7 @@ const handleServiceTypeChange = (e) => {
       try {
         const servicesResponse = await axios.get(`${process.env.REACT_APP_API_URL}/api/services`);
         const clientsResponse = await axios.get(`${process.env.REACT_APP_API_URL}/api/clients`);
-        const techniciansResponse = await axios.get(`${process.env.REACT_APP_API_URL}/api/users?role=Technician`);
+        const techniciansResponse = await axios.get(`${process.env.REACT_APP_API_URL}/api/users?rol=Operario,Operario Hogar`);
 
         setServices(servicesResponse.data);
         setClients(clientsResponse.data);
@@ -480,7 +493,7 @@ const handleServiceTypeChange = (e) => {
   
     const fetchTechnicians = async () => {
       try {
-        const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/users?role=Technician`);
+        const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/users?rol=Operario,Operario Hogar`);
         setTechnicians(response.data);
       } catch (error) {
         console.error("Error fetching technicians:", error);
@@ -708,9 +721,11 @@ const filteredTechniciansForCompanion = technicians.filter(
     try {
       const response = await axios.post(`${process.env.REACT_APP_API_URL}/api/services`, serviceData);
       if (response.data.success) {
+        const createdService = response.data.service;
         setServices([...services, response.data.service]);
         handleCloseAddServiceModal();
         showNotification("Exito","Servicio guardado exitosamente");
+        navigate(`/services-calendar?serviceId=${createdService.id}`);
       } else {
         console.error("Error: No se pudo guardar el servicio.", response.data.message);
         showNotification("Error","Error: No se pudo guardar el servicio");
@@ -1377,6 +1392,25 @@ const filteredTechniciansForCompanion = technicians.filter(
                   )}
                 </div>
                   <p className='my-1'><strong>Responsable:</strong> {technicians.find((tech) => tech.id === selectedService.responsible)?.name || "No asignado"}</p>
+                  {selectedService.companion && selectedService.companion !== "{}" && selectedService.companion !== '{""}' && (
+                    <p>
+                        <strong>Acompañante(s):</strong>{' '}
+                        {(() => {
+                            // Convierte la cadena de IDs en un array
+                            const companionIds = selectedService.companion
+                                .replace(/[\{\}"]/g, '') // Limpia los caracteres `{}`, `"`
+                                .split(',')
+                                .map((id) => id.trim()); // Divide y recorta espacios
+                            // Mapea los IDs a nombres usando el estado `users`
+                            const companionNames = companionIds.map((id) => {
+                                const tech = technicians.find((tech) => tech.id === id); // Encuentra el usuario por ID
+                                return tech ? `${tech.name} ${tech.lastname || ''}`.trim() : `Desconocido (${id})`;
+                            });
+                            // Devuelve la lista de nombres como texto
+                            return companionNames.join(', ');
+                        })()}
+                    </p>
+                  )}
                   {selectedService.category === "Periódico" && (
                     <p><strong>Cantidad al Mes:</strong> {selectedService.quantity_per_month}</p>
                   )}

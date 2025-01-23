@@ -13,7 +13,7 @@ function EditMyProfile({ userInfo, onProfileUpdate }) {
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [selectedFile, setSelectedFile] = useState(null);
-  const [profilePic, setProfilePic] = useState('/images/default-profile.png');
+  const [profilePic, setProfilePic] = useState('/images/LogoImpecol.png');
   const [showModal, setShowModal] = useState(false);
   const [modalContent, setModalContent] = useState('');
   const [modalTitle, setModalTitle] = useState('');

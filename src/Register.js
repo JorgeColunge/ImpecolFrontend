@@ -48,8 +48,8 @@ function Register() {
     <div className="container d-flex justify-content-center align-items-center vh-100">
       <div className="row w-100"  style={{marginTop:'50px', marginBottom:'200px'}}>
         <div className="col-md-6 bg-light p-5 rounded-start shadow-lg">
-          <div className="text-center mb-4">
-            <img src="/images/Logo FumiPlagax.png" alt="Logo" width="150" /> {/* Ajusta el tamaño si es necesario */}
+          <div className="text-center mb-4 px-sm-0 mx-sm-0 px-md-2 mx-md-2 px-lg-5 mx-lg-5">
+            <img src="/images/LogoImpecol.png" alt="Logo" className="px-5 img-fluid" />
           </div>
           <form onSubmit={handleSubmit}>
           <div className="mb-3">
@@ -205,14 +205,12 @@ function Register() {
             </p>
           </div>
         </div>
-        <div
-          className="col-md-6 rounded-end"
-          style={{
-            backgroundImage: `url("/Fondo 1.jpg")`,
-            backgroundSize: '230%',
-            backgroundPosition: 'center',
-          }}
-        ></div>
+        <div className="col-md-6 d-flex align-items-center justify-content-center bg-success rounded-end">
+          <div className="text-center text-white">
+            <h1>¡Limpieza impecable!</h1>
+            <p>Tu aliado en el aseo.</p>
+          </div>
+        </div>
       </div>
     </div>
   );

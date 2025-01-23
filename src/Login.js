@@ -19,7 +19,12 @@ function Login({ onLogin }) {
         const userData = response.data.user;
         localStorage.setItem("user_info", JSON.stringify(userData));
         onLogin(userData);
-        navigate('/profile');
+        // Redirigir según el rol del usuario
+        if (userData.rol === "Cliente") {
+          navigate('/client-profile');
+        } else {
+            navigate('/profile');
+        }
       } else {
         setError(response.data.message || "Credenciales incorrectas");
       }
@@ -31,10 +36,10 @@ function Login({ onLogin }) {
 
   return (
     <div className="container d-flex justify-content-center align-items-center vh-100">
-      <div className="row w-100">
+      <div className="row w-100"  style={{marginTop:'50px', marginBottom:'200px'}}>
         <div className="col-md-6 bg-light p-5 rounded-start shadow-lg">
-          <div className="text-center mb-4">
-            <img src="/images/LogoImpecol.png" alt="Logo" width="300" />
+          <div className="text-center mb-4 px-sm-0 px-md-2 mx-md-2 px-lg-5 mx-lg-5">
+            <img src="/images/LogoImpecol.png" alt="Logo" className="px-5 img-fluid" />
           </div>
           <form onSubmit={handleSubmit}>
             <div className="mb-3">
@@ -66,6 +71,7 @@ function Login({ onLogin }) {
             </div>
             <button type="submit" className="btn btn-primary w-100 mb-3">Iniciar Sesión</button>
             {error && <p className="text-danger text-center">{error}</p>}
+            <a href="/register" className="text-success text-decoration-none">Resgístrate aquí</a>
           </form>
         </div>
         <div className="col-md-6 d-flex align-items-center justify-content-center bg-success rounded-end">

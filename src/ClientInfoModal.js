@@ -77,7 +77,7 @@ function ClientInfoModal({ clientId, show, onClose }) {
                 </h5>
                 <div className="table-responsive">
                   {stations.length > 0 ? (
-                    <table className="table table-bordered table-hover">
+                    <table className="table table-bordered table-hover text-center">
                       <thead className="table-light">
                         <tr>
                           <th>#</th>
@@ -100,7 +100,7 @@ function ClientInfoModal({ clientId, show, onClose }) {
                                   src={`${station.qr_code}`}
                                   alt={`QR de estación ${station.description}`}
                                   className="img-fluid rounded"
-                                  style={{ maxWidth: "100px" }}
+                                  style={{ maxWidth: "200px" }}
                                 />
                               ) : (
                                 <span className="text-muted">No disponible</span>
@@ -123,32 +123,36 @@ function ClientInfoModal({ clientId, show, onClose }) {
       </Modal.Body>
       <Modal.Footer>
         <div className="w-100">
-          <div className="action-buttons d-flex justify-content-around mb-4">
+          {/* Botones de acción */}
+          <div className="action-buttons d-flex flex-wrap flex-md-nowrap justify-content-around mb-4">
             <Button
-              className="btn-outline-primary w-100 mx-2"
+              className="btn-outline-primary w-100 w-md-auto mx-2 mb-2 mb-md-0"
               onClick={() => window.open(`tel:${client?.phone || ""}`)}
             >
               <i className="fas fa-phone"></i>
               <span style={{ marginLeft: "8px" }}>Llamar</span>
             </Button>
             <Button
-              className="btn-outline-success w-100 mx-2"
+              className="btn-outline-success w-100 w-md-auto mx-2 mb-2 mb-md-0"
               onClick={() =>
-                window.open(`https://wa.me/${client?.phone?.replace(/\D/g, "")}`, "_blank")
+                window.open(
+                  `https://wa.me/${client?.phone?.replace(/\D/g, "")}`,
+                  "_blank"
+                )
               }
             >
               <i className="fab fa-whatsapp"></i>
               <span style={{ marginLeft: "8px" }}>WhatsApp</span>
             </Button>
             <Button
-              className="btn-outline-dark w-100 mx-2"
+              className="btn-outline-dark w-100 w-md-auto mx-2 mb-2 mb-md-0"
               onClick={() => window.open(`mailto:${client?.email || ""}`)}
             >
               <i className="fas fa-envelope"></i>
               <span style={{ marginLeft: "8px" }}>Correo</span>
             </Button>
             <Button
-              className="btn-outline-danger w-100 mx-2"
+              className="btn-outline-danger w-100 w-md-auto mx-2 mb-2 mb-md-0"
               onClick={() =>
                 window.open(
                   `https://www.google.com/maps?q=${encodeURIComponent(

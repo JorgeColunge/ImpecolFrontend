@@ -200,7 +200,7 @@ function SidebarMenu({ onLogout, userInfo, isSidebarVisible, onToggle }) {
       <div className="logo-container">
         <div className="logo-mask">
           <img
-            src={`${client?.photo || user?.image || "/images/default-profile.png"}`}
+            src={`${client?.photo || user?.image || "/images/LogoImpecol.png"}`}
             alt="Profile"
             className="logo"
           />

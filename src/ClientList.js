@@ -6,7 +6,7 @@ import './ClientList.css';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import '@fortawesome/fontawesome-free/css/all.min.css';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
-import { BuildingFill, GeoAltFill, PhoneFill, TelephoneFill } from 'react-bootstrap-icons';
+import { BuildingFill, GeoAltFill, PhoneFill, TelephoneFill, X, XCircle } from 'react-bootstrap-icons';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 
@@ -156,8 +156,15 @@ function ClientList() {
   };
 
   const handleSaveNewStation = async () => {
+    // Validación manual
+    const { description, type, category, latitude, longitude } = newStation;
+  
+    if (!description || !category) {
+      handleShowNotification("Por favor completa todos los campos obligatorios."); // Mostrar mensaje al usuario
+      return; // Detener la ejecución si los campos están vacíos
+    }
+  
     try {
-      const { description, type, category, latitude, longitude, altitude } = newStation;
       const response = await axios.post(`${process.env.REACT_APP_API_URL}/api/stations`, {
         description,
         type,
@@ -165,7 +172,7 @@ function ClientList() {
         client_id: selectedClient.id, // Asociar con el cliente seleccionado
         latitude, // Enviar latitud
         longitude, // Enviar longitud
-        altitude, // Enviar altitud
+        altitude: newStation.altitude || null, // Altitud opcional
       });
   
       const addedStation = response.data.station;
@@ -174,14 +181,37 @@ function ClientList() {
       setStations((prevStations) => [...prevStations, addedStation]);
   
       // Reiniciar el formulario y cerrar el modal
-      setNewStation({ description: '', type: 'Control', category: '', latitude: '', longitude: '', altitude: '' });
+      setNewStation({
+        description: '',
+        type: 'Control',
+        category: '',
+        latitude: '',
+        longitude: '',
+        altitude: '',
+      });
       handleShowNotification('Estación agregada exitosamente');
       setShowAddStationModal(false);
     } catch (error) {
       console.error('Error al guardar la estación:', error);
       handleShowNotification('Hubo un error al guardar la estación');
     }
-  };  
+  };
+  
+  
+  const handleDeleteStation = async (stationId) => {
+    try {
+      await axios.delete(`${process.env.REACT_APP_API_URL}/api/stations/${stationId}`);
+      
+      // Actualiza el estado eliminando la estación
+      setStations((prevStations) => prevStations.filter((station) => station.id !== stationId));
+      
+      handleShowNotification("Estación eliminada exitosamente.");
+    } catch (error) {
+      console.error("Error al eliminar estación:", error);
+      handleShowNotification("Hubo un error al eliminar la estación.");
+    }
+  };
+  
 
   const handleShowActionModal = (type) => {
     setActionType(type);
@@ -716,7 +746,7 @@ function ClientList() {
             <BuildingFill className="me-2" /> Detalles del Cliente
           </Modal.Title>
         </Modal.Header>
-      <Modal.Body style={{height:'55vh'}}>
+      <Modal.Body style={{height:'65vh'}}>
         {selectedClient ? (
           <div className="row">
             {/* Parte superior izquierda: Información de la Empresa */}
@@ -766,13 +796,14 @@ function ClientList() {
                 </h5>
                 <div className="table-container">
                 {stations.length > 0 ? (
-              <table className="table table-bordered table-hover">
+              <table className="table table-bordered table-hover text-center">
                 <thead className="table-light">
                   <tr>
-                    <th>#</th>
-                    <th>Tipo</th>
-                    <th>Categoría</th>
-                    <th>QR</th>
+                    <th style={{width:'20%'}}>Descripción</th>
+                    <th style={{width:'20%'}}>Tipo</th>
+                    <th style={{width:'20%'}}>Categoría</th>
+                    <th style={{width:'35%'}}>QR</th>
+                    <th style={{width:'5%'}}>Acciones</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -786,11 +817,26 @@ function ClientList() {
                       <img
                         src={`${station.qr_code}`}
                         alt={`QR de estación ${station.description}`}
-                        style={{ maxWidth: "100px" }}
+                        style={{ width: "50%", marginLeft: '25%', marginRight: '25%' }}
                       />
                     ) : (
                       "No disponible"
                     )}
+                  </td>
+                  <td style={{ textAlign: 'center', position: 'relative' }}>
+                    {/* Ícono de eliminación al final de la fila */}
+                    <XCircle
+                      style={{
+                        cursor: 'pointer',
+                        color: 'red',
+                        fontSize: '1.2rem',
+                      }}
+                      onClick={(e) => {
+                        e.stopPropagation(); // Evita eventos innecesarios
+                        handleDeleteStation(station.id); // Llama a la función para eliminar
+                      }}
+                      title="Eliminar estación"
+                    />
                   </td>
                 </tr>
               ))}
@@ -833,32 +879,35 @@ function ClientList() {
       <Modal.Footer>
         <div className="w-100">
           {/* Botones de acción */}
-          <div className="action-buttons d-flex justify-content-around mb-4">
+          <div className="action-buttons d-flex flex-wrap flex-md-nowrap justify-content-around mb-4">
             <Button
-              className="btn-outline-primary w-100 mx-2"
+              className="btn-outline-primary w-100 w-md-auto mx-2 mb-2 mb-md-0"
               onClick={() => window.open(`tel:${selectedClient?.phone || ""}`)}
             >
               <i className="fas fa-phone"></i>
               <span style={{ marginLeft: "8px" }}>Llamar</span>
             </Button>
             <Button
-              className="btn-outline-success w-100 mx-2"
+              className="btn-outline-success w-100 w-md-auto mx-2 mb-2 mb-md-0"
               onClick={() =>
-                window.open(`https://wa.me/${selectedClient?.phone?.replace(/\D/g, "")}`, "_blank")
+                window.open(
+                  `https://wa.me/${selectedClient?.phone?.replace(/\D/g, "")}`,
+                  "_blank"
+                )
               }
             >
               <i className="fab fa-whatsapp"></i>
               <span style={{ marginLeft: "8px" }}>WhatsApp</span>
             </Button>
             <Button
-              className="btn-outline-dark w-100 mx-2"
+              className="btn-outline-dark w-100 w-md-auto mx-2 mb-2 mb-md-0"
               onClick={() => window.open(`mailto:${selectedClient?.email || ""}`)}
             >
               <i className="fas fa-envelope"></i>
               <span style={{ marginLeft: "8px" }}>Correo</span>
             </Button>
             <Button
-              className="btn-outline-danger w-100 mx-2"
+              className="btn-outline-danger w-100 w-md-auto mx-2 mb-2 mb-md-0"
               onClick={() =>
                 window.open(
                   `https://www.google.com/maps?q=${encodeURIComponent(
@@ -995,13 +1044,13 @@ function ClientList() {
         <Modal.Body>
           <Form>
           <Form.Group controlId="formStationDescription" className="mb-3">
-        <Form.Label>#</Form.Label>
+        <Form.Label>Descripción</Form.Label>
         <Form.Control
           type="text"
           name="description"
-          value={stations.length + 1} // Valor autoincrementado
-          readOnly // Deshabilita la edición
-          style={{ backgroundColor: '#e9ecef', color: '#495057' }} // Color gris
+          onChange={(e) => setNewStation({ ...newStation, description: e.target.value })}
+          required
+          style={{ borderColor: newStation.descriptionError ? 'red' : '' }}
         />
       </Form.Group>
 
@@ -1024,6 +1073,7 @@ function ClientList() {
         <Form.Select
           name="category"
           value={newStation.category}
+          required
           onChange={(e) =>
             setNewStation({ ...newStation, category: e.target.value })
           }

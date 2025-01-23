@@ -11,7 +11,7 @@ function EditProfile() {
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [selectedFile, setSelectedFile] = useState(null);
-  const [profilePic, setProfilePic] = useState('/images/default-profile.png');
+  const [profilePic, setProfilePic] = useState('/images/LogoImpecol.png');
   const [profileColor, setProfileColor] = useState('#ffffff');
   const [showModal, setShowModal] = useState(false);
   const [modalContent, setModalContent] = useState('');

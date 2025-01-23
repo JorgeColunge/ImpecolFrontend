@@ -28,7 +28,7 @@ function UserList() {
 
   const userInfo = JSON.parse(localStorage.getItem("user_info"));
   const canAddUser = userInfo?.rol === "Superadministrador" || userInfo?.rol === "Administrador";
-  const [profilePicPreview, setProfilePicPreview] = useState('/images/default-profile.png');
+  const [profilePicPreview, setProfilePicPreview] = useState('/images/LogoImpecol.png');
   const [searchTerm, setSearchTerm] = useState('');
   const [dropdownPosition, setDropdownPosition] = useState(null);
   const [selectedUser, setSelectedUser] = useState(null);
@@ -466,7 +466,8 @@ const deleteUser = async (id) => {
               <option value="Administrador">Administrador</option>
               <option value="Comercial">Comercial</option>
               <option value="Supervisor Técnico">Supervisor Técnico</option>
-              <option value="Técnico">Técnico</option>
+              <option value="Operario">Operario</option>
+              <option value="Operario Hogar">Operario Hogar</option>
             </Form.Control>
           </Form.Group>
           <Form.Group controlId="formUserEmail" className="mb-3">

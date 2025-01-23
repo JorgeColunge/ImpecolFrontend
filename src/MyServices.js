@@ -513,7 +513,6 @@ function MyServices() {
                   {selectedService.category === "Periódico" && (
                     <p><strong>Cantidad al Mes:</strong> {selectedService.quantity_per_month}</p>
                   )}
-                  <p><strong>Valor:</strong> ${selectedService.value}</p>
                 </div>
               </div>
 
