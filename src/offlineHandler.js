@@ -2,16 +2,20 @@ import { openDB } from 'idb';
 
 // Inicializar IndexedDB
 const initDB = async () => {
-  return openDB('offline-db', 2, {
-    upgrade(db) {
+  return openDB('offline-db', 3, {
+    upgrade(db, oldVersion, newVersion, transaction) {
+      console.log(`🔄 Actualizando IndexedDB de versión ${oldVersion} a ${newVersion}`);
+
       if (!db.objectStoreNames.contains('requests')) {
+        console.log('🛠️ Creando Object Store "requests" en IndexedDB...');
         db.createObjectStore('requests', { keyPath: 'id', autoIncrement: true });
+      } else {
+        console.log('✅ Object Store "requests" ya existe.');
       }
     },
   });
 };
 
-// Guardar solicitud
 // Guardar solicitud
 export const saveRequest = async (request) => {
   try {
@@ -174,14 +178,33 @@ export const getRequests = async () => {
 
 // Eliminar solicitudes sincronizadas
 export const clearRequests = async () => {
-  const db = await initDB();
-  await db.clear('requests');
+  try {
+    const db = await initDB();
+    
+    if (!db.objectStoreNames.contains('requests')) {
+      console.warn('⚠️ No hay datos en IndexedDB para eliminar.');
+      return;
+    }
+
+    await db.clear('requests');
+    console.log('✅ Solicitudes eliminadas de IndexedDB.');
+  } catch (error) {
+    console.error('❌ Error al eliminar solicitudes en IndexedDB:', error);
+  }
 };
+
 
 // Detectar si está offline
 export const isOffline = () => !navigator.onLine;
 
 export const syncRequests = async () => {
+  const db = await initDB();
+  
+  if (!db.objectStoreNames.contains('requests')) {
+    console.warn('⚠️ No hay solicitudes almacenadas, evitando error.');
+    return;
+  }
+  
   const requests = await getRequests();
 
   if (requests.length === 0) {

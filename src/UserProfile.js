@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
+import { getProfile, saveProfile } from './indexedDBHandler';
 import { PencilSquare, Person, Envelope, Phone } from 'react-bootstrap-icons';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import './App.css';
@@ -13,8 +14,20 @@ function UserProfile({ userInfo }) {
   useEffect(() => {
     const fetchUser = async () => {
       try {
-        const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/users/${userInfo.id_usuario}`);
-        setUser(response.data);
+        if (navigator.onLine) { 
+          console.log("Modo online: obteniendo perfil del servidor...");
+          const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/users/${userInfo.id_usuario}`);
+          setUser(response.data);
+          await saveProfile(response.data); // Guarda el perfil en IndexedDB
+        } else {
+          console.log("Modo offline: obteniendo perfil de IndexedDB...");
+          const offlineUser = await getProfile(userInfo.id_usuario);
+          if (offlineUser) {
+            setUser(offlineUser);
+          } else {
+            console.warn("No hay datos en IndexedDB para este usuario.");
+          }
+        }
       } catch (error) {
         console.error("Error al obtener la información del usuario:", error);
       } finally {
@@ -38,7 +51,7 @@ function UserProfile({ userInfo }) {
           <div className="position-relative">
             <div className='img-mask mx-auto'>
             <img
-              src={`${user?.image || '/images/LogoImpecol.png'}`}
+              src={`${user?.image || "/images/Logo Fumiplagax.png"}`}
               alt="Profile"
               className="rounded-img shadow-sm"
               width="150"

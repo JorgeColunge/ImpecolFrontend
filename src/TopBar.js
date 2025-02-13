@@ -82,10 +82,10 @@ const handleNotificationClick = async (notificationId, route) => {
       expand="lg"
       className="top-bar shadow-sm px-3"
       style={{
-        marginLeft: isSidebarVisible ? (isSidebarOpen ? '240px' : '60px') : '0px',
+        marginLeft: isSidebarVisible ? (isSidebarOpen ? '200px' : '60px') : '0px',
         width: isSidebarVisible
           ? isSidebarOpen
-            ? 'calc(100% - 240px)'
+            ? 'calc(100% - 200px)'
             : 'calc(100% - 60px)'
           : '100%',
       }}

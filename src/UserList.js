@@ -18,7 +18,7 @@ function UserList() {
     name: '',
     lastname: '',
     phone: '',
-    rol: 'Técnico',
+    rol: 'Operario',
     password: '',
     email: '', // Campo agregado para email
     image: null,
@@ -71,30 +71,41 @@ function UserList() {
 
   useEffect(() => {
     const fetchUsers = async () => {
-      setLoading(true);
-      try {
-        if (isOffline()) {
-          // Cargar usuarios desde IndexedDB si está offline
-          const localUsers = await getUsers();
-          setUsers(localUsers);
-          console.log('Usuarios cargados desde IndexedDB');
-        } else {
-          // Cargar usuarios desde el servidor
-          const response = await api.get('/users');
-          setUsers(response.data);
-    
-          // Guardar usuarios en IndexedDB
-          await saveUsers(response.data, true);
-          console.log('Usuarios guardados en IndexedDB');
+        setLoading(true);
+        try {
+            if (isOffline()) {
+                console.log('Modo offline detectado, cargando usuarios desde IndexedDB...');
+                const localUsers = await getUsers();
+                setUsers(localUsers);
+            } else {
+                console.log('Modo online detectado, cargando usuarios desde el servidor...');
+                const response = await api.get('/users');
+                setUsers(response.data);
+                await saveUsers(response.data, true);
+            }
+        } catch (error) {
+            console.error('Error al obtener usuarios:', error);
+        } finally {
+            setLoading(false);
         }
-      } catch (error) {
-        console.error('Error al obtener usuarios:', error);
-      } finally {
-        setLoading(false);
-      }
     };
+
     fetchUsers();
-  }, []);
+
+    // Escuchar cambios en el estado de conexión
+    const handleConnectionChange = () => {
+        console.log('Cambio de conexión detectado, recargando usuarios...');
+        fetchUsers();
+    };
+
+    window.addEventListener('online', handleConnectionChange);
+    window.addEventListener('offline', handleConnectionChange);
+
+    return () => {
+        window.removeEventListener('online', handleConnectionChange);
+        window.removeEventListener('offline', handleConnectionChange);
+    };
+}, []);
 
   useEffect(() => {
     return () => {
@@ -107,7 +118,21 @@ function UserList() {
   }, [users]); 
 
   const handleShowModal = () => setShowModal(true);
-  const handleCloseModal = () => setShowModal(false);
+
+  const handleCloseModal = () => {
+    setNewUser({
+      id: '',
+      name: '',
+      lastname: '',
+      phone: '',
+      rol: 'Operario',
+      password: '',
+      email: '',
+      image: null,
+    });
+    setProfilePicPreview('/images/LogoImpecol.png'); // Restablecer la previsualización de la imagen  
+    setShowModal(false);
+  }
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -306,24 +331,26 @@ const deleteUser = async (id) => {
               key={user.id}
               onClick={() => navigate(`/show-profile/${user.id}`)}
             >
-              <td className="text-center align-middle  zoom">
-                {isOffline() ? (
-                  user.imageUrl ? (
-                    <div className="img-mask mx-auto">
-                      <img
-                        src={user.imageUrl}
-                        alt="Foto de perfil"
-                        className="rounded-img"
-                        width="50"
-                        height="50"
-                      />
+              <td className="text-center align-middle  zoom position-relative">
+              {isOffline() ? (
+                  user.imageBlob ? ( // Asegurar que el usuario tenga una imagen almacenada
+                    <div className="img-mask-sm mx-auto position-relative">
+                        <img
+                            src={user.imageUrl} // Cargar la imagen desde IndexedDB
+                            alt="Foto de perfil"
+                            className="rounded-img-sm"
+                            width="50"
+                            height="50"
+                            onLoad={() => console.log(`Imagen cargada en offline para usuario ${user.id}`)}
+                            onError={(e) => console.error(`Error al cargar imagen en offline para usuario ${user.id}`, e)}
+                        />
                     </div>
-                  ) : (
+                ) : (
                     <div>No Image</div>
-                  )
+                )
                 ) : (
                   user.image ? (
-                    <div className="img-mask-sm mx-auto">
+                    <div className="img-mask-sm mx-auto position-relative">
                       <img
                         src={`${user.image}`}
                         alt="Foto de perfil"
@@ -468,6 +495,7 @@ const deleteUser = async (id) => {
               <option value="Supervisor Técnico">Supervisor Técnico</option>
               <option value="Operario">Operario</option>
               <option value="Operario Hogar">Operario Hogar</option>
+              <option value="Técnico">SST</option>
             </Form.Control>
           </Form.Group>
           <Form.Group controlId="formUserEmail" className="mb-3">

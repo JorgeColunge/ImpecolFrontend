@@ -1,9 +1,10 @@
 import React, { useEffect, useState, useRef } from 'react';
 import axios from 'axios';
 import moment from 'moment-timezone';
+import { getServices, saveServices, saveEvents, getEvents, saveTechnicians, getTechnicians, saveInspections, getInspections } from "./indexedDBHandler";
 import { Card, Col, Row, Button, Table, Modal, Form, ModalTitle } from 'react-bootstrap';
 import 'bootstrap/dist/css/bootstrap.min.css';
-import { Calendar, Person, Bag, Building, PencilSquare, Trash, Bug, Diagram3, GearFill, Clipboard, PlusCircle, InfoCircle, FileText, GeoAlt, PersonFill, Stopwatch, ArrowRepeat, Bullseye } from 'react-bootstrap-icons';
+import { Calendar, Person, Bag, Building, PencilSquare, Trash, Bug, Diagram3, GearFill, Clipboard, PlusCircle, InfoCircle, FileText, GeoAlt, PersonFill, Stopwatch, Bullseye, ArrowRepeat } from 'react-bootstrap-icons';
 import { useNavigate, useLocation } from 'react-router-dom';
 import ClientInfoModal from './ClientInfoModal'; // Ajusta la ruta según la ubicación del componente
 import './ServiceList.css'
@@ -133,66 +134,136 @@ function MyServices() {
   useEffect(() => {
     const fetchMyServices = async () => {
       try {
-        const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/services`);
-        // Filtrar servicios donde el usuario es responsable o está en companions
-        const userServices = response.data.filter(service => {
-          const isResponsible = service.responsible === userId;
-
-          // Verificar si el usuario está en el campo companion
-          const isCompanion = service.companion?.includes(`"${userId}"`); // Busca el ID en el campo companion (asegúrate del formato exacto)
-          
-          return isResponsible || isCompanion;
-        });
+        if (navigator.onLine) {
+          console.log("🌐 Modo online: obteniendo servicios desde el servidor...");
   
-        console.log("Servicios filtrados para el usuario:", userServices);
+          const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/services`);
+          const userServices = response.data.filter(service => {
+            const isResponsible = service.responsible === userId;
+            const isCompanion = service.companion?.includes(`"${userId}"`);
+            return isResponsible || isCompanion;
+          });
   
-        // Obtener nombres de los clientes
-        const clientData = {};
-        for (const service of userServices) {
-          if (service.client_id && !clientData[service.client_id]) {
-            try {
-              const clientResponse = await axios.get(`${process.env.REACT_APP_API_URL}/api/clients/${service.client_id}`);
-              clientData[service.client_id] = clientResponse.data.name;
-            } catch (error) {
-              console.error(`Error fetching client ${service.client_id}:`, error);
-            }
+          console.log("✅ Servicios filtrados para el usuario:", userServices);
+  
+          // Obtener nombres de los clientes
+          const clientData = {};
+          for (const service of userServices) {
+              if (service.client_id && !clientData[service.client_id]) {
+                  try {
+                      const clientResponse = await axios.get(`${process.env.REACT_APP_API_URL}/api/clients/${service.client_id}`);
+                      clientData[service.client_id] = clientResponse.data.name; // Asegurar que solo se almacene el nombre como string
+                  } catch (error) {
+                      console.error(`⚠️ Error obteniendo cliente ${service.client_id}:`, error);
+                  }
+              }
           }
+  
+          // Guardar en IndexedDB
+          await saveServices(userServices, clientData);
+          console.log("📥 Servicios y clientes almacenados en IndexedDB.");
+  
+          // Actualizar el estado con los datos
+          setClientNames(clientData);
+          setServices(userServices);
+        } else {
+          console.log("📴 Modo offline: obteniendo datos desde IndexedDB...");
+  
+          const { services, clients } = await getServices();
+  
+          console.log("📂 Servicios obtenidos desde IndexedDB:", services);
+          console.log("📂 Clientes obtenidos desde IndexedDB:", clients);
+  
+          if (!services || services.length === 0) {
+            console.error("❌ No se encontraron servicios en IndexedDB.");
+          }
+  
+          setClientNames(clients);
+          setServices(services);
         }
-        setClientNames(clientData); // Guarda los nombres de los clientes
-        setServices(userServices);
-        setLoading(false);
       } catch (error) {
-        console.error("Error fetching services:", error);
+        console.error("❌ Error al obtener servicios:", error);
+        
+        if (error instanceof TypeError && error.message.includes("Failed to convert value to 'Response'")) {
+          console.error("⚠️ Error del Service Worker detectado: posible fallo de red o solicitud interceptada.");
+        }
+  
+        setLoading(false);
+      } finally {
         setLoading(false);
       }
     };
+  
     fetchMyServices();
-  }, [userId]);  
+  }, [userId]);
 
   useEffect(() => {
     const fetchScheduledEvents = async () => {
-      try {
-        const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/service-schedule`);
-        setScheduledEvents(response.data);
-      } catch (error) {
-        console.error("Error fetching scheduled events:", error);
-      }
-    };
-    fetchScheduledEvents();
-  }, []);
+        try {
+            const userServiceIds = services.map(service => service.id).join(",");
 
-  useEffect(() => {
-    const fetchTechnicians = async () => {
-      try {
-        const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/users?role=Technician`);
-        setTechnicians(response.data);
-        console.log("Técnicos:", response.data);
-      } catch (error) {
-        console.error("Error fetching technicians:", error);
-      }
+            console.log("📌 Lista de service_id del usuario:", userServiceIds);
+
+            if (!userServiceIds) {
+                console.log("❌ No hay servicios asignados al usuario. No se solicitarán eventos.");
+                return;
+            }
+
+            if (navigator.onLine) {
+                console.log("🌐 Modo online: obteniendo eventos desde el servidor...");
+                const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/service-service-schedule?serviceIds=${userServiceIds}`);
+
+                console.log("✅ Respuesta de la API de eventos:", response.data);
+
+                // Guardar eventos en IndexedDB para uso offline
+                await saveEvents(response.data);
+
+                setScheduledEvents(response.data);
+            } else {
+                console.log("📴 Modo offline: obteniendo eventos desde IndexedDB...");
+                const offlineEvents = await getEvents();
+                setScheduledEvents(offlineEvents);
+            }
+
+        } catch (error) {
+            console.error("❌ Error al obtener eventos programados:", error);
+        }
     };
-    fetchTechnicians();
-  }, []);
+
+    if (services.length > 0) {
+        console.log("📢 Se han obtenido servicios, procediendo a solicitar eventos...");
+        fetchScheduledEvents();
+    } else {
+        console.log("⚠️ Aún no hay servicios cargados, esperando actualización...");
+    }
+}, [services]); // Se ejecuta cuando los servicios cambian
+
+useEffect(() => {
+  const fetchTechnicians = async () => {
+      try {
+          if (navigator.onLine) {
+              console.log("🌐 Modo online: obteniendo técnicos desde el servidor...");
+              const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/users?role=Technician`);
+
+              console.log("✅ Respuesta de la API de técnicos:", response.data);
+
+              // Guardar técnicos en IndexedDB para modo offline
+              await saveTechnicians(response.data);
+
+              setTechnicians(response.data);
+          } else {
+              console.log("📴 Modo offline: obteniendo técnicos desde IndexedDB...");
+              const offlineTechnicians = await getTechnicians();
+              setTechnicians(offlineTechnicians);
+          }
+
+      } catch (error) {
+          console.error("❌ Error al obtener técnicos:", error);
+      }
+  };
+
+  fetchTechnicians();
+}, []);
 
   const today = moment().startOf('day');
   const nextWeek = moment().add(7, 'days').endOf('day');
@@ -229,22 +300,37 @@ function MyServices() {
 
   const fetchInspections = async (serviceId) => {
     try {
-      const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/inspections?service_id=${serviceId}`);
-      const formattedInspections = response.data
-        .filter((inspection) => inspection.service_id === serviceId) // Filtra por `service_id`
-        .map((inspection) => ({
-          ...inspection,
-          date: moment(inspection.date).format("DD/MM/YYYY"), // Formato legible para la fecha
-          time: inspection.time ? moment(inspection.time, "HH:mm:ss").format("HH:mm") : "--",
-          exit_time: inspection.exit_time ? moment(inspection.exit_time, "HH:mm:ss").format("HH:mm") : "--",
-          observations: inspection.observations || "Sin observaciones",
-        }))
-        .sort((a, b) => b.datetime - a.datetime); // Ordena por fecha y hora
-      setInspections(formattedInspections);
+        if (navigator.onLine) {
+            console.log(`🌐 Modo online: obteniendo inspecciones desde el servidor para el servicio ${serviceId}...`);
+            const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/inspections?service_id=${serviceId}`);
+
+            console.log("✅ Respuesta de la API de inspecciones:", response.data);
+
+            // Formatear inspecciones antes de guardar
+            const formattedInspections = response.data.map((inspection) => ({
+                ...inspection,
+                date: moment(inspection.date).format("DD/MM/YYYY"),
+                time: inspection.time ? moment(inspection.time, "HH:mm:ss").format("HH:mm") : "--",
+                exit_time: inspection.exit_time ? moment(inspection.exit_time, "HH:mm:ss").format("HH:mm") : "--",
+                observations: inspection.observations || "Sin observaciones",
+            }));
+
+            console.log("📋 Inspecciones formateadas antes de guardar:", formattedInspections);
+
+            // Guardar en IndexedDB
+            await saveInspections(formattedInspections);
+
+            setInspections(formattedInspections);
+        } else {
+            console.log(`📴 Modo offline: obteniendo inspecciones desde IndexedDB para el servicio ${serviceId}...`);
+            const offlineInspections = await getInspections(serviceId);
+            setInspections(offlineInspections);
+        }
+
     } catch (error) {
-      console.error("Error fetching inspections:", error);
+        console.error("❌ Error fetching inspections:", error);
     }
-  }; 
+};
 
   const handleServiceClick = (service) => {
     setSelectedService(service);

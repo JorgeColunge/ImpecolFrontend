@@ -10,8 +10,9 @@ function EditProfile() {
   const [lastname, setLastname] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
+  const [role, setRole] = useState('');
   const [selectedFile, setSelectedFile] = useState(null);
-  const [profilePic, setProfilePic] = useState('/images/LogoImpecol.png');
+  const [profilePic, setProfilePic] = useState("/images/Logo Fumiplagax.png");
   const [profileColor, setProfileColor] = useState('#ffffff');
   const [showModal, setShowModal] = useState(false);
   const [modalContent, setModalContent] = useState('');
@@ -20,31 +21,45 @@ function EditProfile() {
   const { id } = useParams();
   const navigate = useNavigate();
 
-  useEffect(() => {
-    const fetchUserInfo = async () => {
-      try {
-        const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/users/${id}`);
-        const userData = response.data;
-        setName(userData.name);
-        setLastname(userData.lastname);
-        setEmail(userData.email);
-        setPhone(userData.phone);
-        if (userData.image) {
-          setProfilePic(`${userData.image}`);
-        }
-        if (userData.color) {
-          setProfileColor(userData.color);
-        }
-      } catch (error) {
-        console.error('Error al obtener información del usuario:', error);
-        setModalTitle('Error');
-        setModalContent('No se pudo cargar la información del usuario.');
-        setShowModal(true);
-      }
-    };
+// ✅ Agrega esta función para convertir RGB a HEX
+function rgbToHex(rgb) {
+  if (rgb.startsWith("#")) return rgb; // Si ya es hexadecimal, devolverlo
 
-    fetchUserInfo();
-  }, [id]);
+  const result = rgb.match(/\d+/g); // Extrae los números de "rgb(r,g,b)"
+  if (!result || result.length < 3) return "#ffffff"; // Si hay error, devuelve blanco
+
+  const r = parseInt(result[0]).toString(16).padStart(2, "0");
+  const g = parseInt(result[1]).toString(16).padStart(2, "0");
+  const b = parseInt(result[2]).toString(16).padStart(2, "0");
+
+  return `#${r}${g}${b}`;
+}
+
+useEffect(() => {
+  const fetchUserInfo = async () => {
+    try {
+      const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/users/${id}`);
+      const userData = response.data;
+
+      setName(userData.name);
+      setLastname(userData.lastname);
+      setEmail(userData.email);
+      setPhone(userData.phone);
+      setRole(userData.rol || '');
+      if (userData.image) {
+        setProfilePic(`${userData.image}`);
+      }
+      if (userData.color) {
+        const formattedColor = rgbToHex(userData.color); // ✅ Convierte RGB a HEX
+        setProfileColor(formattedColor);
+      }
+    } catch (error) {
+      console.error('Error al obtener información del usuario:', error);
+    }
+  };
+
+  fetchUserInfo();
+}, [id]); 
 
   const handleFileChange = (e) => {
     const file = e.target.files[0];
@@ -59,7 +74,17 @@ function EditProfile() {
   };
 
   const handleSave = async () => {
-    console.log('Color enviado:', profileColor);
+    console.log('Datos que se enviarán:', {
+      name,
+      lastname,
+      email,
+      phone,
+      userId: id,
+      color: profileColor,
+      role, // Aquí se está enviando el nuevo cargo
+      image: selectedFile ? selectedFile.name : 'No se ha cambiado la imagen'
+    });
+  
     const formData = new FormData();
     formData.append('name', name);
     formData.append('lastname', lastname);
@@ -67,20 +92,23 @@ function EditProfile() {
     formData.append('phone', phone);
     formData.append('userId', id);
     formData.append('color', profileColor);
+    formData.append('role', role); // 📌 Aquí se agrega el cargo al FormData
     if (selectedFile) {
       formData.append('image', selectedFile);
     }
-
+  
     try {
       const response = await axios.post(`${process.env.REACT_APP_API_URL}/api/updateProfile`, formData);
       if (response.status === 200) {
+        console.log("Respuesta del backend:", response.data); // 📌 Verifica la respuesta de la API
+  
         const updatedUserInfo = { ...JSON.parse(localStorage.getItem('user_info')), ...response.data };
-        localStorage.setItem('user_info', JSON.stringify(updatedUserInfo));
-
+        localStorage.setItem('user_info', JSON.stringify(updatedUserInfo)); // 📌 Se guarda en localStorage
+  
         setModalTitle('Éxito');
         setModalContent('¡Perfil actualizado exitosamente!');
         setShowModal(true);
-
+  
         setTimeout(() => {
           setShowModal(false);
           navigate(`/show-profile/${id}`);
@@ -96,7 +124,7 @@ function EditProfile() {
       setModalContent('Error al actualizar el perfil.');
       setShowModal(true);
     }
-  };
+  };  
 
   return (
     <div className="container mt-3 mb-5">
@@ -160,6 +188,32 @@ function EditProfile() {
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
                 />
+              </div>
+              <div className="mb-3">
+                <label className="form-label">Cargo</label>
+                {JSON.parse(localStorage.getItem("user_info"))?.rol === "Administrador" || 
+                JSON.parse(localStorage.getItem("user_info"))?.rol === "Superadministrador" ? (
+                  <select
+                    className="form-control"
+                    value={role}
+                    onChange={(e) => setRole(e.target.value)}
+                  >
+                    <option value="Superadministrador">Superadministrador</option>
+                    <option value="Administrador">Administrador</option>
+                    <option value="Comercial">Comercial</option>
+                    <option value="Supervisor Técnico">Supervisor Técnico</option>
+                    <option value="Operario">Operario</option>
+                    <option value="Operario Hogar">Operario Hogar</option>
+                    <option value="Técnico">SST</option>
+                  </select>
+                ) : (
+                  <input
+                    type="text"
+                    className="form-control"
+                    value={role}
+                    disabled
+                  />
+                )}
               </div>
               <div className="mb-3">
                 <label className="form-label">Color</label>

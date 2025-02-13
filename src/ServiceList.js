@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import axios from 'axios';
 import moment, { duration } from 'moment-timezone';
 import { useNavigate, useLocation } from 'react-router-dom'; // Asegúrate de tener configurado react-router
-import { Calendar, Person, Bag, Building, PencilSquare, Trash, Bug, Diagram3, GearFill, Clipboard, PlusCircle, InfoCircle, FileText, GeoAlt, Stopwatch, Bullseye, ArrowRepeat } from 'react-bootstrap-icons';
+import { Calendar, Person, Bag, Building, PencilSquare, Trash, Bug, Diagram3, GearFill, Clipboard, PlusCircle, InfoCircle, FileText, GeoAlt, Stopwatch, Bullseye, ArrowRepeat, Calendar2Check } from 'react-bootstrap-icons';
 import { Card, Col, Row, Collapse, Button, Table, Modal, Form, CardFooter, ModalTitle } from 'react-bootstrap';
 import ClientInfoModal from './ClientInfoModal';
 import 'bootstrap/dist/css/bootstrap.min.css';
@@ -283,6 +283,10 @@ const handleInterventionAreasChange = (e) => {
 
   const navigate = useNavigate();
 
+  const handleSchedule = (serviceId) => {
+    navigate(`/services-calendar?serviceId=${serviceId}`); // Navega a la ruta con el id del servicio
+ };
+
   const handleInspectionClick = (inspection) => {
     console.log("Clicked inspection:", inspection);
     // Redirigir a la página de Detalles de Inspección con el ID seleccionado
@@ -399,36 +403,47 @@ const handleServiceTypeChange = (e) => {
   });
 };
 
-  const handleSaveChanges = async () => {
-    try {
-      // Convierte los campos al formato requerido por la base de datos
+const handleSaveChanges = async () => {
+  try {
+      const interventionAreas = editService.intervention_areas.filter(
+          (area) => area !== "Otro"
+      );
+
+      if (editService.customInterventionArea.trim()) {
+          interventionAreas.push(editService.customInterventionArea.trim());
+      }
+
       const formattedEditService = {
         ...editService,
-        service_type: `{${editService.service_type.map((type) => `"${type}"`).join(",")}}`, // Formato {"Tipo1","Tipo2"}
-        intervention_areas: `{${editService.intervention_areas.map((area) => `"${area}"`).join(",")}}`,
-        companion: `{${editService.companion.map((id) => `"${id}"`).join(",")}}`,
-      };
-  
-      // Enviar la solicitud al servidor
+        intervention_areas: `{${interventionAreas.map((a) => `"${a}"`).join(",")}}`,
+        pest_to_control: `{${editService.pest_to_control.map((p) => `"${p}"`).join(",")}}`,
+        service_type: `{${editService.service_type.map((s) => `"${s}"`).join(",")}}`,
+        companion: `{${editService.companion.map((c) => `"${c}"`).join(",")}}`, 
+        customInterventionArea: "",
+    };
+
+
       const response = await axios.put(
-        `${process.env.REACT_APP_API_URL}/api/services/${editService.id}`,
-        formattedEditService
+          `${process.env.REACT_APP_API_URL}/api/services/${editService.id}`,
+          formattedEditService
       );
-  
+
       if (response.data.success) {
-        // Actualiza la lista de servicios con los cambios realizados
-        setServices((prevServices) =>
-          prevServices.map((service) =>
-            service.id === editService.id ? { ...formattedEditService } : service
-          )
-        );
-        setShowEditModal(false); // Cierra el modal de edición
-        setEditService(null); // Limpia el estado de edición
+          setServices((prevServices) =>
+              prevServices.map((service) =>
+                  service.id === editService.id
+                      ? { ...formattedEditService, id: editService.id }
+                      : service
+              )
+          );
+
+          handleCloseEditModal();
+          setEditService(null);
       }
-    } catch (error) {
+  } catch (error) {
       console.error("Error updating service:", error);
-    }
-  };
+  }
+};
   
   
   const handleDeleteClick = async (serviceId) => {
@@ -458,10 +473,15 @@ const handleServiceTypeChange = (e) => {
         const clientsResponse = await axios.get(`${process.env.REACT_APP_API_URL}/api/clients`);
         const techniciansResponse = await axios.get(`${process.env.REACT_APP_API_URL}/api/users?rol=Operario,Operario Hogar`);
 
-        setServices(servicesResponse.data);
+        // Ordenar los servicios de forma descendente por created_at
+        const sortedServices = servicesResponse.data.sort((a, b) => 
+          new Date(b.created_at) - new Date(a.created_at)
+        );
+
+        setServices(sortedServices);
         setClients(clientsResponse.data);
         setTechnicians(techniciansResponse.data);
-        setFilteredServices(servicesResponse.data);
+        setFilteredServices(sortedServices);
         setLoading(false);
       } catch (error) {
         console.error("Error fetching data:", error);
@@ -693,7 +713,44 @@ const filteredTechniciansForCompanion = technicians.filter(
 );
 
 
-  const handleCloseAddServiceModal = () => setShowAddServiceModal(false);
+const handleCloseAddServiceModal = () => {
+  setNewService({
+    service_type: [],
+    description: '',
+    pest_to_control: [],
+    intervention_areas: [],
+    customInterventionArea: '',
+    responsible: '',
+    category: '',
+    quantity_per_month: '',
+    date: '',
+    time: '',
+    client_id: '',
+    value: '',
+    companion: [],
+    created_by: userId,
+    created_at: moment().format('DD-MM-YYYY'),
+  });
+  setShowAddServiceModal(false);
+};  
+
+const handleCloseEditModal = () => {
+  setEditService({
+    service_type: [],
+    description: '',
+    pest_to_control: '',
+    intervention_areas: '',
+    responsible: '',
+    category: '',
+    quantity_per_month: '',
+    client_id: '',
+    value: '',
+    companion: [],
+    created_by: userId,
+    created_at: moment().format('DD-MM-YYYY'),
+  });
+  setShowEditModal(false);
+};  
 
   const handleNewServiceChange = (e) => {
     const { name, value } = e.target;
@@ -748,6 +805,24 @@ const filteredTechniciansForCompanion = technicians.filter(
         : prevService.companion.filter((companionId) => companionId !== value) // Elimina el ID si se deselecciona
     }));
   };  
+
+  const handleEditCompanionChange = (e) => {
+    const { value, checked } = e.target;
+
+    setEditService((prevService) => {
+        let updatedCompanions = checked
+            ? [...prevService.companion, value] // Agregar el ID si está seleccionado
+            : prevService.companion.filter((companionId) => companionId !== value); // Eliminar el ID si se deselecciona
+
+        // Filtra valores vacíos o nulos
+        updatedCompanions = updatedCompanions.filter((id) => id.trim() !== "");
+
+        return {
+            ...prevService,
+            companion: updatedCompanions.length > 0 ? updatedCompanions : [], // Mantiene [] si no hay acompañantes
+        };
+    });
+  };
 
   return (
       <div className="container mt-4">
@@ -1146,7 +1221,7 @@ const filteredTechniciansForCompanion = technicians.filter(
           </Form>
         </Modal.Body>
         <Modal.Footer>
-          <Button variant="dark" onClick={() => setShowAddServiceModal(false)}>
+          <Button variant="dark" onClick={() => handleCloseAddServiceModal()}>
             Cancelar
           </Button>
           <Button variant="success" onClick={() => handleSaveNewService()}>
@@ -1316,8 +1391,8 @@ const filteredTechniciansForCompanion = technicians.filter(
                             type="checkbox"
                             label={<span style={{ fontSize: "0.8rem" }}>{technician.name}</span>}
                             value={technician.id}
-                            checked={newService.companion.includes(technician.id)}
-                            onChange={handleCompanionChange}
+                            checked={editService.companion.includes(technician.id)}
+                            onChange={handleEditCompanionChange}
                           />
                         </div>
                       ))}
@@ -1339,7 +1414,7 @@ const filteredTechniciansForCompanion = technicians.filter(
           )}
         </Modal.Body>
         <Modal.Footer>
-          <Button variant="dark" onClick={() => setShowEditModal(false)}>
+          <Button variant="dark" onClick={() => handleCloseEditModal()}>
             Cancelar
           </Button>
           <Button variant="success" onClick={handleSaveChanges}>
@@ -1362,6 +1437,16 @@ const filteredTechniciansForCompanion = technicians.filter(
         <Modal.Body className="bg-light p-4">
           {selectedService && (
             <div className="d-flex flex-column gap-4">
+              <button
+                className="btn btn-outline-success d-flex align-items-center w-100"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleSchedule(selectedService.id);
+                }}
+                >
+                <Calendar2Check size={18} className="me-2" />
+                  Agendar Servicio
+              </button>
               {/* Detalles del servicio */}
               <div className="bg-white shadow-sm rounded p-3">
                 <h5 className="text-secondary mb-3">
