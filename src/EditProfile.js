@@ -204,7 +204,7 @@ useEffect(() => {
                     <option value="Supervisor Técnico">Supervisor Técnico</option>
                     <option value="Operario">Operario</option>
                     <option value="Operario Hogar">Operario Hogar</option>
-                    <option value="Técnico">SST</option>
+                    <option value="SST">SST</option>
                   </select>
                 ) : (
                   <input
