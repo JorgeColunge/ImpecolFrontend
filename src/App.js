@@ -36,7 +36,7 @@ import CompanyStations from './CompanyStations';
 import UnsavedChangesModal from './UnsavedChangesModal';
 import { UnsavedChangesProvider } from './UnsavedChangesContext';
 import { syncRequests } from './offlineHandler';
-import { saveUsers, getUsers, syncUsers } from './indexedDBHandler';
+import { saveUsers, getUsers, syncUsers, syncUsersOnStart } from './indexedDBHandler';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import './App.css';
 
@@ -97,6 +97,11 @@ function App() {
         window.removeEventListener('resize', handleResize); // Limpia el evento al desmontar
       };
     }, []);
+
+    useEffect(() => {
+      syncUsersOnStart(); // Sincroniza usuarios al iniciar la app
+    }, []);
+
 
   const handleSidebarToggle = (isOpen) => {
     setIsSidebarOpen(isOpen);
