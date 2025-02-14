@@ -2,8 +2,50 @@ import { openDB } from 'idb';
 import api from './Api';
 import axios from 'axios';
 
+const requestPersistentStorage = async () => {
+  if (navigator.storage && navigator.storage.persist) {
+      console.log("🟢 Verificando si el almacenamiento ya es persistente...");
+      const isPersistent = await navigator.storage.persisted();
+
+      console.log(`🔎 Estado inicial de persistencia: ${isPersistent ? "✅ Sí" : "❌ No"}`);
+
+      if (!isPersistent) {
+          console.log("⚠️ El almacenamiento NO es persistente. Intentando solicitar persistencia...");
+
+          try {
+              const granted = await navigator.storage.persist();
+              
+              console.log(granted 
+                  ? "✅ Almacenamiento persistente concedido con éxito."
+                  : "❌ No se pudo establecer almacenamiento persistente. El navegador lo rechazó.");
+
+              if (!granted) {
+                  console.warn("🔍 Posibles razones del rechazo:");
+                  console.warn("1️⃣ El usuario no ha interactuado lo suficiente con la app.");
+                  console.warn("2️⃣ La app no está instalada como PWA.");
+                  console.warn("3️⃣ El sitio no está en HTTPS (excepto localhost).");
+                  console.warn("4️⃣ Hay restricciones de almacenamiento del navegador.");
+                  console.warn("5️⃣ Se está ejecutando en modo incógnito o con almacenamiento limitado.");
+              }
+
+              return granted;
+          } catch (error) {
+              console.error("❌ Error al solicitar almacenamiento persistente:", error);
+              return false;
+          }
+      } else {
+          console.log("✅ El almacenamiento YA era persistente.");
+          return true;
+      }
+  } else {
+      console.warn("❌ El navegador NO soporta `navigator.storage.persist()`.");
+      return false;
+  }
+};
+
 // Inicializar IndexedDB para los usuarios
 export const initUsersDB = async () => {
+    await requestPersistentStorage();
     return openDB('offline-ddbb', 3, { // Incrementa la versión a 3
       upgrade(db, oldVersion) {
         if (oldVersion < 1) {
@@ -20,6 +62,7 @@ export const initUsersDB = async () => {
   };
 
   export const initDB = async () => {
+    await requestPersistentStorage();
     return openDB('offline-ddbb', 3, {
       upgrade(db) {
         if (!db.objectStoreNames.contains('stationFindings')) {
@@ -201,6 +244,7 @@ export const initUsersDB = async () => {
 
 // Inicializa IndexedDB para perfiles
 export const initProfileDB = async () => {
+    await requestPersistentStorage();
     return openDB('offline-profile', 3, {
         upgrade(db) {
             if (!db.objectStoreNames.contains('profile')) {
@@ -229,6 +273,7 @@ export const getProfile = async (userId) => {
 
 // Inicializar IndexedDB para servicios y clientes
 export const initServicesDB = async () => {
+  await requestPersistentStorage();
   return openDB('offline-services', 6, { // Asegura que la versión sea mayor a la anterior
       upgrade(db, oldVersion) {
           if (oldVersion < 6) {
@@ -364,6 +409,7 @@ export const syncServicesOnStart = async () => {
 
 // Inicializar IndexedDB para clientes
 export const initClientsDB = async () => {
+  await requestPersistentStorage();
   return openDB('offline-clients', 1, { // Asegurar nueva versión
       upgrade(db, oldVersion) {
           if (oldVersion < 6) {
