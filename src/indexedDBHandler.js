@@ -2,44 +2,47 @@ import { openDB } from 'idb';
 import api from './Api';
 import axios from 'axios';
 
+// Solicitar almacenamiento persistente y mostrar detalles de almacenamiento
 const requestPersistentStorage = async () => {
   if (navigator.storage && navigator.storage.persist) {
-      console.log("🟢 Verificando si el almacenamiento ya es persistente...");
-      const isPersistent = await navigator.storage.persisted();
+    console.log("🟢 Verificando si el almacenamiento ya es persistente...");
+    const isPersisted = await navigator.storage.persisted();
 
-      console.log(`🔎 Estado inicial de persistencia: ${isPersistent ? "✅ Sí" : "❌ No"}`);
+    if (!isPersisted) {
+      try {
+        const granted = await navigator.storage.persist();
+        console.log(granted 
+          ? "✅ Almacenamiento persistente concedido con éxito." 
+          : "❌ No se pudo establecer almacenamiento persistente.");
 
-      if (!isPersistent) {
-          console.log("⚠️ El almacenamiento NO es persistente. Intentando solicitar persistencia...");
-
-          try {
-              const granted = await navigator.storage.persist();
-              
-              console.log(granted 
-                  ? "✅ Almacenamiento persistente concedido con éxito."
-                  : "❌ No se pudo establecer almacenamiento persistente. El navegador lo rechazó.");
-
-              if (!granted) {
-                  console.warn("🔍 Posibles razones del rechazo:");
-                  console.warn("1️⃣ El usuario no ha interactuado lo suficiente con la app.");
-                  console.warn("2️⃣ La app no está instalada como PWA.");
-                  console.warn("3️⃣ El sitio no está en HTTPS (excepto localhost).");
-                  console.warn("4️⃣ Hay restricciones de almacenamiento del navegador.");
-                  console.warn("5️⃣ Se está ejecutando en modo incógnito o con almacenamiento limitado.");
-              }
-
-              return granted;
-          } catch (error) {
-              console.error("❌ Error al solicitar almacenamiento persistente:", error);
-              return false;
-          }
-      } else {
-          console.log("✅ El almacenamiento YA era persistente.");
-          return true;
+        if (!granted) {
+          console.warn("🔍 Posibles razones del rechazo:");
+          console.warn("1️⃣ El usuario no ha interactuado lo suficiente con la app.");
+          console.warn("2️⃣ La app no está instalada como PWA.");
+          console.warn("3️⃣ El sitio no está en HTTPS (excepto localhost).");
+          console.warn("4️⃣ Restricciones del navegador o modo incógnito.");
+          console.warn("5️⃣ No se ha alcanzado el umbral de uso de almacenamiento.");
+        }
+      } catch (error) {
+        console.error("❌ Error al solicitar almacenamiento persistente:", error);
+        return false;
       }
+    } else {
+      console.log("✅ El almacenamiento YA era persistente.");
+    }
+
+    // Obtener detalles de almacenamiento
+    if (navigator.storage && navigator.storage.estimate) {
+      const estimate = await navigator.storage.estimate();
+      console.log(`📊 Cuota total: ${(estimate.quota / 1024 / 1024).toFixed(2)} MB`);
+      console.log(`📦 Espacio usado: ${(estimate.usage / 1024 / 1024).toFixed(2)} MB`);
+      console.log(`💾 Uso: ${(estimate.usage / estimate.quota * 100).toFixed(2)}%`);
+    }
+
+    return isPersisted;
   } else {
-      console.warn("❌ El navegador NO soporta `navigator.storage.persist()`.");
-      return false;
+    console.warn("❌ El navegador NO soporta `navigator.storage.persist()`.");
+    return false;
   }
 };
 
@@ -116,7 +119,7 @@ export const initUsersDB = async () => {
 
     // Ahora guarda los usuarios en IndexedDB
     const db = await initUsersDB();
-    const tx = db.transaction('users', 'readwrite');
+    const tx = db.transaction('users', 'readwrite', { durability: 'strict' });
     const store = tx.objectStore('users');
   
     // Las operaciones de IndexedDB son rápidas y síncronas
@@ -191,7 +194,7 @@ export const initUsersDB = async () => {
           console.log(`Usuario sincronizado correctamente: ${user.id}`);
   
           // Actualiza el estado del usuario en IndexedDB
-          const tx = db.transaction('users', 'readwrite');
+          const tx = db.transaction('users', 'readwrite', { durability: 'strict' });
           const store = tx.objectStore('users');
           user.synced = true; // Marca como sincronizado
           await store.put(user);
@@ -220,7 +223,7 @@ export const initUsersDB = async () => {
             const serverUserIds = new Set(serverUsers.map(user => user.id));
 
             // Eliminar usuarios de IndexedDB que no están en el servidor
-            const tx = db.transaction('users', 'readwrite');
+            const tx = db.transaction('users', 'readwrite', { durability: 'strict' });
             const store = tx.objectStore('users');
             for (const user of usersInDB) {
                 if (!serverUserIds.has(user.id)) { // Si el ID no está en el servidor, eliminarlo
@@ -257,7 +260,7 @@ export const initProfileDB = async () => {
 // Guardar perfil en IndexedDB
 export const saveProfile = async (user) => {
     const db = await initProfileDB();
-    const tx = db.transaction('profile', 'readwrite');
+    const tx = db.transaction('profile', 'readwrite', { durability: 'strict' });
     const store = tx.objectStore('profile');
     await store.put(user);
     await tx.done;
@@ -301,7 +304,7 @@ export const initServicesDB = async () => {
 export const saveServices = async (services, clients) => {
   try {
       const db = await initServicesDB();
-      const tx = db.transaction(['services', 'clients'], 'readwrite');
+      const tx = db.transaction(['services', 'clients'], 'readwrite', { durability: 'strict' });
       const serviceStore = tx.objectStore('services');
       const clientStore = tx.objectStore('clients');
 
@@ -425,7 +428,7 @@ export const initClientsDB = async () => {
 export const saveClients = async (clients) => {
   try {
       const db = await initClientsDB();
-      const tx = db.transaction('clients', 'readwrite');
+      const tx = db.transaction('clients', 'readwrite', { durability: 'strict' });
       const store = tx.objectStore('clients');
 
       for (const client of clients) {
@@ -455,7 +458,7 @@ export const getClients = async () => {
 export const saveEvents = async (events) => {
   try {
       const db = await initServicesDB();
-      const tx = db.transaction('events', 'readwrite');
+      const tx = db.transaction('events', 'readwrite', { durability: 'strict' });
       const eventStore = tx.objectStore('events');
 
       // Guardar cada evento en IndexedDB
@@ -487,7 +490,7 @@ export const getEvents = async () => {
 export const saveTechnicians = async (technicians) => {
   try {
       const db = await initServicesDB();
-      const tx = db.transaction('technicians', 'readwrite');
+      const tx = db.transaction('technicians', 'readwrite', { durability: 'strict' });
       const techStore = tx.objectStore('technicians');
 
       // Guardar cada técnico en IndexedDB
@@ -520,7 +523,7 @@ export const getTechnicians = async () => {
 export const saveInspections = async (inspections) => {
   try {
       const db = await initServicesDB();
-      const tx = db.transaction('inspections', 'readwrite');
+      const tx = db.transaction('inspections', 'readwrite', { durability: 'strict' });
       const inspectionStore = tx.objectStore('inspections');
 
       console.log("🔄 Guardando inspecciones en IndexedDB...", inspections);
