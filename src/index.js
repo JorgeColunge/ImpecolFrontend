@@ -4,6 +4,7 @@ import './index.css';
 import App from './App';
 import { UnsavedChangesProvider } from './UnsavedChangesContext';
 import reportWebVitals from './reportWebVitals';
+import * as serviceWorker from './serviceWorker';
 import '@fortawesome/fontawesome-free/css/all.min.css'; // Iconos FontAwesome
 import 'bootstrap/dist/css/bootstrap.min.css'; // Estilos de Bootstrap
 
@@ -16,3 +17,4 @@ root.render(
 
 // Reportar métricas de rendimiento (opcional)
 reportWebVitals();
+serviceWorker.register();
