@@ -16,6 +16,7 @@ function EditMyProfile({ userInfo, onProfileUpdate }) {
   const [profilePic, setProfilePic] = useState("/images/Logo Fumiplagax.png");
   const [showModal, setShowModal] = useState(false);
   const [modalContent, setModalContent] = useState('');
+  const [password, setPassword] = useState('');
   const [modalTitle, setModalTitle] = useState('');
 
   useEffect(() => {
@@ -54,6 +55,13 @@ function EditMyProfile({ userInfo, onProfileUpdate }) {
   };
 
   const handleSave = async () => {
+    if (password && password.length < 6) {
+      setModalTitle('Error');
+      setModalContent('La contraseña debe tener al menos 6 caracteres.');
+      setShowModal(true);
+      return;
+    }    
+  
     const formData = new FormData();
     formData.append('name', name);
     formData.append('lastname', lastname);
@@ -63,7 +71,10 @@ function EditMyProfile({ userInfo, onProfileUpdate }) {
     if (selectedFile) {
       formData.append('image', selectedFile);
     }
-
+    if (password.trim()) {  
+      formData.append('password', password);
+    }
+  
     try {
       const response = await axios.post(`${process.env.REACT_APP_API_URL}/api/updateProfile`, formData);
       if (response.status === 200) {
@@ -75,18 +86,15 @@ function EditMyProfile({ userInfo, onProfileUpdate }) {
           phone,
           image: response.data.imageUrl || userInfo.image,
         };
-
-        // Llama a onProfileUpdate para actualizar el estado global
+  
         onProfileUpdate(updatedUserInfo);
-
-        // Actualiza localStorage
         localStorage.setItem('user_info', JSON.stringify(updatedUserInfo));
-
+  
+        setPassword('');  // Limpiar el estado de la contraseña
         setModalTitle('Éxito');
         setModalContent('¡Perfil actualizado exitosamente!');
         setShowModal(true);
-
-        // Navega después de un pequeño retraso para que el usuario pueda leer el mensaje
+  
         setTimeout(() => {
           setShowModal(false);
           navigate(`/profile`);
@@ -102,7 +110,7 @@ function EditMyProfile({ userInfo, onProfileUpdate }) {
       setModalContent('Error al actualizar el perfil.');
       setShowModal(true);
     }
-  };
+  };  
 
   const isEditable = userInfo?.rol === 'Administrador' || userInfo?.rol === 'Superadministrador';
 
@@ -169,6 +177,16 @@ function EditMyProfile({ userInfo, onProfileUpdate }) {
                   className="form-control"
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
+                />
+                </div>
+              <div className="mb-3">
+                <label className="form-label">Nueva Contraseña</label>
+                <input
+                  type="password"
+                  className="form-control"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Ingrese nueva contraseña"
                 />
               </div>
               <div className="mt-3 text-center">
