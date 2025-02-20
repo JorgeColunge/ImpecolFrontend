@@ -1,99 +1,111 @@
 /* Ajustes generales de las tarjetas */
 .card {
-    border-radius: 8px;
-    border: 1px solid #e0e0e0;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-  }
-  
-  .card-body {
-    padding: 16px;
-  }
-  
-  .card-title {
-    font-size: 1rem;
-    font-weight: bold;
-    color: #333;
-    margin-bottom: 0.5rem;
-  }
-  
-  /* Estilos de texto dentro de la tarjeta */
-  .card-text {
-    font-size: 0.875rem;
-    color: #555;
-  }
-  
-  /* Estilos para los botones de enlace */
-  .card .text-success {
-    font-size: 0.875rem;
-    font-weight: 500;
-    color: #28a745 !important;
-    cursor: pointer;
-  }
-  
-  .card .text-success:hover {
-    text-decoration: underline;
-  }
-  
-  /* Ajuste de márgenes en el contenedor */
-  .container.my-4 {
-    margin-top: 0.5rem;
-    margin-bottom: 0.5rem;
-  }  
-  
-  /* Ajustes de espaciado para columnas */
-  .mb-3 {
-    margin-bottom: 0.5rem !important;
-  }
-  
-  /* Espaciado en el botón "Agregar Nueva Inspección" */
-  .btn-success {
-    margin-top: 0;
-    width: auto;
-    font-size: 1rem;
-    font-weight: 600;
-  }   
+  border-radius: 8px;
+  border: 1px solid #e0e0e0;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
 
-  .text-truncate {
-    overflow: hidden;
-    white-space: nowrap;
-    text-overflow: ellipsis;
-  }
+.card-body {
+  padding: 16px;
+}
 
-  .menu-actions {
-    position: absolute;
-    width: 100%;
-    background: white;
-    border: 1px solid #e0e0e0;
-    box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1);
-    border-radius: 8px;
-    overflow: hidden;
-    transition: transform 1s ease, opacity 0.3s ease;
-    bottom: 41px; /* Posición del menú sobre el botón */
-    left: 0;
-    z-index: 2;
-    opacity: 0;
-    visibility: hidden;
-    transform: scaleY(0); /* Comienza colapsado verticalmente */
-    transform-origin: bottom; /* El origen de la animación es la parte inferior */
-  }
-  
-  .menu-actions.expand {
-    opacity: 1;
-    visibility: visible;
-    transform: scaleY(1); /* Expande completamente verticalmente */
-  }  
-  
-  .menu-actions button {
-    width: 100%;
-    padding: 8px 16px;
-    text-align: left;
-    border: none;
-    background: transparent;
-    cursor: pointer;
-    transition: background 0.2s ease;
-  }
-  
-  .menu-actions button:hover {
-    background: #f1f1f1;
-  }
-  
+.card-title {
+  font-size: 1rem;
+  font-weight: bold;
+  color: #333;
+  margin-bottom: 0.5rem;
+}
+
+/* Estilos de texto dentro de la tarjeta */
+.card-text {
+  font-size: 0.875rem;
+  color: #555;
+}
+
+/* Estilos para los botones de enlace */
+.card .text-success {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #28a745 !important;
+  cursor: pointer;
+}
+
+.card .text-success:hover {
+  text-decoration: underline;
+}
+
+/* Ajuste de márgenes en el contenedor */
+.container.my-4 {
+  margin-top: 0.5rem;
+  margin-bottom: 0.5rem;
+}  
+
+/* Ajustes de espaciado para columnas */
+.mb-3 {
+  margin-bottom: 0.5rem !important;
+}
+
+/* Espaciado en el botón "Agregar Nueva Inspección" */
+.btn-success {
+  margin-top: 0;
+  width: auto;
+  font-size: 1rem;
+  font-weight: 600;
+}   
+
+.text-truncate {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.menu-actions {
+  position: absolute;
+  width: 100%;
+  background: white;
+  border: 1px solid #e0e0e0;
+  box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1);
+  border-radius: 8px;
+  overflow: hidden;
+  transition: transform 1s ease, opacity 0.3s ease;
+  bottom: 41px; /* Posición del menú sobre el botón */
+  left: 0;
+  z-index: 2;
+  opacity: 0;
+  visibility: hidden;
+  transform: scaleY(0); /* Comienza colapsado verticalmente */
+  transform-origin: bottom; /* El origen de la animación es la parte inferior */
+}
+
+.menu-actions.expand {
+  opacity: 1;
+  visibility: visible;
+  transform: scaleY(1); /* Expande completamente verticalmente */
+}  
+
+.menu-actions button {
+  width: 100%;
+  padding: 8px 16px;
+  text-align: left;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.menu-actions button:hover {
+  background: #f1f1f1;
+}
+
+.loading-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(255, 255, 255, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1050;
+}

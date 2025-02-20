@@ -224,14 +224,14 @@ const Rules = () => {
         </div>
       )}
 
-<div className="d-flex justify-content-end gap-2 mt-2 mb-2">
-<Button variant="primary" onClick={handleShowCategoryModal}>
-  Agregar Categoría
-</Button>
-  <Button variant="success" onClick={handleShowModal}>
-    Agregar Norma
-  </Button>
-</div>
+      <div className="d-flex justify-content-end gap-2 mt-2 mb-2">
+      <Button variant="outline-success" onClick={handleShowCategoryModal}>
+        Agregar Categoría
+      </Button>
+        <Button variant="success" onClick={handleShowModal}>
+          Agregar Norma
+        </Button>
+      </div>
 
       <Modal show={showModal} onHide={handleCloseModal} centered size="lg">
         <Modal.Header closeButton>

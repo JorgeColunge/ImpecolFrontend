@@ -23,6 +23,7 @@ const MyServicesCalendar = () => {
     const [scheduleModalOpen, setScheduleModalOpen] = useState(false);
     const calendarRef = useRef(null);
     const [currentView, setCurrentView] = useState('timeGridWeek');
+    const [mesComp, setMesComp] = useState(moment().format('MMMM YYYY')); // Estado para mesComp
     const [selectedEvent, setSelectedEvent] = useState(null);
     const [showEventModal, setShowEventModal] = useState(false);
     const [selectedService, setSelectedService] = useState('');
@@ -71,19 +72,34 @@ const MyServicesCalendar = () => {
     const userId = storedUserInfo?.id_usuario || '';
     const userColor = storedUserInfo?.color || '#007bff'; // Color del usuario conectado
 
+    const handleDatesSet = (dateInfo) => {
+        const newMesComp = moment(dateInfo.view.currentStart).format('MMMM YYYY'); // Formato 'Mes Año'
+        
+        // Capitalizar la primera letra del mes (en español, Moment.js lo da en minúsculas)
+        const formattedMesComp = newMesComp.charAt(0).toUpperCase() + newMesComp.slice(1);
+        
+        // Verifica si ha cambiado el mes y actualiza el estado
+        if (mesComp !== formattedMesComp) {
+            console.log(`🔄 Cambio de mes detectado: ${mesComp} → ${formattedMesComp}`);
+            setMesComp(formattedMesComp);
+        } else {
+            console.log(`📅 Estás viendo el mes de: ${formattedMesComp}`);
+        }
+    };
+    
     useEffect(() => {
         const fetchData = async () => {
             await fetchScheduleAndServices();
         };
         fetchData();
-    }, []);
+    }, [mesComp]);  // 🔥 Se ejecuta cada vez que `mesComp` cambie       
 
     const fetchScheduleAndServices = async () => {
         try {
             console.log('Fetching schedule and services...');
             
             // Paso 1: Obtén los eventos de la agenda de servicios
-            const scheduleResponse = await fetch(`${process.env.REACT_APP_API_URL}/api/service-schedule`);
+            const scheduleResponse = await fetch(`${process.env.REACT_APP_API_URL}/api/service-schedule?month=${mesComp}`);
             if (!scheduleResponse.ok) throw new Error('Failed to fetch schedule');
             const scheduleData = await scheduleResponse.json();
     
@@ -430,9 +446,10 @@ const MyServicesCalendar = () => {
                             <Button variant="light" className="me-2" onClick={() => calendarRef.current.getApi().next()}>
                                 <ChevronRight />
                             </Button>
-                            <Button variant="light" className="me-2" onClick={handleTodayClick}>
-                                Hoy
-                            </Button>
+                        <Button variant="outline-dark" className="me-2" onClick={handleTodayClick}>
+                            Hoy
+                        </Button>
+                        <span className="fw-bold fs-5 text-secondary ms-2">{mesComp}</span>
                         </div>
                         <div>
                             <Button
@@ -458,31 +475,33 @@ const MyServicesCalendar = () => {
                         </div>
                     </div>
                     <div className="custom-calendar">
-                        <FullCalendar
-                            ref={calendarRef}
-                            plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
-                            initialView={currentView}
-                            headerToolbar={false}
-                            locale={esLocale}
-                            events={events}
-                            editable={false}
-                            eventStartEditable={false}
-                            eventDurationEditable={false}
-                            selectable={true}
-                            select={handleDateSelect}
-                            timeZone="local"
-                            height="70vh"
-                            nowIndicator={true}
-                            slotLabelFormat={{ hour: 'numeric', hour12: true, meridiem: 'short' }}
-                            eventContent={renderEventContent}
-                            eventClick={handleEventClick} // Aquí añadimos el evento
-                            dayHeaderContent={({ date }) => (
+                    <FullCalendar
+                        ref={calendarRef}
+                        plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
+                        initialView={currentView}
+                        headerToolbar={false}
+                        locale={esLocale}
+                        events={events}
+                        editable={true}
+                        selectable={true}
+                        select={handleDateSelect}
+                        timeZone="local"
+                        height="70vh"
+                        nowIndicator={true}
+                        slotLabelFormat={{ hour: 'numeric', hour12: true, meridiem: 'short' }}
+                        eventContent={renderEventContent}
+                        eventClick={handleEventClick}
+                        dayHeaderContent={({ date }) => {
+                            const utcDate = new Date(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate());
+                            return (
                                 <div className="day-header">
-                                    <div className="day-name text-sm text-gray-500">{date.toLocaleDateString('es-ES', { weekday: 'short' }).toUpperCase()}</div>
-                                    <div className="day-number text-lg font-bold">{date.getDate()}</div>
+                                    <div className="day-name">{utcDate.toLocaleDateString('es-ES', { weekday: 'short' }).toUpperCase()}</div>
+                                    <div className="day-number font-bold">{utcDate.getDate()}</div>
                                 </div>
-                            )}
-                        />
+                            );
+                        }}                        
+                        datesSet={handleDatesSet} // 👈 Ejecuta la función cuando cambian las fechas
+                    />
                     </div>
                 </div>
             </div>
@@ -558,6 +577,7 @@ const MyServicesCalendar = () => {
                                     {selectedEvent.category === "Periódico" && (
                                         <p><strong>Cantidad al Mes:</strong> {selectedEvent.quantyPerMonth}</p>
                                     )}
+                                    <p><strong>Valor:</strong> ${selectedEvent.value}</p>
                                 </div>
                             </div>
 
@@ -569,29 +589,38 @@ const MyServicesCalendar = () => {
                                 <p className="text-muted">{selectedEvent.description || "No especificada"}</p>
                             </div>
 
-                            
-                            {/* Áreas */}
-                            {selectedEvent.interventionAreas && (() => {
-                                const areasMatches = selectedEvent.interventionAreas.match(/"([^"]+)"/g);
-                                return areasMatches && areasMatches.length > 0;
-                                })() && (
-                                <div className="d-flex gap-3">
-                                    
-                                    <div className="flex-fill bg-white shadow-sm rounded p-3 w-100">
-                                        <h5 className="text-secondary mb-3">
-                                        <GeoAlt className="me-2" /> Áreas de Intervención
-                                        </h5>
-                                        <p>
+                            {/* Plagas y Áreas */}
+                            <div className="d-flex gap-3">
+                                {/* Plagas */}
+                                <div className="flex-fill bg-white shadow-sm rounded p-3 w-50">
+                                    <h5 className="text-secondary mb-3">
+                                        <Bug className="me-2" /> Plagas
+                                    </h5>
+                                    <p>
                                         {(() => {
-                                            const areasMatches = selectedEvent.interventionAreas.match(/"([^"]+)"/g);
-                                            return areasMatches
+                                        const pestMatches = selectedEvent.pestToControl.match(/"([^"]+)"/g);
+                                        return pestMatches
+                                            ? pestMatches.map((item) => item.replace(/"/g, "")).join(", ")
+                                            : "No especificado";
+                                        })()}
+                                    </p>
+                                </div>
+
+                                {/* Áreas */}
+                                <div className="flex-fill bg-white shadow-sm rounded p-3 w-50">
+                                    <h5 className="text-secondary mb-3">
+                                        <GeoAlt className="me-2" /> Áreas de Intervención
+                                    </h5>
+                                    <p>
+                                        {(() => {
+                                        const areasMatches = selectedEvent.interventionAreas.match(/"([^"]+)"/g);
+                                        return areasMatches
                                             ? areasMatches.map((item) => item.replace(/"/g, "")).join(", ")
                                             : "No especificado";
                                         })()}
-                                        </p>
-                                    </div>
+                                    </p>
                                 </div>
-                            )}
+                            </div>
 
                             {/* Tabla de Inspecciones */}
                             <div className="bg-white shadow-sm rounded p-3">

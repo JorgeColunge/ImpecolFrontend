@@ -10,6 +10,7 @@ function Inspections() {
   const [inspections, setInspections] = useState([]);
   const [services, setServices] = useState([]);
   const [clients, setClients] = useState([]);
+  const [loading, setLoading] = useState(true); // Nuevo estado para la carga
   const [filterClient, setFilterClient] = useState('');
   const [filterService, setFilterService] = useState('');
   const [filterDate, setFilterDate] = useState('');
@@ -43,11 +44,23 @@ function Inspections() {
   const [openService, setOpenService] = useState(null);
 
   useEffect(() => {
-    fetchInspections();
-    fetchServices();
-    fetchClients();
-    fetchUsers();
-  }, []);
+    const fetchData = async () => {
+      try {
+        await Promise.all([
+          fetchInspections(),
+          fetchServices(),
+          fetchClients(),
+          fetchUsers()
+        ]);
+      } catch (error) {
+        console.error("Error al cargar los datos:", error);
+      } finally {
+        setLoading(false); // Desactiva el spinner cuando los datos se cargan
+      }
+    };
+  
+    fetchData();
+  }, []);  
 
   useEffect(() => {
     applyFilters();
@@ -296,8 +309,18 @@ function Inspections() {
     }
   };  
 
+  if (loading) {
+    return (
+      <div className="loading-overlay">
+        <div className="spinner-border text-success" role="status">
+          <span className="visually-hidden">Cargando...</span>
+        </div>
+      </div>
+    );
+  }
+  
   return (
-    <div className="container my-4">
+    <div className="container my-4">  
       <Row className="w-100" style={{ height: 'auto', alignItems: 'flex-start' }}>
         {/* Filtros */}
         <Row className="mt-1 mb-4 mx-0 w-100 px-0" style={{ minHeight: 0, height: 'auto' }}>
