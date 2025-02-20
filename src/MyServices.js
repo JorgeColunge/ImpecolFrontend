@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import axios from 'axios';
 import moment from 'moment-timezone';
-import { getServices, saveServices, saveEvents, getEvents, saveTechnicians, getTechnicians, saveInspections, getInspections } from "./indexedDBHandler";
+import { getServices, saveServices, saveEvents, getEvents, saveTechnicians, getTechnicians, saveInspections, getInspections, syncPendingInspections, savePendingInspection } from "./indexedDBHandler";
 import { Card, Col, Row, Button, Table, Modal, Form, ModalTitle } from 'react-bootstrap';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import { Calendar, Person, Bag, Building, PencilSquare, Trash, Bug, Diagram3, GearFill, Clipboard, PlusCircle, InfoCircle, FileText, GeoAlt, PersonFill, Stopwatch, Bullseye, ArrowRepeat } from 'react-bootstrap-icons';
@@ -64,7 +64,6 @@ function MyServices() {
           const service = services.find(s => s.id === serviceIdFromState);
           if (service) {
               setSelectedService(service);
-              fetchInspections(service.id);
               setShowServiceModal(true);
           }
       }
@@ -166,6 +165,7 @@ function MyServices() {
           // Actualizar el estado con los datos
           setClientNames(clientData);
           setServices(userServices);
+          fetchAllInspections(userServices);
         } else {
           console.log("📴 Modo offline: obteniendo datos desde IndexedDB...");
   
@@ -180,6 +180,7 @@ function MyServices() {
   
           setClientNames(clients);
           setServices(services);
+          fetchAllInspections(services);
         }
       } catch (error) {
         console.error("❌ Error al obtener servicios:", error);
@@ -265,6 +266,20 @@ useEffect(() => {
   fetchTechnicians();
 }, []);
 
+useEffect(() => {
+  const syncOnReconnect = () => {
+    console.log("🌐 Conexión restaurada, sincronizando inspecciones...");
+    syncPendingInspections();
+  };
+
+  window.addEventListener("online", syncOnReconnect);
+
+  return () => {
+    window.removeEventListener("online", syncOnReconnect);
+  };
+}, []);
+
+
   const today = moment().startOf('day');
   const nextWeek = moment().add(7, 'days').endOf('day');
 
@@ -298,12 +313,59 @@ useEffect(() => {
     return eventDate.format('DD-MM-YYYY');
   };
 
+  const fetchAllInspections = async (services) => {
+    try {
+        if (navigator.onLine) {
+            console.log("🌐 Modo online: obteniendo inspecciones de todos los servicios...");
+            
+            const inspectionsByService = {};
+            
+            for (const service of services) {
+                try {
+                    const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/inspections_service/${service.id}`);
+                    console.log(`✅ Inspecciones para servicio ${service.id}:`, response.data);
+
+                    const formattedInspections = response.data.map((inspection) => ({
+                        ...inspection,
+                        date: moment(inspection.date).format("DD/MM/YYYY"),
+                        time: inspection.time ? moment(inspection.time, "HH:mm:ss").format("HH:mm") : "--",
+                        exit_time: inspection.exit_time ? moment(inspection.exit_time, "HH:mm:ss").format("HH:mm") : "--",
+                        observations: inspection.observations || "Sin observaciones",
+                    }));
+
+                    inspectionsByService[service.id] = formattedInspections;
+                } catch (error) {
+                    console.error(`❌ Error obteniendo inspecciones para el servicio ${service.id}:`, error);
+                    inspectionsByService[service.id] = []; // Si hay error, asegurarse de que exista la clave
+                }
+            }
+
+            // Guardar en IndexedDB para modo offline
+            await saveInspections(inspectionsByService);
+
+            // Actualizar estado en el frontend
+            setInspections(inspectionsByService);
+
+        } else {
+            console.log("📴 Modo offline: obteniendo inspecciones desde IndexedDB...");
+            
+            const offlineInspections = await getInspections();
+            
+            console.log("✅ Inspecciones recuperadas desde IndexedDB:", offlineInspections);
+            
+            setInspections(offlineInspections); // 🔥 Ahora está en formato `{ service_id: [inspections] }`
+        }
+
+    } catch (error) {
+        console.error("❌ Error cargando inspecciones:", error);
+    }
+  };
+
   const fetchInspections = async (serviceId) => {
     try {
         if (navigator.onLine) {
             console.log(`🌐 Modo online: obteniendo inspecciones desde el servidor para el servicio ${serviceId}...`);
-            const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/inspections?service_id=${serviceId}`);
-
+            const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/inspections_service/${serviceId}`);
             console.log("✅ Respuesta de la API de inspecciones:", response.data);
 
             // Formatear inspecciones antes de guardar
@@ -313,6 +375,7 @@ useEffect(() => {
                 time: inspection.time ? moment(inspection.time, "HH:mm:ss").format("HH:mm") : "--",
                 exit_time: inspection.exit_time ? moment(inspection.exit_time, "HH:mm:ss").format("HH:mm") : "--",
                 observations: inspection.observations || "Sin observaciones",
+                findings: inspection.findings ? JSON.parse(inspection.findings) : [],
             }));
 
             console.log("📋 Inspecciones formateadas antes de guardar:", formattedInspections);
@@ -334,14 +397,12 @@ useEffect(() => {
 
   const handleServiceClick = (service) => {
     setSelectedService(service);
-    fetchInspections(service.id);
     setShowServiceModal(true);
   };
 
   const handleCloseServiceModal = () => {
     setShowServiceModal(false);
     setSelectedService(null);
-    setInspections([]);
   };
 
   const handleShowAddInspectionModal = () => {
@@ -374,50 +435,75 @@ useEffect(() => {
 
   const navigate = useNavigate();
 
-    const handleSaveInspection = async () => {
+  const handleSaveInspection = async () => {
+    console.log("📌 Iniciando guardado de inspección...");
+  
     if (!Array.isArray(newInspection.inspection_type) || newInspection.inspection_type.length === 0) {
-        showNotification("Error","Debe seleccionar al menos un tipo para la Inspección.");
-        return;
+      showNotification("Error", "Debe seleccionar al menos un tipo de Inspección.");
+      return;
     }
-
+  
     if (
-        newInspection.inspection_type.includes("Desratización") &&
-        !newInspection.inspection_sub_type
+      newInspection.inspection_type.includes("Desratización") &&
+      !newInspection.inspection_sub_type
     ) {
-        showNotification("Error","Debe seleccionar un Sub tipo para Desratización.");
-        return;
+      showNotification("Error", "Debe seleccionar un Sub tipo para Desratización.");
+      return;
     }
-
+  
     const inspectionData = {
-        inspection_type: newInspection.inspection_type,
-        inspection_sub_type: newInspection.inspection_type.includes("Desratización")
+      inspection_type: newInspection.inspection_type,
+      inspection_sub_type: newInspection.inspection_type.includes("Desratización")
         ? newInspection.inspection_sub_type
-        : null, // Enviar null si no aplica
-        service_id: selectedService.id,
-        date: moment().format("YYYY-MM-DD"), // Fecha actual
-        time: moment().format("HH:mm:ss"), // Hora actual
+        : null,
+      service_id: selectedService.id,
+      date: moment().format("YYYY-MM-DD"), 
+      time: moment().format("HH:mm:ss"),
+      observations: newInspection.observations || "Sin observaciones",
+      status: "pending",  // Indica que está pendiente de sincronización
     };
-
-    try {
-        const response = await axios.post(`${process.env.REACT_APP_API_URL}/api/inspections`, inspectionData);
-
-        if (response.data.success) {
-        showNotification("Exito","Inspección guardada exitosamente");
-        fetchInspections(selectedService.id);
-        handleCloseAddInspectionModal();
-
-        // Redirigir al componente de inspección con el ID
-        navigate(`/inspection/${response.data.inspection.id}`);
-        } else {
-        console.error(
-            "Error: No se pudo guardar la inspección correctamente.",
-            response.data.message
-        );
+  
+    console.log("📋 Inspección generada:", inspectionData);
+  
+    if (!navigator.onLine) {
+      console.log("📴 Modo offline detectado. Guardando inspección en IndexedDB...");
+  
+      try {
+        const idLocal = await savePendingInspection(inspectionData);
+  
+        if (idLocal) {
+          showNotification("Guardado", "Inspección almacenada para sincronización.");
+          handleCloseAddInspectionModal();
+  
+          // 🔄 Redirigir usando el ID local
+          navigate(`/inspection/${idLocal}`);
         }
-    } catch (error) {
-        console.error("Error saving inspection:", error);
+  
+      } catch (error) {
+        console.error("❌ Error al guardar inspección en IndexedDB:", error);
+      }
+  
+    } else {
+      try {
+        console.log("🌐 Enviando inspección al servidor...");
+        const response = await axios.post(`${process.env.REACT_APP_API_URL}/api/inspections`, inspectionData);
+  
+        if (response.data.success) {
+          console.log(`✅ Inspección guardada correctamente con ID ${response.data.inspection.id}`);
+          showNotification("Éxito", "Inspección guardada exitosamente.");
+          fetchInspections(selectedService.id);
+          handleCloseAddInspectionModal();
+          navigate(`/inspection/${response.data.inspection.id}`);
+        } else {
+          console.error("❌ Error al guardar inspección:", response.data.message);
+        }
+      } catch (error) {
+        console.error("❌ Error al guardar inspección:", error);
+      }
     }
-    }; 
+  };
+  
+  
 
   const parseServiceType = (serviceType) => {
     if (!serviceType) return [];
@@ -637,7 +723,7 @@ useEffect(() => {
                 <h5 className="text-secondary mb-3">
                   <Clipboard className="me-2" /> Inspecciones
                 </h5>
-                {inspections.length > 0 ? (
+                {inspections[selectedService.id] && inspections[selectedService.id].length > 0 ? (
                   <div className="custom-table-container">
                   <table className="custom-table">
                     <thead>
@@ -650,7 +736,7 @@ useEffect(() => {
                       </tr>
                     </thead>
                     <tbody>
-                      {inspections.map((inspection) => (
+                      {inspections[selectedService.id].map((inspection) => (
                         <tr key={inspection.id} onClick={() => navigate(`/inspection/${inspection.id}`)}>
                           <td>{inspection.id}</td>
                           <td>{inspection.date}</td>

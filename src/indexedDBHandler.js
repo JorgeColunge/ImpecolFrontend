@@ -64,16 +64,7 @@ export const initUsersDB = async () => {
     });
   };
 
-  export const initDB = async () => {
-    await requestPersistentStorage();
-    return openDB('offline-ddbb', 3, {
-      upgrade(db) {
-        if (!db.objectStoreNames.contains('stationFindings')) {
-          db.createObjectStore('stationFindings', { keyPath: 'id' });
-        }
-      },
-    });
-  };
+  
 
   const getImageUrl = (image) => {
     if (!image) return null;
@@ -277,9 +268,9 @@ export const getProfile = async (userId) => {
 // Inicializar IndexedDB para servicios y clientes
 export const initServicesDB = async () => {
   await requestPersistentStorage();
-  return openDB('offline-services', 6, { // Asegura que la versión sea mayor a la anterior
+  return openDB('offline-services', 7, { // Asegura que la versión sea mayor a la anterior
       upgrade(db, oldVersion) {
-          if (oldVersion < 6) {
+          if (oldVersion < 7) {
               if (!db.objectStoreNames.contains('services')) {
                   db.createObjectStore('services', { keyPath: 'id' });
               }
@@ -294,6 +285,9 @@ export const initServicesDB = async () => {
               }
               if (!db.objectStoreNames.contains('inspections')) {
                 db.createObjectStore('inspections', { keyPath: 'id' });
+              }
+              if (!db.objectStoreNames.contains('pending_inspections')) {
+                db.createObjectStore('pending_inspections', { keyPath: 'id', autoIncrement: true });
               }
           }
       },
@@ -528,9 +522,14 @@ export const saveInspections = async (inspections) => {
 
       console.log("🔄 Guardando inspecciones en IndexedDB...", inspections);
 
-      for (const inspection of inspections) {
-          console.log("➡️ Guardando inspección con service_id:", inspection.service_id, " - ID:", inspection.id);
-          await inspectionStore.put(inspection);
+      // 🔥 Convertir el objeto de inspecciones en un array plano
+      for (const serviceId in inspections) { 
+          if (Array.isArray(inspections[serviceId])) { // Verifica que sea un array
+              for (const inspection of inspections[serviceId]) {
+                  console.log("➡️ Guardando inspección con service_id:", inspection.service_id, " - ID:", inspection.id);
+                  await inspectionStore.put(inspection);
+              }
+          }
       }
 
       await tx.done;
@@ -540,7 +539,7 @@ export const saveInspections = async (inspections) => {
   }
 };
 
-export const getInspections = async (serviceId) => {
+export const getInspections = async () => {
   try {
       const db = await initServicesDB();
       const tx = db.transaction('inspections', 'readonly');
@@ -548,16 +547,168 @@ export const getInspections = async (serviceId) => {
 
       console.log("📂 Todas las inspecciones en IndexedDB:", allInspections);
 
-      // Convertimos serviceId a string para asegurar que el filtrado funcione correctamente
-      const serviceIdStr = String(serviceId);
+      // 🔥 Agrupar inspecciones por `service_id`
+      const inspectionsByService = {};
+      for (const inspection of allInspections) {
+          if (!inspectionsByService[inspection.service_id]) {
+              inspectionsByService[inspection.service_id] = [];
+          }
+          inspectionsByService[inspection.service_id].push(inspection);
+      }
 
-      // Filtrar solo las inspecciones que pertenecen al servicio
-      const serviceInspections = allInspections.filter(ins => String(ins.service_id) === serviceIdStr);
-
-      console.log(`📂 Inspecciones obtenidas desde IndexedDB para el servicio ${serviceId}:`, serviceInspections);
-      return serviceInspections;
+      console.log("📂 Inspecciones organizadas por servicio:", inspectionsByService);
+      return inspectionsByService;
   } catch (error) {
       console.error("❌ Error al obtener inspecciones desde IndexedDB:", error);
-      return [];
+      return {};
+  }
+};
+
+export const getInspectionById = async (inspectionId) => {
+  try {
+    const db = await initServicesDB();
+    const tx = db.transaction('inspections', 'readonly');
+    const store = tx.objectStore('inspections');
+
+    // Buscar la inspección por ID
+    const inspection = await store.get(inspectionId);
+
+    if (inspection) {
+      console.log(`🔍 Inspección encontrada con ID ${inspectionId}:`, inspection);
+      return inspection;
+    } else {
+      console.warn(`⚠️ No se encontró la inspección con ID ${inspectionId}`);
+      return null;
+    }
+  } catch (error) {
+    console.error(`❌ Error al obtener la inspección con ID ${inspectionId}:`, error);
+    return null;
+  }
+};
+
+export const savePendingInspection = async (inspectionData) => {
+  try {
+    console.log("📴 Modo offline: generando ID personalizado...");
+
+    // 📌 Generar ID basado en la fecha y hora actual
+    const now = new Date();
+    const day = String(now.getDate()).padStart(2, '0');
+    const month = String(now.getMonth() + 1).padStart(2, '0'); // Mes empieza desde 0
+    const year = String(now.getFullYear()).slice(-2); // Últimos dos dígitos del año
+    const hours = String(now.getHours()).padStart(2, '0');
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+
+    const generatedId = `offline${day}${month}${year}-${hours}${minutes}`;
+
+    console.log(`✅ ID generado para inspección offline: ${generatedId}`);
+
+    // 📌 Agregar el ID personalizado a la inspección antes de almacenarla
+    const inspectionWithId = {
+      id: generatedId, // ID generado
+      ...inspectionData,
+    };
+
+    // 🛢️ Guardar en `pending_inspections`
+    const db = await initServicesDB();
+    let tx = db.transaction('pending_inspections', 'readwrite');
+    let store = tx.objectStore('pending_inspections');
+    await store.add(inspectionWithId);
+    await tx.done;
+
+    console.log(`✅ Inspección guardada en IndexedDB en 'pending_inspections' con ID: ${generatedId}`);
+
+    // 🛢️ Guardar también en `inspections`
+    tx = db.transaction('inspections', 'readwrite');
+    store = tx.objectStore('inspections');
+    await store.put(inspectionWithId);
+    await tx.done;
+
+    console.log(`✅ Inspección guardada en IndexedDB en 'inspections' con ID: ${generatedId}`);
+
+    return generatedId; // Retornar el ID para redirigir en MyServices.js
+
+  } catch (error) {
+    console.error("❌ Error al guardar inspección en IndexedDB:", error);
+  }
+};
+
+export const syncPendingInspections = async () => {
+  try {
+    const db = await initServicesDB();
+    const tx = db.transaction('pending_inspections', 'readonly');
+    const pendingInspections = await tx.objectStore('pending_inspections').getAll();
+
+    if (pendingInspections.length === 0) {
+      console.log("✅ No hay inspecciones pendientes por sincronizar.");
+      return;
+    }
+
+    console.log("🔄 Sincronizando inspecciones pendientes:", pendingInspections);
+
+    for (const inspection of pendingInspections) {
+      try {
+        const response = await axios.post(`${process.env.REACT_APP_API_URL}/api/inspections`, inspection);
+
+        if (response.data.success && response.data.newId) {
+          const newId = response.data.newId; // ID generado por el servidor
+          console.log(`✅ Inspección ${inspection.id} sincronizada con nuevo ID: ${newId}`);
+
+          // 🛢️ Eliminar inspección sincronizada de `pending_inspections`
+          const deleteTx = db.transaction('pending_inspections', 'readwrite');
+          await deleteTx.objectStore('pending_inspections').delete(inspection.id);
+          await deleteTx.done;
+
+          // 🛢️ Actualizar ID en `inspections`
+          const updateTx = db.transaction('inspections', 'readwrite');
+          const store = updateTx.objectStore('inspections');
+          await store.delete(inspection.id); // Eliminar el antiguo registro
+          await store.put({ ...inspection, id: newId }); // Guardar con el nuevo ID
+          await updateTx.done;
+
+          console.log(`✅ Inspección con ID ${inspection.id} actualizada a ${newId} en IndexedDB.`);
+        } else {
+          console.error(`❌ Error al sincronizar inspección ${inspection.id}:`, response.data.message);
+        }
+      } catch (error) {
+        console.error(`❌ Error en la sincronización de la inspección ${inspection.id}:`, error);
+      }
+    }
+
+    console.log("✅ Sincronización de inspecciones completada.");
+  } catch (error) {
+    console.error("❌ Error al sincronizar inspecciones pendientes:", error);
+  }
+};
+
+// 🔄 Nueva función para actualizar los campos de la inspección en IndexedDB según los datos recibidos
+export const updateInspection = async (inspectionId, newObservations, exitTime, findings) => {
+  try {
+    const db = await initServicesDB();
+    const tx = db.transaction('inspections', 'readwrite');
+    const store = tx.objectStore('inspections');
+    
+    const inspection = await store.get(inspectionId);
+    if (!inspection) {
+      console.warn(`⚠️ No se encontró la inspección con ID ${inspectionId}`);
+      return;
+    }
+    
+    // Actualizar solo los campos que reciban datos
+    if (newObservations !== undefined) {
+      inspection.observations = newObservations;
+    }
+    if (exitTime !== undefined) {
+      inspection.exit_time = exitTime;
+    }
+    if (findings !== undefined) {
+      inspection.findings = findings;
+    }
+    
+    await store.put(inspection);
+    await tx.done;
+    
+    console.log(`✅ Inspección con ID ${inspectionId} actualizada.`, { observations: newObservations, exit_time: exitTime, findings: findings });
+  } catch (error) {
+    console.error(`❌ Error al actualizar la inspección con ID ${inspectionId}:`, error);
   }
 };

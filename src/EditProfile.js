@@ -203,11 +203,13 @@ useEffect(() => {
                     value={role}
                     onChange={(e) => setRole(e.target.value)}
                   >
-                    <option value="Técnico">Técnico</option>
-                    <option value="Supervisor técnico">Supervisor técnico</option>
-                    <option value="Comercial">Comercial</option>
-                    <option value="Administrador">Administrador</option>
                     <option value="Superadministrador">Superadministrador</option>
+                    <option value="Administrador">Administrador</option>
+                    <option value="Comercial">Comercial</option>
+                    <option value="Supervisor Técnico">Supervisor Técnico</option>
+                    <option value="Operario">Operario</option>
+                    <option value="Operario Hogar">Operario Hogar</option>
+                    <option value="SST">SST</option>
                   </select>
                 ) : (
                   <input

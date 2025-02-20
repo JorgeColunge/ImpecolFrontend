@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { Button, Table, InputGroup, FormControl, Modal, Form } from 'react-bootstrap';
 import api from './Api'; // Usa el archivo de API con lógica offline integrada
 import { saveRequest, isOffline } from './offlineHandler';
-import { initDB, initUsersDB, saveUsers, getUsers } from './indexedDBHandler';
+import { initUsersDB, saveUsers, getUsers, getInspectionById, saveInspections } from './indexedDBHandler';
 import SignatureCanvas from 'react-signature-canvas';
 import "./Inspection.css";
 import { ArrowDownSquare, ArrowUpSquare, Eye, FileEarmarkArrowDown, FileEarmarkPlus, EnvelopePaper, Whatsapp, Radioactive, FileEarmarkExcel, FileEarmarkImage, FileEarmarkPdf, FileEarmarkWord, PencilSquare, QrCodeScan, XCircle } from 'react-bootstrap-icons';
@@ -303,72 +303,71 @@ function Inspection() {
   
     const fetchInspectionData = async () => {
       try {
-        console.log('Iniciando la carga de datos de inspección...');
-        const response = await api.get(`${process.env.REACT_APP_API_URL}/api/inspections/${inspectionId}`);
-        console.log('Datos de inspección obtenidos:', response.data);
-  
-        setInspectionData(response.data);
-  
-        // Cargar observaciones generales
-        setGeneralObservations(response.data.observations || '');
-  
-        // Inicializar findingsByType
-        const initialFindings = response.data.findings?.findingsByType || {};
-        console.log('Hallazgos iniciales:', initialFindings);
+        console.log('🔍 Verificando modo de conexión...');
+    
+        let inspectionData;
+    
+        if (isOffline()) {
+          console.log('📴 Modo offline activado. Consultando IndexedDB...');
+          inspectionData = await getInspectionById(inspectionId);
+    
+          if (!inspectionData) {
+            console.warn(`⚠️ Inspección ${inspectionId} no encontrada en IndexedDB.`);
+            return setLoading(false);
+          }
+    
+          console.log('✅ Inspección cargada desde IndexedDB:', inspectionData);
 
+          // 🔥 Convertir `inspection_type` de array a string separado por comas
+          if (Array.isArray(inspectionData.inspection_type)) {
+            inspectionData.inspection_type = inspectionData.inspection_type.join(", ");
+          }
+        } else {
+          console.log('🌐 Modo online. Consultando API...');
+          const response = await api.get(`${process.env.REACT_APP_API_URL}/api/inspections/${inspectionId}`);
+          inspectionData = response.data;
+    
+          console.log('✅ Inspección obtenida desde API:', inspectionData);
+    
+          // Guardar en IndexedDB para acceso offline en el futuro
+          await saveInspections({ [inspectionData.service_id]: [inspectionData] });
+          console.log('📥 Inspección almacenada en IndexedDB.');
+        }
+    
+        setInspectionData(inspectionData);
+    
+        // Cargar observaciones generales
+        setGeneralObservations(inspectionData.observations || '');
+    
+        // Procesar hallazgos
+        const initialFindings = inspectionData.findings?.findingsByType || {};
         for (const type of Object.keys(initialFindings)) {
-          console.log(`Procesando hallazgos para el tipo: ${type}`);
           initialFindings[type] = await Promise.all(
             initialFindings[type].map(async (finding) => {
-              console.log(`Procesando hallazgo con ID: ${finding.id}`);
-        
-              // Validación para verificar si existe una URL de foto
-              if (!finding.photo) {
-                console.warn(`El hallazgo con ID ${finding.id} no tiene foto asociada.`);
-                return {
-                  ...finding,
-                  photo: null,
-                  photoRelative: null,
-                  photoBlob: null,
-                };
-              }
-        
-              // Intentar pre-firmar la URL
+              if (!finding.photo) return { ...finding, photo: null, photoRelative: null, photoBlob: null };
+    
               let signedUrl = null;
               try {
                 signedUrl = await preSignUrl(finding.photo);
-                console.log(`URL pre-firmada para hallazgo con ID ${finding.id}: ${signedUrl}`);
               } catch (error) {
-                console.error(`Error al pre-firmar la URL para hallazgo con ID ${finding.id}:`, error);
+                console.error(`❌ Error al pre-firmar la URL del hallazgo ${finding.id}:`, error);
               }
-        
-              return {
-                ...finding,
-                photo: signedUrl, // Usar la URL pre-firmada
-                photoRelative: finding.photo || null,
-                photoBlob: null,
-              };
+    
+              return { ...finding, photo: signedUrl, photoRelative: finding.photo || null, photoBlob: null };
             })
           );
-        }        
-  
+        }
         setFindingsByType(initialFindings);
-        console.log('findingsByType actualizado:', initialFindings);
-
-        const initialProducts = response.data.findings?.productsByType || {};
-        setProductsByType(initialProducts);
-  
-        // Cargar firmas si existen y prefirmar URLs
-        const signatures = response.data.findings?.signatures || {};
+    
+        // Cargar firmas y pre-firmar URLs
+        const signatures = inspectionData.findings?.signatures || {};
         if (signatures.technician?.signature) {
-          const techSignedUrl = await preSignUrl(signatures.technician.signature);
-          setTechSignaturePreview(techSignedUrl || signatures.technician.signature);
+          setTechSignaturePreview(await preSignUrl(signatures.technician.signature) || signatures.technician.signature);
         }
         if (signatures.client?.signature) {
-          const clientSignedUrl = await preSignUrl(signatures.client.signature);
-          setClientSignaturePreview(clientSignedUrl || signatures.client.signature);
+          setClientSignaturePreview(await preSignUrl(signatures.client.signature) || signatures.client.signature);
         }
-  
+        
         // Cargar datos del cliente
         if (signatures.client) {
           setSignData({
@@ -377,64 +376,46 @@ function Inspection() {
             position: signatures.client.position || '',
           });
         }
-  
-      // Estaciones
-      const initialStationsFindings = response.data.findings?.stationsFindings || [];
-      console.log('Datos iniciales de hallazgos en estaciones:', initialStationsFindings);
-
-      // Procesar hallazgos de estaciones
-      const clientStationsData = {};
-      for (const finding of initialStationsFindings) {
-        try {
-          const signedUrl = finding.photo ? await preSignUrl(finding.photo) : null;
-
-          // Asegúrate de usar el stationId como clave única y validar correctamente
-          if (!finding.stationId) {
-            console.warn(`El hallazgo con ID ${finding.id} no tiene un stationId asociado.`);
-            continue; // Ignora este hallazgo si no tiene un stationId
+    
+        // Procesar hallazgos en estaciones
+        const clientStationsData = {};
+        for (const finding of inspectionData.findings?.stationsFindings || []) {
+          try {
+            const signedUrl = finding.photo ? await preSignUrl(finding.photo) : null;
+            if (!finding.stationId) continue;
+    
+            clientStationsData[finding.stationId] = { ...finding, photo: signedUrl, photoRelative: finding.photo || null, photoBlob: null };
+          } catch (error) {
+            console.error(`❌ Error procesando hallazgo en estación ${finding.stationId}:`, error);
           }
-
-          // Crear una entrada única para cada stationId
-          clientStationsData[finding.stationId] = {
-            ...finding,
-            photo: signedUrl, // Usar la URL pre-firmada si existe
-            photoRelative: finding.photo || null,
-            photoBlob: null,
-          };
-        } catch (error) {
-          console.error(`Error procesando el hallazgo para stationId ${finding.stationId}:`, error);
         }
-      }
-
-      // Actualiza el estado con los datos procesados
-      setClientStations(clientStationsData);
-      console.log('Datos de estaciones procesados correctamente:', clientStationsData);
-  
+        setClientStations(clientStationsData);
+    
         // Cargar estaciones relacionadas
-        const clientId = response.data.service_id
-          ? (await api.get(`${process.env.REACT_APP_API_URL}/api/services/${response.data.service_id}`)).data
-              .client_id
-          : null;
-  
-        if (clientId) {
-          const stationsResponse = await api.get(
-            `${process.env.REACT_APP_API_URL}/api/stations/client/${clientId}`
-          );
-          setStations(stationsResponse.data);
+        if (!isOffline() && inspectionData.service_id) {
+          const serviceResponse = await api.get(`${process.env.REACT_APP_API_URL}/api/services/${inspectionData.service_id}`);
+          const clientId = serviceResponse.data.client_id;
+    
+          if (clientId) {
+            const stationsResponse = await api.get(`${process.env.REACT_APP_API_URL}/api/stations/client/${clientId}`);
+            setStations(stationsResponse.data);
+          }
         }
-  
-        // Consultar productos disponibles
-        const productsResponse = await api.get(`${process.env.REACT_APP_API_URL}/api/products`);
-        console.log('Productos obtenidos desde la API:', productsResponse.data);
-        setAvailableProducts(productsResponse.data);
-  
+    
+        // Cargar productos disponibles
+        if (!isOffline()) {
+          const productsResponse = await api.get(`${process.env.REACT_APP_API_URL}/api/products`);
+          setAvailableProducts(productsResponse.data);
+        }
+    
         setLoading(false);
-        console.log('Carga de datos de inspección completada.');
+        console.log('✅ Carga de datos de inspección completada.');
       } catch (error) {
-        console.error('Error al cargar los datos de inspección:', error);
+        console.error('❌ Error al cargar los datos de inspección:', error);
         setLoading(false);
       }
     };
+    
     
     const fetchActions = async () => {
       try {
@@ -955,44 +936,6 @@ const dataURLtoBlob = (dataURL) => {
     handleCloseStationModal();
   };
   
-  const saveStationFindingOffline = async (stationId, finding) => {
-    const db = await initDB();
-    const tx = db.transaction("stationFindings", "readwrite");
-    const store = tx.objectStore("stationFindings");
-  
-    await store.put({
-      id: stationId,
-      ...finding,
-      photoBlob: finding.photoBlob ? new Blob([finding.photoBlob], { type: "image/jpeg" }) : null,
-    });
-  
-    await tx.done;
-    console.log("Hallazgo guardado offline para estación:", stationId);
-  };  
-
-  const syncStationFindings = async () => {
-    const db = await initDB();
-    const tx = db.transaction("stationFindings", "readonly");
-    const store = tx.objectStore("stationFindings");
-    const findings = await store.getAll();
-  
-    for (const finding of findings) {
-      const formData = new FormData();
-      formData.append("stationId", finding.id);
-      formData.append("description", finding.description || "");
-      if (finding.photoBlob) {
-        formData.append("photo", finding.photoBlob, `${finding.id}.jpg`);
-      }
-  
-      try {
-        await api.post("/station/findings", formData);
-        console.log(`Hallazgo sincronizado para estación: ${finding.id}`);
-      } catch (error) {
-        console.error(`Error al sincronizar hallazgo para estación ${finding.id}:`, error);
-      }
-    }
-  }; 
-
   // Manejador de estado de colapso
 const handleCollapseToggle = (currentKey) => {
   setCollapseStates({ [currentKey]: !collapseStates[currentKey] }); // Solo permite un hallazgo expandido
@@ -2568,7 +2511,7 @@ const handleDeleteFinding = () => {
               {/* Mostrar la información completa si hay firmas */}
               {/* Firma del Técnico */}
               <div className="mb-4 text-center">
-                <h5>Firma del Técnico</h5>
+                <h5>Firma del Operario</h5>
                 <img
                   src={techSignaturePreview}
                   alt="Firma del Técnico"
@@ -2695,7 +2638,7 @@ const handleDeleteFinding = () => {
         <Modal.Body>
           {/* Firma del Técnico */}
           <div className="mb-4 text-center">
-            <h5 className="mb-3">Firma del Técnico</h5>
+            <h5 className="mb-3">Firma del Operario</h5>
             <div className="position-relative text-center">
               <SignatureCanvas
                 ref={sigCanvasTech}
@@ -2716,7 +2659,7 @@ const handleDeleteFinding = () => {
               />
             </div>
             <div className="mt-4 text-center">
-              <h6>Datos del Técnico</h6>
+              <h6>Datos del Operario</h6>
               <p><strong>Nombre:</strong> {storedUserInfo?.name || 'No disponible'} {storedUserInfo?.lastname}</p>
               <p><strong>Cédula:</strong> {storedUserInfo?.id_usuario || 'No disponible'}</p>
               <p><strong>Cargo:</strong> {userRol || 'No disponible'}</p>

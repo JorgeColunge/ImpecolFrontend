@@ -1,4 +1,5 @@
 import { openDB } from 'idb';
+import { updateInspection } from './indexedDBHandler';
 
 // Inicializar IndexedDB
 const initDB = async () => {
@@ -97,6 +98,104 @@ export const convertFormDataToObject = async (formData) => {
 
   try {
     await Promise.all(promises);
+    // 🔍 Agregar log para ver generalObservations
+    if (object.generalObservations) {
+      console.log(`📝📝📝📝📝 generalObservations 📝📝📝📝📝📝`, object.generalObservations);
+    }
+
+    // 🔍 Agregar log para ver exitTime
+    if (object.exitTime) {
+      console.log(`📝📝📝📝📝 exitTime 📝📝📝📝📝📝`, object.exitTime);
+    }
+
+    // 🔄 Construcción del campo findings con datos locales
+    const parsedFindingsByType = object.findingsByType 
+      ? (typeof object.findingsByType === "string" ? JSON.parse(object.findingsByType) : object.findingsByType) 
+      : {};
+      
+    const parsedProductsByType = object.productsByType 
+      ? (typeof object.productsByType === "string" ? JSON.parse(object.productsByType) : object.productsByType) 
+      : {};
+
+    const parsedStationsFindings = object.stationsFindings 
+      ? (typeof object.stationsFindings === "string" ? JSON.parse(object.stationsFindings) : object.stationsFindings) 
+      : [];
+
+    const parsedSignatures = object.signatures 
+      ? (typeof object.signatures === "string" ? JSON.parse(object.signatures) : object.signatures) 
+      : {};
+
+    // 📌 Construir URLs locales para imágenes
+    const findingsImagesById = {};
+    if (object.findingsImages && Array.isArray(object.findingsImages)) {
+      object.findingsImages.forEach(image => {
+        if (image.id) {
+          findingsImagesById[image.id] = image.localUrl; // Usar la URL local en IndexedDB
+        }
+      });
+    }
+
+    const stationImagesById = {};
+    if (object.stationImages && Array.isArray(object.stationImages)) {
+      object.stationImages.forEach(image => {
+        if (image.id) {
+          stationImagesById[image.id] = image.localUrl; // Usar la URL local en IndexedDB
+        }
+      });
+    }
+
+    // Asociar imágenes a `findingsByType`
+    Object.keys(parsedFindingsByType).forEach(type => {
+      parsedFindingsByType[type] = parsedFindingsByType[type].map(finding => {
+        // Asocia la imagen correspondiente al ID del hallazgo
+        if (findingsImagesById[finding.id]) {
+          finding.photo = findingsImagesById[finding.id];
+        }
+        return finding;
+      });
+    });
+
+    // Asociar imágenes a `stationsFindings`
+    parsedStationsFindings.forEach(finding => {
+      if (stationImagesById[finding.stationId]) {
+        finding.photo = stationImagesById[finding.stationId];
+      }
+    });
+
+    // Reconstruir el objeto signatures con URLs locales
+    const updatedSignatures = {
+      client: {
+        id: parsedSignatures?.client?.id || null,
+        name: parsedSignatures?.client?.name || null,
+        position: parsedSignatures?.client?.position || null,
+        signature: parsedSignatures?.client?.signature || null, // Mantener firma local
+      },
+      technician: {
+        id: parsedSignatures?.technician?.id || null,
+        name: parsedSignatures?.technician?.name || null,
+        role: parsedSignatures?.technician?.role || null,
+        signature: parsedSignatures?.technician?.signature || null, // Mantener firma local
+      },
+    };
+
+    // Construir objeto final de findings
+    const findings = {
+      findingsByType: parsedFindingsByType,
+      productsByType: parsedProductsByType,
+      stationsFindings: parsedStationsFindings,
+      signatures: updatedSignatures,
+      genericImages: object.genericImages || [], // Usar imágenes locales si existen
+      findingsImages: object.findingsImages ? object.findingsImages.map(img => img.localUrl) : [], // Usar imágenes locales
+      stationImages: object.stationImages ? object.stationImages.map(img => img.localUrl) : [], // Usar imágenes locales
+    };
+
+    // 🔍 Agregar log para ver findings construido
+    console.log(`📝📝📝📝📝 findings construido 📝📝📝📝📝📝`, findings);
+
+    // 📌 Llamar a la función para actualizar IndexedDB solo si hay inspectionId
+    if (object.inspectionId) {
+      await updateInspection(object.inspectionId, object.generalObservations, object.exitTime, findings);
+    }
     return object;
   } catch (error) {
     console.error(`❌ Error al convertir FormData a objeto:`, error);
