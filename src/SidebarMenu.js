@@ -94,7 +94,7 @@ function SidebarMenu({ onLogout, userInfo, isSidebarVisible, onToggle }) {
       label: "Perfil",
       icon: <Person size={20} />,
       path: "/profile",
-      roles: ["Operario Hogar","Operario", "Comercial", "Supervisor Técnico", "Administrador", "Superadministrador"],
+      roles: ["Operario Hogar","Operario", "Comercial", "Supervisor Técnico", "Administrador", "Superadministrador", "SST"],
     },
     {
       label: "Perfil",
@@ -106,7 +106,7 @@ function SidebarMenu({ onLogout, userInfo, isSidebarVisible, onToggle }) {
       label: "Usuarios",
       icon: <PersonFillGear size={20} />,
       path: "/users",
-      roles: ["Administrador", "Superadministrador"],
+      roles: ["Administrador", "Superadministrador", "SST"],
     },
     {
       label: "Clientes",
@@ -118,7 +118,7 @@ function SidebarMenu({ onLogout, userInfo, isSidebarVisible, onToggle }) {
       label: "Calendario",
       icon: <Calendar3 size={20} />,
       path: "/services-calendar",
-      roles: ["Comercial", "Supervisor Técnico", "Administrador", "Superadministrador"],
+      roles: ["Comercial", "Supervisor Técnico", "Administrador", "Superadministrador", "SST"],
     },
     {
       label: "Mi Calendario",
@@ -136,7 +136,7 @@ function SidebarMenu({ onLogout, userInfo, isSidebarVisible, onToggle }) {
       label: "Servicios",
       icon: <ClipboardCheck size={20} />,
       path: "/services",
-      roles: ["Comercial", "Supervisor Técnico", "Administrador", "Superadministrador"],
+      roles: ["Comercial", "Supervisor Técnico", "Administrador", "Superadministrador", "SST"],
     },
     {
       label: "Servicios",
@@ -154,13 +154,13 @@ function SidebarMenu({ onLogout, userInfo, isSidebarVisible, onToggle }) {
       label: "Inspecciones",
       icon: <FileText size={20} />,
       path: "/inspections",
-      roles: ["Supervisor Técnico", "Administrador", "Superadministrador"],
+      roles: ["Supervisor Técnico", "Administrador", "Superadministrador", "SST"],
     },
     {
       label: "Productos",
       icon: <Eyedropper size={20} />,
       path: "/products",
-      roles: ["Supervisor Técnico", "Administrador", "Superadministrador"],
+      roles: ["Supervisor Técnico", "Administrador", "Superadministrador", "SST"],
     },
     {
       label: "Facturación",
@@ -184,7 +184,7 @@ function SidebarMenu({ onLogout, userInfo, isSidebarVisible, onToggle }) {
       label: "Cerrar Sesión",
       icon: <BoxArrowRight size={20} />,
       action: handleLogout,
-      roles: ["Operario Hogar","Operario", "Cliente", "Comercial", "Supervisor Técnico", "Administrador", "Superadministrador"],
+      roles: ["Operario Hogar","Operario", "Cliente", "Comercial", "Supervisor Técnico", "Administrador", "Superadministrador", "SST"],
     },
   ];
 
