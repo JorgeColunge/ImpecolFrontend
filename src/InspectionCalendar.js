@@ -706,7 +706,6 @@ const InspectionCalendar = () => {
                             phone: clientData?.phone || 'Sin teléfono',
                             color: responsibleData?.color || '#fdd835',
                             backgroundColor: responsibleData?.color,
-                            pestToControl: serviceData.pest_to_control,
                             interventionAreas: serviceData.intervention_areas,
                             value: serviceData.value,
                             companion: serviceData.companion,
@@ -890,7 +889,6 @@ const InspectionCalendar = () => {
             phone: extendedProps.phone || 'Sin teléfono',
             category: extendedProps.category || 'Sin categoría', // Nueva propiedad
             quantyPerMonth: extendedProps.quantyPerMonth || null, // Nueva propiedad
-            pestToControl: extendedProps.pestToControl,
             interventionAreas: extendedProps.interventionAreas,
             value: extendedProps.value,
             companion: extendedProps.companion,
@@ -1561,23 +1559,9 @@ const InspectionCalendar = () => {
 
                             {/* Plagas y Áreas */}
                             <div className="d-flex gap-3">
-                                {/* Plagas */}
-                                <div className="flex-fill bg-white shadow-sm rounded p-3 w-50">
-                                    <h5 className="text-secondary mb-3">
-                                        <Bug className="me-2" /> Plagas
-                                    </h5>
-                                    <p>
-                                        {(() => {
-                                        const pestMatches = selectedEvent.pestToControl.match(/"([^"]+)"/g);
-                                        return pestMatches
-                                            ? pestMatches.map((item) => item.replace(/"/g, "")).join(", ")
-                                            : "No especificado";
-                                        })()}
-                                    </p>
-                                </div>
 
                                 {/* Áreas */}
-                                <div className="flex-fill bg-white shadow-sm rounded p-3 w-50">
+                                <div className="flex-fill bg-white shadow-sm rounded p-3 w-100">
                                     <h5 className="text-secondary mb-3">
                                         <GeoAlt className="me-2" /> Áreas de Intervención
                                     </h5>
