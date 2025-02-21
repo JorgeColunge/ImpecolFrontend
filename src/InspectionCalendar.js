@@ -22,6 +22,7 @@ const InspectionCalendar = () => {
     const [allEvents, setAllEvents] = useState([]); // Todos los eventos cargados
     const [isLoading, setIsLoading] = useState(false); // Nuevo estado para el spinner
     const [mesComp, setMesComp] = useState(moment().format('MM/YYYY')); // Estado para mesComp
+    const [mesCompNom, setMesCompNom] = useState(moment().format('MMMM YYYY')); // Estado para el nombre del mes    
     const [services, setServices] = useState([]);
     const calendarRef = useRef(null);
     const [currentView, setCurrentView] = useState('timeGridWeek');
@@ -37,6 +38,7 @@ const InspectionCalendar = () => {
         },
     ]);    
     const [users, setUsers] = useState([]); // Lista de usuarios
+    const [searchTerm, setSearchTerm] = useState(''); // Estado para el campo de búsqueda
     const [isCollapsed, setIsCollapsed] = useState(true); // Estado de la columna colapsable
     const [selectedUsers, setSelectedUsers] = useState([]); // Lista de usuarios seleccionados
     const [alertMessage, setAlertMessage] = useState('');
@@ -91,17 +93,15 @@ const InspectionCalendar = () => {
     }, [location.search, services]); // Ejecuta el efecto cuando cambie la URL o los servicios
 
     const handleDatesSet = (dateInfo) => {
-        const newMesComp = moment(dateInfo.view.currentStart).format('MM/YYYY'); // Formato mm/aaaa
-        const viewType = dateInfo.view.type; // Tipo de vista actual
-        
-        // Verifica si ha cambiado el mes y actualiza el estado
+        const newMesComp = moment(dateInfo.view.currentStart).format('MM/YYYY'); // Formato MM/YYYY
+        const newMesCompNom = moment(dateInfo.view.currentStart).format('MMMM YYYY'); // Formato "Febrero 2025"
+    
         if (mesComp !== newMesComp) {
             console.log(`🔄 Cambio de mes detectado: ${mesComp} → ${newMesComp}`);
-            setMesComp(newMesComp); // Actualiza el estado y dispara `useEffect`
-        } else {
-            console.log(`📅 Estás viendo el mes de: ${newMesComp}`);
+            setMesComp(newMesComp); // Actualiza el estado de mesComp
+            setMesCompNom(newMesCompNom.charAt(0).toUpperCase() + newMesCompNom.slice(1)); // Capitaliza la primera letra
         }
-    };    
+    };          
 
     useEffect(() => {
         if (showEventModal && selectedEvent) {
@@ -158,8 +158,6 @@ const InspectionCalendar = () => {
 
     const openScheduleModal = async () => {
         try {
-            // Obtener los eventos más recientes de la base de datos
-            await fetchScheduleAndServices();
             // Abrir el modal después de actualizar los datos
             setScheduleModalOpen(true);
         } catch (error) {
@@ -170,8 +168,8 @@ const InspectionCalendar = () => {
 
     const filterEvents = (updatedAllEvents = allEvents) => {
         const filteredEvents = selectedUsers.length
-            ? updatedAllEvents.filter((event) => selectedUsers.includes(event.responsibleId))
-            : updatedAllEvents; // Si no hay usuarios seleccionados, muestra todos
+        ? updatedAllEvents.filter((event) =>
+            event.responsibleId.some((id) => selectedUsers.includes(id))): updatedAllEvents;    
         setEvents(filteredEvents);
     };    
 
@@ -700,7 +698,7 @@ const InspectionCalendar = () => {
                             quantyPerMonth: serviceData.quantity_per_month || null,
                             clientName,
                             clientId: serviceData.client_id,
-                            responsibleId: serviceData.responsible,
+                            responsibleId: [serviceData.responsible, ...(serviceData.companion ? serviceData.companion.replace(/[\{\}"]/g, '').split(',') : [])],
                             responsibleName,
                             address: clientData?.address || 'Sin dirección',
                             phone: clientData?.phone || 'Sin teléfono',
@@ -1123,7 +1121,6 @@ const InspectionCalendar = () => {
                     
                             alert('Eventos agendados con éxito.');
                             handleScheduleModalClose();
-                            window.location.reload();
                         } catch (error) {
                             console.error('Error scheduling service:', error);
                         }finally {
@@ -1157,8 +1154,9 @@ const InspectionCalendar = () => {
                             </Button>
                             {/* Mostrar el mes y año actual */}
                             <span className="fw-bold ms-3" style={{ fontSize: "1.2rem" }}>
-                                {mesComp}
+                            {mesCompNom}
                             </span>
+
                         </div>
 
                         <div>
@@ -1210,80 +1208,105 @@ const InspectionCalendar = () => {
                 </div>
             </div>
             {/* Columna fija de usuarios */}
-            <div
-                className="user-column bg-light shadow-sm px-3"
-                style={{
-                    width: '240px',
-                    height: '87vh',
-                    overflowY: 'auto',
-                    scrollbarWidth: 'none',
-                }}
-            >
-                <div
-                    className={`user-item-all d-flex flex-row align-items-center p-2 mb-3 ${
-                    selectedUsers.length === users.length ? 'selected' : ''
-                    }`}
-                    onClick={toggleSelectAll}
-                    style={{
-                    cursor: 'pointer',
-                    borderRadius: '5px',
-                    }}
-                    >
-                    <div className="flex-grow-1 text-center text-dark fw-bold">Todos</div>
-                    </div>
-                        {Object.entries(groupByRole(users)).map(([role, roleUsers]) => (
-                            <div key={role} className="mb-4">
-                                <h6 className="text-secondary text-uppercase">{role}</h6>
-                                {roleUsers.map((user) => (
-                                    <div
-                                        key={user.id}
-                                        className={`user-item d-flex flex-column align-items-center p-3 ${
-                                            selectedUsers.includes(user.id) ? 'selected' : ''
-                                        }`}
-                                        onClick={() => handleUserSelection(user.id)}
-                                        style={{
-                                            cursor: 'pointer',
-                                            borderRadius: '10px',
-                                            transition: 'background-color 0.2s ease',
-                                            textAlign: 'center',
-                                            position: 'relative',
-                                        }}
-                                    >
-                                        {/* Cuadro de color */}
-                                        <div
-                                            style={{
-                                                position: 'absolute',
-                                                top: '5px',
-                                                right: '5px',
-                                                width: '15px',
-                                                height: '15px',
-                                                borderRadius: '3px',
-                                                backgroundColor: user.color,
-                                            }}
-                                        ></div>
+{/* Columna fija de usuarios */}
+<div
+    className="user-column bg-light shadow-sm px-3"
+    style={{
+        width: '240px',
+        height: '87vh',
+        overflowY: 'auto',
+        scrollbarWidth: 'none',
+    }}
+>
+    {/* Botón "Todos" */}
+    <div
+        className={`user-item-all d-flex flex-row align-items-center p-2 mb-3 ${
+            selectedUsers.length === users.length ? 'selected' : ''
+        }`}
+        onClick={toggleSelectAll}
+        style={{
+            cursor: 'pointer',
+            borderRadius: '5px',
+        }}
+    >
+        <div className="flex-grow-1 text-center text-dark fw-bold">Todos</div>
+    </div>
 
-                                        <img
-                                            src={`${user.image}`}
-                                            alt={user.name}
-                                            className="rounded-circle"
-                                            style={{
-                                                width: '90px',
-                                                height: '90px',
-                                                objectFit: 'cover',
-                                                marginBottom: '5px',
-                                            }}
-                                        />
-                                        <div>
-                                            <strong style={{ fontSize: '14px', color: '#333' }}>{user.name}</strong>
-                                            <br />
-                                            <small style={{ fontSize: '12px', color: '#666' }}>{user.rol}</small>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        ))}
-            </div>
+    {/* 🔍 Campo de búsqueda */}
+    <Form.Control
+    type="text"
+    placeholder="Buscar usuario..."
+    className="mb-3"
+    value={searchTerm} // ✅ Ahora está definido
+    onChange={(e) => setSearchTerm(e.target.value.toLowerCase())} // ✅ Ahora está definido
+/>
 
+    {Object.entries(groupByRole(users))
+        .map(([role, roleUsers]) => {
+            // 🔎 Filtra los usuarios por nombre antes de renderizar
+            const filteredUsers = roleUsers.filter((user) =>
+                searchTerm ? user.name.toLowerCase().includes(searchTerm) : true
+            );            
+
+            // Si no hay usuarios después del filtro, no mostrar el rol
+            if (filteredUsers.length === 0) return null;
+
+            return (
+                <div key={role} className="mb-4">
+                    <h6 className="text-secondary text-uppercase">{role}</h6>
+                    {filteredUsers.map((user) => (
+                        <div
+                            key={user.id}
+                            className={`user-item d-flex flex-column align-items-center p-3 ${
+                                selectedUsers.includes(user.id) ? 'selected' : ''
+                            }`}
+                            onClick={() => handleUserSelection(user.id)}
+                            style={{
+                                cursor: 'pointer',
+                                borderRadius: '10px',
+                                transition: 'background-color 0.2s ease',
+                                textAlign: 'center',
+                                position: 'relative',
+                            }}
+                        >
+                            <div
+                                style={{
+                                    position: 'absolute',
+                                    top: '5px',
+                                    right: '5px',
+                                    width: '15px',
+                                    height: '15px',
+                                    borderRadius: '3px',
+                                    backgroundColor: user.color,
+                                }}
+                            ></div>
+
+                            <img
+                                src={`${user.image}`}
+                                alt={user.name}
+                                className="rounded-circle"
+                                style={{
+                                    width: '90px',
+                                    height: '90px',
+                                    objectFit: 'cover',
+                                    marginBottom: '5px',
+                                }}
+                            />
+                        <div style={{ textAlign: 'center' }}>  {/* 👈 Asegura que el texto esté centrado */}
+                            <strong style={{ fontSize: '14px', color: '#333', display: 'block' }}>
+                                {user.name}  {/* 👈 Nombre en una línea */}
+                            </strong>
+                            <span style={{ fontSize: '14px', color: '#666', display: 'block' }}>
+                                {user.lastname}  {/* 👈 Apellido en otra línea */}
+                            </span>
+                            <small style={{ fontSize: '12px', color: '#888' }}>{user.rol}</small>
+                        </div>
+                        </div>
+                    ))}
+                </div>
+            );
+        })}
+</div>
 
             <Modal show={scheduleModalOpen} onHide={handleScheduleModalClose} backdrop="static" centered>
                 <Modal.Header closeButton>
@@ -1545,7 +1568,7 @@ const InspectionCalendar = () => {
                                     {selectedEvent.category === "Periódico" && (
                                         <p><strong>Cantidad al Mes:</strong> {selectedEvent.quantyPerMonth}</p>
                                     )}
-                                    <p><strong>Valor:</strong> ${selectedEvent.value}</p> {/* Agrega el valor si está disponible */}
+                                    <p><strong>Valor:</strong> {new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(selectedEvent.value)}</p>
                                 </div>
                             </div>
 
@@ -1559,7 +1582,6 @@ const InspectionCalendar = () => {
 
                             {/* Plagas y Áreas */}
                             <div className="d-flex gap-3">
-
                                 {/* Áreas */}
                                 <div className="flex-fill bg-white shadow-sm rounded p-3 w-100">
                                     <h5 className="text-secondary mb-3">

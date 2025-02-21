@@ -1499,7 +1499,7 @@ const handleCloseEditModal = () => {
                   {selectedService.category === "Periódico" && (
                     <p><strong>Cantidad al Mes:</strong> {selectedService.quantity_per_month}</p>
                   )}
-                  <p><strong>Valor:</strong> ${selectedService.value}</p>
+                  <p><strong>Valor:</strong> {new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(selectedService.value)}</p>
                 </div>
               </div>
 
