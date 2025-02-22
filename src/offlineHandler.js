@@ -353,3 +353,57 @@ export const syncRequests = async () => {
   await clearRequests();
   console.log('✅ Sincronización completada y solicitudes eliminadas.');
 };
+
+export const updateRequestsWithNewInspectionId = async (oldId, newId) => {
+  try {
+    const db = await initDB();
+    const tx = db.transaction('requests', 'readwrite');
+    const store = tx.objectStore('requests');
+    const requests = await store.getAll();
+
+    console.log(`🔍 Buscando solicitudes con ID ${oldId} para actualizar...`);
+    console.log("📂 Solicitudes encontradas en IndexedDB:", requests);
+
+    let updated = false; // Para verificar si hubo cambios
+
+    for (const request of requests) {
+      let modified = false;
+
+      // 🔄 **Actualizar el `inspectionId` en el `body`**
+      if (request.body && request.body.inspectionId === oldId) {
+        console.log(`🔄 Actualizando solicitud ${request.id}: Reemplazando ${oldId} con ${newId}`);
+        console.log("📌 Estado ANTES de la modificación:", JSON.stringify(request, null, 2));
+
+        request.body.inspectionId = newId;
+        modified = true;
+      }
+
+      // 🔄 **Actualizar la URL si contiene `oldId`**
+      if (request.url.includes(oldId)) {
+        request.url = request.url.replace(oldId, newId);
+        console.log(`🔄 URL actualizada: ${request.url}`);
+        modified = true;
+      }
+
+      // 🔄 **Guardar solo si hubo modificaciones**
+      if (modified) {
+        await store.put(request);
+        updated = true;
+        console.log("📌 Estado DESPUÉS de la modificación:", JSON.stringify(request, null, 2));
+      }
+    }
+
+    await tx.done;
+    console.log(`✅ Todas las solicitudes con ID ${oldId} han sido actualizadas con el nuevo ID ${newId}.`);
+
+    // **Si hubo actualizaciones, iniciar la sincronización**
+    if (updated) {
+      console.log("🔄 Iniciando sincronización de solicitudes actualizadas...");
+      await syncRequests();
+    } else {
+      console.log("✅ No hubo solicitudes para actualizar, no se requiere sincronización.");
+    }
+  } catch (error) {
+    console.error(`❌ Error al actualizar las solicitudes con nuevo ID ${newId}:`, error);
+  }
+};

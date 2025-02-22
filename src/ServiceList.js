@@ -26,7 +26,6 @@ function ServiceList() {
   const [showEditServiceType, setShowEditServiceType] = useState(false); // Nuevo estado para el colapso en edición
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [clientNames, setClientNames] = useState({});
-  const [showPestOptions, setShowPestOptions] = useState(false);
   const [showInterventionAreasOptions, setShowInterventionAreasOptions] = useState(false);
   const [newInspection, setNewInspection] = useState({
     inspection_type: [], // Tipos de inspección seleccionados
@@ -36,7 +35,6 @@ function ServiceList() {
   const [editService, setEditService] = useState({
     service_type: [],
     description: '',
-    pest_to_control: '',
     intervention_areas: [],
     responsible: '',
     category: '',
@@ -80,7 +78,6 @@ function ServiceList() {
   const [newService, setNewService] = useState({
     service_type: [],
     description: '',
-    pest_to_control: '',
     intervention_areas: [],
     responsible: '',
     category: '',
@@ -405,20 +402,11 @@ const handleServiceTypeChange = (e) => {
 
 const handleSaveChanges = async () => {
   try {
-      const interventionAreas = editService.intervention_areas.filter(
-          (area) => area !== "Otro"
-      );
-
-      if (editService.customInterventionArea.trim()) {
-          interventionAreas.push(editService.customInterventionArea.trim());
-      }
-
       const formattedEditService = {
         ...editService,
-        intervention_areas: `{${interventionAreas.map((a) => `"${a}"`).join(",")}}`,
-        pest_to_control: `{${editService.pest_to_control.map((p) => `"${p}"`).join(",")}}`,
-        service_type: `{${editService.service_type.map((s) => `"${s}"`).join(",")}}`,
-        companion: `{${editService.companion.map((c) => `"${c}"`).join(",")}}`, 
+        intervention_areas: `{${(editService.intervention_areas || []).map((a) => `"${a}"`).join(",")}}`,
+        service_type: `{${(editService.service_type || []).map((s) => `"${s}"`).join(",")}}`,
+        companion: `{${(editService.companion || []).map((c) => `"${c}"`).join(",")}}`, 
         customInterventionArea: "",
     };
 
@@ -717,7 +705,6 @@ const handleCloseAddServiceModal = () => {
   setNewService({
     service_type: [],
     description: '',
-    pest_to_control: [],
     intervention_areas: [],
     customInterventionArea: '',
     responsible: '',
@@ -738,7 +725,6 @@ const handleCloseEditModal = () => {
   setEditService({
     service_type: [],
     description: '',
-    pest_to_control: '',
     intervention_areas: '',
     responsible: '',
     category: '',
@@ -1275,31 +1261,29 @@ const handleCloseEditModal = () => {
                 />
               </Form.Group>
 
-              {/* Áreas de Intervención */}
-              <Form.Group className="mt-3">
-                <Form.Label style={{ fontWeight: "bold" }}>Áreas de Intervención</Form.Label>
-                <div className="d-flex flex-wrap">
-                  {interventionAreaOptions.map((area, index) => (
-                    <div key={index} className="col-4 mb-2">
-                      <Form.Check
-                        type="checkbox"
-                        label={<span style={{ fontSize: "0.8rem" }}>{area}</span>} // Tamaño reducido
-                        value={area}
-                        checked={editService.intervention_areas.includes(area)}
-                        onChange={(e) => {
-                          const { value, checked } = e.target;
-                          setEditService((prevService) => ({
-                            ...prevService,
-                            intervention_areas: checked
-                              ? [...prevService.intervention_areas, value]
-                              : prevService.intervention_areas.filter((a) => a !== value),
-                          }));
-                        }}
-                      />
+               {/* Áreas de Intervención */}
+              {editService.service_type.length > 0 && // Verifica que haya al menos un tipo seleccionado
+                !editService.service_type.includes("Hogar") && ( // Asegúrate de que no sea "Hogar"
+                  <Form.Group className="mt-3">
+                    <Form.Label style={{ fontWeight: "bold" }}>Áreas de Intervención</Form.Label>
+                    <div className="d-flex flex-wrap">
+                      {editService.service_type
+                        .flatMap((type) => serviceAreaMapping[type] || []) // Obtiene las áreas correspondientes
+                        .filter((area, index, self) => self.indexOf(area) === index) // Elimina duplicados
+                        .map((area, index) => (
+                          <div key={index} className="col-4 mb-2">
+                            <Form.Check
+                              type="checkbox"
+                              label={<span style={{ fontSize: "0.8rem" }}>{area}</span>}
+                              value={area}
+                              checked={editService.intervention_areas.includes(area)}
+                              onChange={handleInterventionAreasChange}
+                            />
+                          </div>
+                        ))}
                     </div>
-                  ))}
-                </div>
-              </Form.Group>
+                  </Form.Group>
+                )}
 
               {/* Responsable */}
               <Form.Group className="mt-3">

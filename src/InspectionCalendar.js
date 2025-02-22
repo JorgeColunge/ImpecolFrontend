@@ -22,7 +22,7 @@ const InspectionCalendar = () => {
     const [allEvents, setAllEvents] = useState([]); // Todos los eventos cargados
     const [isLoading, setIsLoading] = useState(false); // Nuevo estado para el spinner
     const [mesComp, setMesComp] = useState(moment().format('MM/YYYY')); // Estado para mesComp
-    const [mesCompNom, setMesCompNom] = useState(moment().format('MMMM YYYY')); // Estado para el nombre del mes    
+    const [mesCompNom, setMesCompNom] = useState(moment().format('MMMM YYYY').charAt(0).toUpperCase() + moment().format('MMMM YYYY').slice(1)); // Estado para el nombre del mes    
     const [services, setServices] = useState([]);
     const calendarRef = useRef(null);
     const [currentView, setCurrentView] = useState('timeGridWeek');

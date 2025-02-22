@@ -1,6 +1,7 @@
 import { openDB } from 'idb';
 import api from './Api';
 import axios from 'axios';
+import { updateRequestsWithNewInspectionId } from './offlineHandler';
 
 // Solicitar almacenamiento persistente y mostrar detalles de almacenamiento
 const requestPersistentStorage = async () => {
@@ -649,8 +650,8 @@ export const syncPendingInspections = async () => {
       try {
         const response = await axios.post(`${process.env.REACT_APP_API_URL}/api/inspections`, inspection);
 
-        if (response.data.success && response.data.newId) {
-          const newId = response.data.newId; // ID generado por el servidor
+        if (response.data.success && response.data.inspection.id) {
+          const newId = response.data.inspection.id; // ID generado por el servidor
           console.log(`✅ Inspección ${inspection.id} sincronizada con nuevo ID: ${newId}`);
 
           // 🛢️ Eliminar inspección sincronizada de `pending_inspections`
@@ -666,6 +667,10 @@ export const syncPendingInspections = async () => {
           await updateTx.done;
 
           console.log(`✅ Inspección con ID ${inspection.id} actualizada a ${newId} en IndexedDB.`);
+
+          // 🔄 ACTUALIZAR TODAS LAS SOLICITUDES QUE USABAN EL ID PROVISIONAL
+          await updateRequestsWithNewInspectionId(inspection.id, newId);
+
         } else {
           console.error(`❌ Error al sincronizar inspección ${inspection.id}:`, response.data.message);
         }
