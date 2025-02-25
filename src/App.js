@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { SocketProvider } from './SocketContext';
 import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-dom';
+import moment from 'moment-timezone';
 import Landing from './Landing';
 import Login from './Login';
 import Register from './Register';
@@ -36,7 +37,7 @@ import CompanyStations from './CompanyStations';
 import UnsavedChangesModal from './UnsavedChangesModal';
 import { UnsavedChangesProvider } from './UnsavedChangesContext';
 import { syncRequests } from './offlineHandler';
-import { saveUsers, getUsers, syncUsers, syncUsersOnStart } from './indexedDBHandler';
+import { saveUsers, getUsers, syncUsers, syncUsersOnStart, saveServices, saveEvents, saveTechnicians, saveInspections, syncPendingInspections } from './indexedDBHandler';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import './App.css';
 
@@ -51,6 +52,7 @@ function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isSidebarVisible, setIsSidebarVisible] = useState(window.innerWidth > 768);
   const [notifications, setNotifications] = useState([]);
+  const [services, setServices] = useState([]);
 
   useEffect(() => {
     const updateOnlineStatus = () => setIsOnline(navigator.onLine);
@@ -66,7 +68,7 @@ function App() {
 
   useEffect(() => {
     const handleSyncUpdate = (event) => {
-      setSyncCount(event.detail); // Actualiza el estado con el nuevo valor
+      setSyncCount(event.detail);
     };
   
     window.addEventListener('syncUpdate', handleSyncUpdate);
@@ -77,7 +79,6 @@ function App() {
   }, []);
 
   useEffect(() => {
-    // Inicializar el contador de sincronización en 0 al montar la aplicación
     console.log('🔄 Inicializando contador de sincronización...');
     localStorage.setItem('sync', '0');
   
@@ -89,93 +90,244 @@ function App() {
     // Manejar el cambio de tamaño de ventana
     useEffect(() => {
       const handleResize = () => {
-        setIsSidebarVisible(window.innerWidth > 768); // Cambia la visibilidad del Sidebar según el tamaño
+        setIsSidebarVisible(window.innerWidth > 768);
       };
   
-      window.addEventListener('resize', handleResize); // Detecta cambios en el tamaño de la ventana
+      window.addEventListener('resize', handleResize);
       return () => {
-        window.removeEventListener('resize', handleResize); // Limpia el evento al desmontar
+        window.removeEventListener('resize', handleResize);
       };
     }, []);
 
     useEffect(() => {
-      syncUsersOnStart(); // Sincroniza usuarios al iniciar la app
+      syncUsersOnStart();
+      fetchMyServices();
+      fetchAllInspections(services);
+      fetchTechnicians();
     }, []);
 
-
-  const handleSidebarToggle = (isOpen) => {
-    setIsSidebarOpen(isOpen);
-  };
-
-  const handleSync = () => {
-    console.log('Sincronizando...');
-  };
-
-  const handleNotify = () => {
-    console.log('Notificación');
-  };
-
-  useEffect(() => {
-    const handleOnline = () => {
-      console.log('Conexión restaurada. Iniciando sincronización...');
-      syncRequests();
-      syncUsers();
-    };
-
-    window.addEventListener('online', handleOnline);
-
-    return () => {
-      window.removeEventListener('online', handleOnline);
-    };
-  }, []);
-
-
-  useEffect(() => {
-    const fetchNotifications = async () => {
+    // 📌 Cargar servicios desde IndexedDB o API
+    const fetchMyServices = async () => {
       try {
-        const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/notifications/${userId}`);
-        setNotifications(response.data.notifications);
+        if (navigator.onLine) {
+          console.log("🌐 Modo online: obteniendo servicios desde el servidor...");
+
+          const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/services`);
+          const userServices = response.data.filter(service => {
+            const isResponsible = service.responsible === userId;
+            const isCompanion = service.companion?.includes(`"${userId}"`);
+            return isResponsible || isCompanion;
+          });
+
+          console.log("✅ Servicios filtrados para el usuario:", userServices);
+
+          // Obtener nombres de los clientes
+          const clientData = {};
+          for (const service of userServices) {
+            if (service.client_id && !clientData[service.client_id]) {
+              try {
+                const clientResponse = await axios.get(`${process.env.REACT_APP_API_URL}/api/clients/${service.client_id}`);
+                clientData[service.client_id] = clientResponse.data.name;
+              } catch (error) {
+                console.error(`⚠️ Error obteniendo cliente ${service.client_id}:`, error);
+              }
+            }
+          }
+
+          // Guardar en IndexedDB
+          await saveServices(userServices, clientData);
+          console.log("📥 Servicios y clientes almacenados en IndexedDB.");
+          setServices(userServices);
+        } else {
+          console.log("📴 Modo offline: obtener datos desde IndexedDB...");
+        }
       } catch (error) {
-        console.error("Error fetching notifications:", error);
+        console.error("❌ Error al obtener servicios:", error);
       }
     };
+
+    const fetchTechnicians = async () => {
+      try {
+          if (navigator.onLine) {
+              console.log("🌐 Modo online: obteniendo técnicos desde el servidor...");
+              const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/users?role=Technician`);
+
+              console.log("✅ Respuesta de la API de técnicos:", response.data);
+
+              // Guardar técnicos en IndexedDB para modo offline
+              await saveTechnicians(response.data);
+          } else {
+              console.log("📴 Modo offline: obtener técnicos desde IndexedDB...");
+          }
+
+      } catch (error) {
+          console.error("❌ Error al obtener técnicos:", error);
+      }
+  };
+
+  const fetchAllInspections = async (services) => {
+    try {
+        if (navigator.onLine) {
+            console.log("🌐 Modo online: obteniendo inspecciones de todos los servicios...");
+            
+            const inspectionsByService = {};
+            
+            for (const service of services) {
+                try {
+                    const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/inspections_service/${service.id}`);
+                    console.log(`✅ Inspecciones para servicio ${service.id}:`, response.data);
+
+                    const formattedInspections = response.data.map((inspection) => ({
+                        ...inspection,
+                        date: moment(inspection.date).format("DD/MM/YYYY"),
+                        time: inspection.time ? moment(inspection.time, "HH:mm:ss").format("HH:mm") : "--",
+                        exit_time: inspection.exit_time ? moment(inspection.exit_time, "HH:mm:ss").format("HH:mm") : "--",
+                        observations: inspection.observations || "Sin observaciones",
+                    }));
+
+                    inspectionsByService[service.id] = formattedInspections;
+                } catch (error) {
+                    console.error(`❌ Error obteniendo inspecciones para el servicio ${service.id}:`, error);
+                    inspectionsByService[service.id] = []; // Si hay error, asegurarse de que exista la clave
+                }
+            }
+
+            // Guardar en IndexedDB para modo offline
+            await saveInspections(inspectionsByService);
+
+        } else {
+            console.log("📴 Modo offline: obtener inspecciones desde IndexedDB...");
+        }
+
+    } catch (error) {
+        console.error("❌ Error cargando inspecciones:", error);
+    }
+  };
+
+    useEffect(() => {
+      const fetchScheduledEvents = async () => {
+          try {
+              const userServiceIds = services.map(service => service.id).join(",");
   
-    if (userId) {
-      fetchNotifications();
-    }
-  }, [userId]);
+              console.log("📌 Lista de service_id del usuario:", userServiceIds);
+  
+              if (!userServiceIds) {
+                  console.log("❌ No hay servicios asignados al usuario. No se solicitarán eventos.");
+                  return;
+              }
+  
+              if (navigator.onLine) {
+                  console.log("🌐 Modo online: obteniendo eventos desde el servidor...");
+                  const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/service-service-schedule?serviceIds=${userServiceIds}`);
+  
+                  console.log("✅ Respuesta de la API de eventos:", response.data);
+  
+                  // Guardar eventos en IndexedDB para uso offline
+                  await saveEvents(response.data);
+  
+              } else {
+                  console.log("📴 Modo offline: obteniendo eventos desde IndexedDB...");
+              }
+  
+          } catch (error) {
+              console.error("❌ Error al obtener eventos programados:", error);
+          }
+      };
+  
+      if (services.length > 0) {
+          console.log("📢 Se han obtenido servicios, procediendo a solicitar eventos...");
+          fetchScheduledEvents();
+      } else {
+          console.log("⚠️ Aún no hay servicios cargados, esperando actualización...");
+      }
+  }, [services]); // Se ejecuta cuando los servicios cambian
 
-  useEffect(() => {
-    const storedUserInfo = localStorage.getItem("user_info");
-    if (storedUserInfo) {
-      setUserInfo(JSON.parse(storedUserInfo));
+    const handleSidebarToggle = (isOpen) => {
+      setIsSidebarOpen(isOpen);
+    };
+
+    const handleSync = () => {
+      console.log('Sincronizando...');
+    };
+
+    const handleNotify = () => {
+      console.log('Notificación');
+    };
+
+    useEffect(() => {
+      const handleOnline = async () => {
+        console.log('🌐 Conexión restaurada. Sincronizando inspecciones pendientes...');
+        
+        try {
+          await syncPendingInspections();
+          console.log("✅ Inspecciones sincronizadas con éxito.");
+          
+          console.log("📡 Sincronizando solicitudes...");
+          await syncRequests();
+          console.log("✅ Solicitudes sincronizadas.");
+          
+          console.log("👤 Sincronizando usuarios...");
+          await syncUsers();
+          console.log("✅ Usuarios sincronizados.");
+    
+        } catch (error) {
+          console.error("❌ Error en la sincronización:", error);
+        }
+      };
+    
+      window.addEventListener('online', handleOnline);
+    
+      return () => {
+        window.removeEventListener('online', handleOnline);
+      };
+    }, []);
+    
+    useEffect(() => {
+      const fetchNotifications = async () => {
+        try {
+          const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/notifications/${userId}`);
+          setNotifications(response.data.notifications);
+        } catch (error) {
+          console.error("Error fetching notifications:", error);
+        }
+      };
+    
+      if (userId) {
+        fetchNotifications();
+      }
+    }, [userId]);
+
+    useEffect(() => {
+      const storedUserInfo = localStorage.getItem("user_info");
+      if (storedUserInfo) {
+        setUserInfo(JSON.parse(storedUserInfo));
+        setIsLoggedIn(true);
+      }
+      setLoading(false);
+    }, []);
+
+    const handleLogin = (userData) => {
       setIsLoggedIn(true);
-    }
-    setLoading(false);
-  }, []);
+      setUserInfo(userData);
+      localStorage.setItem("user_info", JSON.stringify(userData));
+    };
 
-  const handleLogin = (userData) => {
-    setIsLoggedIn(true);
-    setUserInfo(userData);
-    localStorage.setItem("user_info", JSON.stringify(userData));
-  };
+    const handleLogout = () => {
+      setIsLoggedIn(false);
+      setUserInfo(null);
+      localStorage.removeItem("user_info");
+    };
 
-  const handleLogout = () => {
-    setIsLoggedIn(false);
-    setUserInfo(null);
-    localStorage.removeItem("user_info");
-  };
+    const handleProfileUpdate = (updatedUserInfo) => {
+      setUserInfo(updatedUserInfo);
+      localStorage.setItem('user_info', JSON.stringify(updatedUserInfo));
+    };  
 
-  const handleProfileUpdate = (updatedUserInfo) => {
-    setUserInfo(updatedUserInfo); // Actualiza el estado global
-    localStorage.setItem('user_info', JSON.stringify(updatedUserInfo)); // Opcional: actualiza localStorage
-  };  
+    if (loading) return <div className="text-center mt-5">Cargando...</div>;
 
-  if (loading) return <div className="text-center mt-5">Cargando...</div>;
-
-  const isAuthorized = (allowedRoles) => {
-    return isLoggedIn && userInfo && allowedRoles.includes(userInfo.rol);
-  };  
+    const isAuthorized = (allowedRoles) => {
+      return isLoggedIn && userInfo && allowedRoles.includes(userInfo.rol);
+    };  
 
   return (
     <SocketProvider>
