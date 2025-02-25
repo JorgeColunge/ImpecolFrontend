@@ -541,7 +541,6 @@ const MyServicesCalendar = () => {
                                         />
                                     </div>
                                     <p><strong>Tipo de Servicio:</strong> {selectedEvent.serviceType.replace(/[\{\}"]/g, '').split(',').join(', ')}</p>
-                                    <p><strong>Empresa:</strong> {selectedEvent.clientName}</p>
                                     <div className='p-0 m-0 d-flex'>
                                         <p className="my-1"><strong>Empresa:</strong> {selectedEvent.clientName || "Cliente Desconocido"}</p>
                                         {selectedEvent.clientId && (
@@ -582,7 +581,6 @@ const MyServicesCalendar = () => {
                                     {selectedEvent.category === "Periódico" && (
                                         <p><strong>Cantidad al Mes:</strong> {selectedEvent.quantyPerMonth}</p>
                                     )}
-                                    <p><strong>Valor:</strong> ${selectedEvent.value}</p>
                                 </div>
                             </div>
 
@@ -596,23 +594,8 @@ const MyServicesCalendar = () => {
 
                             {/* Plagas y Áreas */}
                             <div className="d-flex gap-3">
-                                {/* Plagas */}
-                                <div className="flex-fill bg-white shadow-sm rounded p-3 w-50">
-                                    <h5 className="text-secondary mb-3">
-                                        <Bug className="me-2" /> Plagas
-                                    </h5>
-                                    <p>
-                                        {(() => {
-                                        const pestMatches = selectedEvent.pestToControl.match(/"([^"]+)"/g);
-                                        return pestMatches
-                                            ? pestMatches.map((item) => item.replace(/"/g, "")).join(", ")
-                                            : "No especificado";
-                                        })()}
-                                    </p>
-                                </div>
-
                                 {/* Áreas */}
-                                <div className="flex-fill bg-white shadow-sm rounded p-3 w-50">
+                                <div className="flex-fill bg-white shadow-sm rounded p-3 w-100">
                                     <h5 className="text-secondary mb-3">
                                         <GeoAlt className="me-2" /> Áreas de Intervención
                                     </h5>

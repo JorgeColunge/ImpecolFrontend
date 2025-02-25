@@ -403,26 +403,18 @@ function Inspections() {
                     <div className="d-flex align-items-center mb-2">
                       <Calendar className="ms-auto me-2 text-success" />
                       <span className="me-auto">
-                        {new Date(inspection.date).toLocaleDateString("es-ES")}
+                        {moment.utc(inspection.date).format("DD/MM/YYYY")}
                       </span>
                     </div>
                     <div className="d-flex align-items-center mb-2">
                       <Clock className="ms-auto me-2 text-warning" />
-                      <span className="me-auto">
-                        {new Date(`1970-01-01T${inspection.time}Z`).toLocaleTimeString("es-ES", {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                          hour12: true,
-                        })}
+                      <span className="me-1">
+                        {moment.utc(inspection.time, "HH:mm:ss").format("hh:mm A")}
                       </span>
                       <span className="ms-0 me-auto">
                         -{" "}
                         {inspection.exit_time
-                          ? new Date(`1970-01-01T${inspection.exit_time}Z`).toLocaleTimeString("es-ES", {
-                              hour: "2-digit",
-                              minute: "2-digit",
-                              hour12: true,
-                            })
+                          ? moment.utc(inspection.exit_time, "HH:mm:ss").format("hh:mm A")
                           : "No registrada"}
                       </span>
                     </div>

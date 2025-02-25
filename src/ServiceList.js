@@ -347,7 +347,7 @@ const handleEditClick = (service) => {
   setEditService({
     ...service,
     service_type: parseField(service.service_type),
-    duration: parseField(service.duration),
+    duration: service.duration ? parseInt(service.duration, 10) : 4,
     intervention_areas: parseField(service.intervention_areas),
     companion: parseField(service.companion),
   });
@@ -401,6 +401,13 @@ const handleServiceTypeChange = (e) => {
 };
 
 const handleSaveChanges = async () => {
+  if (newService.service_type.includes("Hogar")) {
+    const duration = parseInt(editService.duration, 10);
+    if (duration < 4 || duration > 8) {
+      showNotification("Error", "La duración debe estar entre 4 y 8 horas para servicios de tipo Hogar.");
+      return;
+    }
+  }
   try {
       const formattedEditService = {
         ...editService,
@@ -408,6 +415,7 @@ const handleSaveChanges = async () => {
         service_type: `{${(editService.service_type || []).map((s) => `"${s}"`).join(",")}}`,
         companion: `{${(editService.companion || []).map((c) => `"${c}"`).join(",")}}`, 
         customInterventionArea: "",
+        duration: editService.duration,
     };
 
 
@@ -757,8 +765,9 @@ const handleCloseEditModal = () => {
       quantity_per_month: newService.quantity_per_month || null,
       client_id: newService.client_id || null,
       value: newService.value || null,
-      responsible: newService.responsible || null, // Asegúrate de incluir responsible
-      companion: newService.companion || [],       // Asegúrate de incluir companion
+      responsible: newService.responsible || null,
+      companion: newService.companion || [],
+      duration: newService.duration,
     };
   
     try {
@@ -1339,20 +1348,26 @@ const handleCloseEditModal = () => {
                 </Form.Group>
               )}
 
-            <Form.Group className="mt-3">
-              <Form.Label style={{ fontWeight: "bold" }}>Duración</Form.Label>
-              <Form.Control
-                type="number"
-                name="duration"
-                value={newService.duration}
-                min="4" // Mínimo permitido
-                max="8" // Máximo permitido
-                onChange={(e) => {
-                  const value = Math.max(4, Math.min(8, parseInt(e.target.value, 10))); // Restringir entre 4 y 8
-                  setNewService({ ...newService, duration: value });
-                }}
-              />
-            </Form.Group>
+              <Form.Group className="mt-3">
+                <Form.Label style={{ fontWeight: "bold" }}>Duración</Form.Label>
+                <Form.Control
+                  type="number"
+                  name="duration"
+                  value={editService.duration} // Evita que el campo quede vacío o NaN
+                  min="4" 
+                  max="8"
+                  onChange={(e) => {
+                    const inputValue = e.target.value;
+                    if (inputValue === "") {
+                      // Permite borrar el valor y evitar NaN
+                      setEditService({ ...editService, duration: "" });
+                      return;
+                    }
+                    const value = Math.max(4, Math.min(8, parseInt(inputValue, 10) || 4)); // Asegura un número válido
+                    setEditService({ ...editService, duration: value });
+                  }}
+                />
+              </Form.Group>
 
               {/* Valor */}
               <Form.Group className="mt-3">
