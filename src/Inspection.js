@@ -11,6 +11,7 @@ import { ArrowDownSquare, ArrowUpSquare, Eye, FileEarmarkArrowDown, FileEarmarkP
 import  {useUnsavedChanges} from './UnsavedChangesContext'
 import QrScannerComponent from './QrScannerComponent';
 import moment from 'moment';
+import { useSocket } from './SocketContext';
 
 function Inspection() {
   const storedUserInfo = JSON.parse(localStorage.getItem("user_info"));
@@ -74,6 +75,60 @@ function Inspection() {
   const [isExecuting, setIsExecuting] = useState(false);
   const [actions, setActions] = useState([]);
   const navigate = useNavigate();
+
+  const socket = useSocket(); // Obtenemos el socket
+
+useEffect(() => {
+  if (socket) {
+    socket.on("inspection_synced", ({ oldId, newId }) => {
+      console.log(`🔄 La inspección ${oldId} ha sido actualizada a ${newId}`);
+
+      if (inspectionId === oldId) {
+        console.log(`✅ Actualizando ID de la inspección actual: ${oldId} → ${newId}`);
+
+        // Actualizamos la URL sin recargar la página
+        navigate(`/inspection/${newId}`, { replace: true });
+
+        // Actualizamos el estado para reflejar el nuevo ID
+        setInspectionData((prevData) => ({
+          ...prevData,
+          id: newId, // Reemplazamos el ID viejo con el nuevo
+        }));
+
+        // Reemplazamos en los hallazgos y firmas si es necesario
+        setFindingsByType((prevFindings) => {
+          const updatedFindings = { ...prevFindings };
+          for (const type in updatedFindings) {
+            updatedFindings[type] = updatedFindings[type].map(finding =>
+              finding.inspection_id === oldId ? { ...finding, inspection_id: newId } : finding
+            );
+          }
+          return updatedFindings;
+        });
+
+        setClientStations((prevStations) => {
+          const updatedStations = { ...prevStations };
+          for (const stationId in updatedStations) {
+            if (updatedStations[stationId].inspection_id === oldId) {
+              updatedStations[stationId].inspection_id = newId;
+            }
+          }
+          return updatedStations;
+        });
+
+        setActions((prevActions) =>
+          prevActions.map((action) =>
+            action.inspection_id === oldId ? { ...action, inspection_id: newId } : action
+          )
+        );
+      }
+    });
+
+    return () => {
+      socket.off("inspection_synced");
+    };
+  }
+}, [socket, inspectionId, navigate]);
 
   // Abrir el modal
   const handleOpenConvertToPdfModal = () => {

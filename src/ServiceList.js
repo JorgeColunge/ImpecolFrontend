@@ -1538,32 +1538,41 @@ const handleCloseEditModal = () => {
                   <Clipboard className="me-2" /> Inspecciones
                 </h5>
                 {inspections.length > 0 ? (
-                  <div className="custom-table-container">
-                  <table className="custom-table">
-                    <thead>
-                      <tr>
-                        <th>ID</th>
-                        <th>Fecha</th>
-                        <th>Inicio</th>
-                        <th>Finalización</th>
-                        <th>Observaciones</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {inspections.map((inspection) => (
-                        <tr key={inspection.id} onClick={() => handleInspectionClick(inspection)}>
-                          <td>{inspection.id}</td>
-                          <td>{inspection.date}</td>
-                          <td>{inspection.time}</td>
-                          <td>{inspection.exit_time}</td>
-                          <td>{inspection.observations}</td>
+                  <div className="custom-table-container" style={{ maxHeight: "300px", overflowY: "auto" }}>
+                    <table className="custom-table">
+                      <thead>
+                        <tr>
+                          <th>ID</th>
+                          <th>Fecha</th>
+                          <th>Creado por</th>
+                          <th>Inicio</th>
+                          <th>Finalización</th>
+                          <th>Observaciones</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>                  
+                      </thead>
+                      <tbody>
+                        {inspections
+                          .slice() // Clonamos para no mutar el estado original
+                          .sort((a, b) => {
+                            const dateTimeA = new Date(`${a.date.split('/').reverse().join('-')}T${a.time}`);
+                            const dateTimeB = new Date(`${b.date.split('/').reverse().join('-')}T${b.time}`);
+                            return dateTimeB - dateTimeA; // Orden descendente (más recientes primero)
+                          })
+                          .map((inspection) => (
+                            <tr key={inspection.id} onClick={() => handleInspectionClick(inspection)}>
+                              <td>{inspection.id}</td>
+                              <td>{inspection.date}</td>
+                              <td>{technicians.find((tech) => tech.id === inspection.created_by)?.name || "No asignado"}</td>
+                              <td>{inspection.time}</td>
+                              <td>{inspection.exit_time}</td>
+                              <td>{inspection.observations}</td>
+                            </tr>
+                          ))}
+                      </tbody>
+                    </table>
+                  </div>
                 ) : (
-                  <p>No hay inspecciones registradas para este servicio.</p>
+                  <p>No hay inspecciones registradas.</p>
                 )}
               </div>
 

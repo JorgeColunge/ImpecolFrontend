@@ -131,6 +131,44 @@ function MyServices() {
   };  
 
   useEffect(() => {
+    if (socket) {
+      socket.on("inspection_synced", ({ oldId, newId }) => {
+        console.log(`🔄 La inspección ${oldId} ha sido actualizada a ${newId}`);
+  
+        setInspections((prevInspections) => {
+          // Crear una copia del estado de inspecciones
+          const updatedInspections = { ...prevInspections };
+  
+          // Buscar en qué servicio está la inspección con oldId
+          for (const serviceId in updatedInspections) {
+            const inspectionsList = updatedInspections[serviceId];
+  
+            // Buscar la inspección que tiene el oldId
+            const index = inspectionsList.findIndex((inspection) => inspection.id === oldId);
+  
+            if (index !== -1) {
+              // Si encontramos la inspección, actualizamos su ID
+              updatedInspections[serviceId][index] = {
+                ...inspectionsList[index],
+                id: newId, // Reemplazar ID viejo con el nuevo
+              };
+  
+              console.log(`✅ Inspección ${oldId} actualizada a ${newId} en el frontend.`);
+              break; // No necesitamos seguir buscando
+            }
+          }
+  
+          return updatedInspections; // Devolvemos la versión actualizada
+        });
+      });
+  
+      return () => {
+        socket.off("inspection_synced");
+      };
+    }
+  }, [socket]);
+
+  useEffect(() => {
     const fetchMyServices = async () => {
       try {
         if (navigator.onLine) {
@@ -461,6 +499,7 @@ useEffect(() => {
       time: moment().format("HH:mm:ss"),
       observations: newInspection.observations || "Sin observaciones",
       status: "pending",  // Indica que está pendiente de sincronización
+      createdBy: userId,
     };
   
     console.log("📋 Inspección generada:", inspectionData);
@@ -724,30 +763,40 @@ useEffect(() => {
                   <Clipboard className="me-2" /> Inspecciones
                 </h5>
                 {inspections[selectedService.id] && inspections[selectedService.id].length > 0 ? (
-                  <div className="custom-table-container">
-                  <table className="custom-table">
-                    <thead>
-                      <tr>
-                        <th>ID</th>
-                        <th>Fecha</th>
-                        <th>Inicio</th>
-                        <th>Finalización</th>
-                        <th>Observaciones</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {inspections[selectedService.id].map((inspection) => (
-                        <tr key={inspection.id} onClick={() => navigate(`/inspection/${inspection.id}`)}>
-                          <td>{inspection.id}</td>
-                          <td>{inspection.date}</td>
-                          <td>{inspection.time}</td>
-                          <td>{inspection.exit_time}</td>
-                          <td>{inspection.observations}</td>
+                  <div className="custom-table-container" style={{ maxHeight: "300px", overflowY: "auto" }}>
+                    <table className="custom-table">
+                      <thead>
+                        <tr>
+                          <th>ID</th>
+                          <th>Fecha</th>
+                          <th>Creada por</th>
+                          <th>Inicio</th>
+                          <th>Finalización</th>
+                          <th>Observaciones</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>                  
+                      </thead>
+                      <tbody>
+                        {inspections[selectedService.id]
+                          .slice() // Clonamos el array para evitar modificar el estado original
+                          .sort((a, b) => {
+                            // Convertimos la fecha y la hora en un objeto Date para cada inspección
+                            const dateTimeA = new Date(`${a.date.split('/').reverse().join('-')}T${a.time}`);
+                            const dateTimeB = new Date(`${b.date.split('/').reverse().join('-')}T${b.time}`);
+                            return dateTimeB - dateTimeA; // Orden descendente (más recientes primero)
+                          })
+                          .map((inspection) => (
+                            <tr key={inspection.id} onClick={() => navigate(`/inspection/${inspection.id}`)}>
+                              <td>{inspection.id}</td>
+                              <td>{inspection.date}</td>
+                              <td>{technicians.find((tech) => tech.id === inspection.created_by)?.name || "No asignado"}</td>
+                              <td>{inspection.time}</td>
+                              <td>{inspection.exit_time}</td>
+                              <td>{inspection.observations}</td>
+                            </tr>
+                          ))}
+                      </tbody>
+                    </table>
+                  </div>
                 ) : (
                   <p>No hay inspecciones registradas para este servicio.</p>
                 )}

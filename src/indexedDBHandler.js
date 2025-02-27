@@ -671,6 +671,13 @@ export const syncPendingInspections = async () => {
           // 🔄 ACTUALIZAR TODAS LAS SOLICITUDES QUE USABAN EL ID PROVISIONAL
           await updateRequestsWithNewInspectionId(inspection.id, newId);
 
+          // 📡 Enviar solicitud al backend para que emita el evento del socket
+          await axios.post(`${process.env.REACT_APP_API_URL}/api/emit-inspection-update`, {
+            oldId: inspection.id,
+            newId
+          });
+          console.log(`📡 Solicitud enviada al backend para emitir evento con oldId: ${inspection.id}, newId: ${newId}`);
+
         } else {
           console.error(`❌ Error al sincronizar inspección ${inspection.id}:`, response.data.message);
         }
