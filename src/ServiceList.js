@@ -671,6 +671,7 @@ const handleSaveChanges = async () => {
         service_id: selectedService.id,
         date: moment().format("YYYY-MM-DD"), // Fecha actual
         time: moment().format("HH:mm:ss"), // Hora actual
+        createdBy: userId,
     };
 
     try {
