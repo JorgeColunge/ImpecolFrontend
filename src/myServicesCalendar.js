@@ -275,7 +275,7 @@ const MyServicesCalendar = () => {
     
             const formattedInspections = filteredInspections.map((inspection) => ({
                 ...inspection,
-                date: moment(inspection.date).format('DD/MM/YYYY'),
+                date: moment.utc(inspection.date).format('DD/MM/YYYY'),
                 time: inspection.time ? moment(inspection.time, 'HH:mm:ss').format('HH:mm') : 'No disponible',
                 exit_time: inspection.exit_time ? moment(inspection.exit_time, 'HH:mm:ss').format('HH:mm') : '--',
                 observations: inspection.observations || 'Sin observaciones',
@@ -631,7 +631,7 @@ const MyServicesCalendar = () => {
                                         {inspections.map((inspection) => (
                                         <tr key={inspection.id} onClick={() => navigate(`/inspection/${inspection.id}`)}>
                                             <td>{inspection.id}</td>
-                                            <td>{moment.utc(inspection.date).format("DD/MM/YYYY")}</td>
+                                            <td>{inspection.date}</td>
                                             <td>{inspection.time}</td>
                                             <td>{inspection.exit_time}</td>
                                             <td>{inspection.observations}</td>
