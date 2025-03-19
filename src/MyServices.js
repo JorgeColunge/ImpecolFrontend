@@ -365,7 +365,7 @@ useEffect(() => {
 
                     const formattedInspections = response.data.map((inspection) => ({
                         ...inspection,
-                        date: moment(inspection.date).format("DD/MM/YYYY"),
+                        date: moment.utc(inspection.date).local().format("DD/MM/YYYY"),
                         time: inspection.time ? moment(inspection.time, "HH:mm:ss").format("HH:mm") : "--",
                         exit_time: inspection.exit_time ? moment(inspection.exit_time, "HH:mm:ss").format("HH:mm") : "--",
                         observations: inspection.observations || "Sin observaciones",
