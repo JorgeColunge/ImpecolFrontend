@@ -1619,7 +1619,7 @@ const InspectionCalendar = () => {
                                         {inspections.map((inspection) => (
                                         <tr key={inspection.id} onClick={() => navigate(`/inspection/${inspection.id}`)}>
                                             <td>{inspection.id}</td>
-                                            <td>{inspection.date}</td>
+                                            <td>{moment.utc(inspection.date).format("DD/MM/YYYY")}</td>
                                             <td>{inspection.time}</td>
                                             <td>{inspection.exit_time}</td>
                                             <td>{inspection.observations}</td>
