@@ -787,7 +787,7 @@ useEffect(() => {
                           .map((inspection) => (
                             <tr key={inspection.id} onClick={() => navigate(`/inspection/${inspection.id}`)}>
                               <td>{inspection.id}</td>
-                              <td>{moment.utc(inspection.date).local().format("DD/MM/YYYY")}</td>
+                              <td>{inspection.date ? moment.utc(inspection.date).tz("America/Bogota").format("DD/MM/YYYY") : "Sin fecha"}</td>
                               <td>{technicians.find((tech) => tech.id === inspection.created_by)?.name || "No asignado"}</td>
                               <td>{inspection.time}</td>
                               <td>{inspection.exit_time}</td>
