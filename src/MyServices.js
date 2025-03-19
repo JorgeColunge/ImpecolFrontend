@@ -365,17 +365,16 @@ useEffect(() => {
 
                     const formattedInspections = response.data.map((inspection, index) => {
                       const rawDate = inspection.date; // Fecha en UTC del servidor
-                      const parsedDate = moment.utc(rawDate); // Asegurar que es UTC
-                      const localDate = parsedDate.local(); // Convertir a local
-
+                      const parsedDate = moment.utc(rawDate).startOf('day'); // Asegurar que sea solo la fecha en UTC sin hora
+                  
                       console.log(`🔍 LOG: Procesando inspección ${index} - ID: ${inspection.id}`);
                       console.log(`   ➡️ Fecha original UTC: ${rawDate}`);
-                      console.log(`   🔄 Convertida a local: ${localDate.format("YYYY-MM-DD HH:mm:ss")}`);
-                      console.log(`   📌 Guardada como: ${localDate.format("DD/MM/YYYY")}`);
-
+                      console.log(`   🔄 Convertida a solo fecha UTC: ${parsedDate.format("YYYY-MM-DD HH:mm:ss")}`);
+                      console.log(`   📌 Guardada como: ${parsedDate.format("DD/MM/YYYY")}`);
+                  
                       return {
                           ...inspection,
-                          date: localDate.format("DD/MM/YYYY"), // Asegurar que la fecha se almacene correctamente
+                          date: parsedDate.format("DD/MM/YYYY"), // Formato sin afectar la fecha
                           time: inspection.time ? moment(inspection.time, "HH:mm:ss").format("HH:mm") : "--",
                           exit_time: inspection.exit_time ? moment(inspection.exit_time, "HH:mm:ss").format("HH:mm") : "--",
                           observations: inspection.observations || "Sin observaciones",
