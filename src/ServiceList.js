@@ -1562,7 +1562,7 @@ const handleCloseEditModal = () => {
                           .map((inspection) => (
                             <tr key={inspection.id} onClick={() => handleInspectionClick(inspection)}>
                               <td>{inspection.id}</td>
-                              <td>{inspection.date}</td>
+                              <td>{moment.utc(inspection.date).startOf('day').format("DD/MM/YYYY")}</td>
                               <td>{technicians.find((tech) => tech.id === inspection.created_by)?.name || "No asignado"}</td>
                               <td>{inspection.time}</td>
                               <td>{inspection.exit_time}</td>

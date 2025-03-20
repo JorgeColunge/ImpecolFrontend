@@ -363,25 +363,13 @@ useEffect(() => {
                     const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/inspections_service/${service.id}`);
                     console.log(`✅ Inspecciones para servicio ${service.id}:`, response.data);
 
-                    const formattedInspections = response.data.map((inspection, index) => {
-                      const rawDate = inspection.date; // Fecha en UTC del servidor
-                      const parsedDate = moment.utc(rawDate).startOf('day'); // Asegurar que sea solo la fecha en UTC sin hora
-                  
-                      console.log(`🔍 LOG: Procesando inspección ${index} - ID: ${inspection.id}`);
-                      console.log(`   ➡️ Fecha original UTC: ${rawDate}`);
-                      console.log(`   🔄 Convertida a solo fecha UTC: ${parsedDate.format("YYYY-MM-DD HH:mm:ss")}`);
-                      console.log(`   📌 Guardada como: ${parsedDate.format("DD/MM/YYYY")}`);
-                  
-                      return {
-                          ...inspection,
-                          date: parsedDate.format("DD/MM/YYYY"), // Formato sin afectar la fecha
-                          time: inspection.time ? moment(inspection.time, "HH:mm:ss").format("HH:mm") : "--",
-                          exit_time: inspection.exit_time ? moment(inspection.exit_time, "HH:mm:ss").format("HH:mm") : "--",
-                          observations: inspection.observations || "Sin observaciones",
-                      };
-                  });
-
-                  console.log(`✅ LOG: Inspecciones formateadas para servicio ${service.id}:`, formattedInspections);
+                    const formattedInspections = response.data.map((inspection) => ({
+                        ...inspection,
+                        date: moment.utc(inspection.date).startOf('day').format("DD/MM/YYYY"),
+                        time: inspection.time ? moment(inspection.time, "HH:mm:ss").format("HH:mm") : "--",
+                        exit_time: inspection.exit_time ? moment(inspection.exit_time, "HH:mm:ss").format("HH:mm") : "--",
+                        observations: inspection.observations || "Sin observaciones",
+                    }));
 
                     inspectionsByService[service.id] = formattedInspections;
                 } catch (error) {
