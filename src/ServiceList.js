@@ -204,7 +204,7 @@ function ServiceList() {
         .filter((inspection) => inspection.service_id === serviceId) // Filtra por `service_id`
         .map((inspection) => ({
           ...inspection,
-          date: moment(inspection.date).format("DD/MM/YYYY"), // Formato legible para la fecha
+          date: moment.utc(inspection.date).startOf('day').format("DD/MM/YYYY"),
           time: inspection.time ? moment(inspection.time, "HH:mm:ss").format("HH:mm") : "--",
           exit_time: inspection.exit_time ? moment(inspection.exit_time, "HH:mm:ss").format("HH:mm") : "--",
           observations: inspection.observations || "Sin observaciones",
@@ -1562,7 +1562,7 @@ const handleCloseEditModal = () => {
                           .map((inspection) => (
                             <tr key={inspection.id} onClick={() => handleInspectionClick(inspection)}>
                               <td>{inspection.id}</td>
-                              <td>{moment.utc(inspection.date).startOf('day').format("DD/MM/YYYY")}</td>
+                              <td>{inspection.date}</td>
                               <td>{technicians.find((tech) => tech.id === inspection.created_by)?.name || "No asignado"}</td>
                               <td>{inspection.time}</td>
                               <td>{inspection.exit_time}</td>
