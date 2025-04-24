@@ -1018,39 +1018,33 @@ const InspectionCalendar = () => {
                                     }
                                     break;                                                                 
                                 
-                                    case 'biweekly': // Día específico cada 2 semanas
-                                    let biweeklyStart = moment(repetitiveStartDate);
-                                    let biweeklyEnd = moment(repetitiveEndDate);
-                                
-                                    console.log(`📅 Inicio de programación: ${biweeklyStart.format('YYYY-MM-DD')}`);
-                                    console.log(`📅 Fin de programación: ${biweeklyEnd.format('YYYY-MM-DD')}`);
-                                
-                                    // 🔹 Asegurar que la fecha inicial esté alineada con la repetición
-                                    while (!biweeklyStart.isSame(moment(repetitiveStartDate), 'day') &&
-                                           biweeklyStart.isBefore(moment(repetitiveStartDate))) {
-                                        biweeklyStart.add(2, 'weeks');
+                                    case 'biweekly':
+                                    const baseDay = moment(manualSchedule.date).day(); // Día original seleccionado (0=Domingo, 1=Lunes, ..., 6=Sábado)
+                                    const baseDate = moment(manualSchedule.date); // Fecha base para controlar el salto de 2 semanas
+
+                                    let current = moment(repetitiveStartDate).startOf('day');
+                                    const end = moment(repetitiveEndDate).endOf('day');
+
+                                    while (current.isSameOrBefore(end)) {
+                                        // Si el día de la semana coincide con el original
+                                        if (current.day() === baseDay) {
+                                            const diffWeeks = current.diff(baseDate, 'weeks'); // Diferencia en semanas con respecto a la fecha base
+
+                                            if (diffWeeks % 2 === 0) { // Cada 2 semanas
+                                                const newEvent = {
+                                                    date: current.format('YYYY-MM-DD'),
+                                                    start_time: manualSchedule.startTime,
+                                                    end_time: manualSchedule.endTime,
+                                                };
+
+                                                eventsToSchedule.push(newEvent);
+                                                console.log(`✅ Evento agregado: ${newEvent.date}, ${newEvent.start_time} - ${newEvent.end_time}`);
+                                            }
+                                        }
+
+                                        current.add(1, 'day'); // Avanza día por día
                                     }
-                                
-                                    while (biweeklyStart.isSameOrBefore(biweeklyEnd)) {
-                                        console.log(`\n🔄 Programando eventos para el día: ${biweeklyStart.format('YYYY-MM-DD')}`);
-                                
-                                        schedules.forEach((manualSchedule, index) => {
-                                            let newEvent = {
-                                                date: biweeklyStart.format('YYYY-MM-DD'),
-                                                start_time: manualSchedule.startTime,
-                                                end_time: manualSchedule.endTime,
-                                            };
-                                
-                                            eventsToSchedule.push(newEvent);
-                                
-                                            console.log(`✅ Evento ${index + 1} agregado -> Fecha: ${newEvent.date}, Horario: ${newEvent.start_time} - ${newEvent.end_time}`);
-                                        });
-                                
-                                        biweeklyStart.add(2, 'weeks'); // Avanza exactamente 2 semanas
-                                        console.log(`📌 Avanzando 2 semanas... Nueva fecha: ${biweeklyStart.format('YYYY-MM-DD')}`);
-                                    }
-                                
-                                    console.log(`✅ Programación completada. Total de eventos: ${eventsToSchedule.length}`);
+
                                     break;
                                                                                    
                                 

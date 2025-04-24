@@ -581,6 +581,7 @@ const handleSaveChanges = async () => {
 
     // Incluir el ID del usuario explícitamente
     formData.append("userId", storedUserInfo?.id_usuario || null);
+    formData.append("exitTime", moment().format("HH:mm"));
 
     // Procesar findingsByType
     const findingsByTypeProcessed = {};
