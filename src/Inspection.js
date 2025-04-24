@@ -666,8 +666,6 @@ const handleSaveChanges = async () => {
       }
     });
 
-    formData.append("exitTime", moment().format("HH:mm:ss"));
-
     // Enviar datos al backend
     await api.post(`/inspections/${inspectionId}/save`, formData, {
       headers: { "Content-Type": "multipart/form-data" },
