@@ -32,6 +32,9 @@ const DocumentConfigurator = ({ selectedTemplateId, selectedEntity }) => {
   const [tableIaDynamicInputs, setTableIaDynamicInputs] = useState({});
   const [customizedValues, setCustomizedValues] = useState({});
   const [tableCustomizedValues, setTableCustomizedValues] = useState({});
+  const [documentName, setDocumentName] = useState("");
+  const [documentType, setDocumentType] = useState("");
+  const [nsSelections, setNsSelections] = useState({});
 
   // Mapear las columnas de "clients" a nombres en español
   const clientFields = [
@@ -41,7 +44,7 @@ const DocumentConfigurator = ({ selectedTemplateId, selectedEntity }) => {
     { label: "Correo Electrónico", value: "email" },
     { label: "Representante", value: "representative" },
     { label: "Tipo de Documento", value: "document_type" },
-    { label: "Número de Documento", value: "document_num1" },
+    { label: "Número de Documento", value: "document_number" },
     { label: "Nombre de Contacto", value: "contact_name" },
     { label: "Teléfono de Contacto", value: "contact_phone" },
     { label: "RUT", value: "rut" },
@@ -80,7 +83,7 @@ const DocumentConfigurator = ({ selectedTemplateId, selectedEntity }) => {
     { label: "Tipo de Servicio", value: "service_type" },
     { label: "Descripción", value: "description" },
     { label: "Plaga a Controlar", value: "pest_to_control" },
-    { label: "Área de Intervención", value: "intervention_are" },
+    { label: "Área de Intervención", value: "intervention_areas" },
     { label: "Responsable", value: "responsible" },
     { label: "Categoría", value: "category" },
     { label: "Cantidad por Mes", value: "quantity_per_month" },
@@ -96,30 +99,52 @@ const DocumentConfigurator = ({ selectedTemplateId, selectedEntity }) => {
     { label: "Descripción", value: "description" },
   ];
 
+  const procedures = [
+    { label: "Procedimiento", value: "process" },
+    { label: "Método de aplicación", value: "application" },
+  ];
+
   const getInspectionFields = (serviceType) => {
     const commonFields = [
       { label: "ID", value: "id" },
-      { label: "Fecha", value: "date" },
-      { label: "Hora", value: "time" },
-      { label: "Duración", value: "duration" },
+      { label: "Fecha de la inspección", value: "date" },
+      { label: "Hora de entrada", value: "time" },
+      { label: "Duración de la inspección", value: "duration" },
       { label: "Observaciones", value: "observations" },
       { label: "ID del Servicio", value: "service_id" },
       { label: "Hora de Salida", value: "exit_time" },
       { label: "Tipo de Inspección", value: "inspection_type" },
       { label: "Subtipo de Inspección", value: "inspection_sub_type" },
-      { label: "Responsable", value: "findings_signatures_technician_name" },
+      { label: "Nombre del Responsable", value: "findings_signatures_technician_name" },
       { label: "Cédula del Responsable", value: "findings_signatures_technician_id" },
       { label: "Firma del Técnico", value: "findings_signatures_technician_signature" },
       { label: "Firma del Cliente", value: "findings_signatures_client_signature" },
       { label: "Nombre del Cliente", value: "findings_signatures_client_name" },
       { label: "Cédula Cliente", value: "findings_signatures_client_id" },
-      { label: "Cargo", value: "findings_signatures_client_position" },
+      { label: "Cargo del cliente", value: "findings_signatures_client_position" },
       { label: "Hallazgos (Todo)", value: "findings_all" },
       { label: "Lugar Hallazgo", value: "findings_findingsByType_place" },
       { label: "Descripción Hallazgo", value: "findings_findingsByType_description" },
       { label: "Foto Hallazgo", value: "findings_findingsByType_photo" },
-      { label: "Producto", value: "findings_productsByType_product" },
+      { label: "Nombre del Producto", value: "findings_productsByType_product" },
       { label: "Dosificación", value: "findings_productsByType_dosage" },
+      { label: "Fecha de vencimiento", value: "findings_productsByType_expirationDate" },
+      { label: "Unidad del producto", value: "findings_productsByType_unity" },
+      { label: "Producto servicio", value: "findings_productsByType_tipo" },
+      { label: "Lote del producto", value: "findings_productsByType_batch" },
+      { label: "Ingrediente Activo", value: "findings_productsByType_activeIngredient" },
+      { label: "Categoría Producto", value: "findings_productsByType_category" },
+      { label: "Hora de reingreso", value: "findings_productsByType_residualDuration" },
+      { label: "Método de aplicación", value: "findings_productsByType_process" },
+      { label: "Lugar Hallazgo Antes", value: "findings_findingsByType_placeAn" },
+      { label: "Descripción Hallazgo Antes", value: "findings_findingsByType_descriptionAn" },
+      { label: "Foto Hallazgo Antes", value: "findings_findingsByType_photoAn" },
+      { label: "Lugar Hallazgo Durante", value: "findings_findingsByType_placeDu" },
+      { label: "Descripción Hallazgo Durante", value: "findings_findingsByType_descriptionDu" },
+      { label: "Foto Hallazgo Durante", value: "findings_findingsByType_photoDu" },
+      { label: "Lugar Hallazgo Después", value: "findings_findingsByType_placeDe" },
+      { label: "Descripción Hallazgo Después", value: "findings_findingsByType_descriptionDe" },
+      { label: "Foto Hallazgo Después", value: "findings_findingsByType_photoDe" },
     ];
   
     const stationDesratizacion = [
@@ -261,9 +286,9 @@ const DocumentConfigurator = ({ selectedTemplateId, selectedEntity }) => {
     ];
   
     if (selectedEntity === "servicio") {
-      options = ["Servicio", "Inspecciones", "Responsable", "Acompañante", "Cliente", "Normativa Cliente"];
+      options = ["Servicio", "Inspecciones", "Responsable", "Acompañante", "Cliente", "Normativa Cliente", "Procedimiento"];
     } else if (selectedEntity === "inspeccion") {
-      options = ["Inspección", "Servicio", "Responsable", "Acompañante", "Cliente", "Normativa Cliente"];
+      options = ["Inspección", "Servicio", "Responsable", "Acompañante", "Cliente", "Normativa Cliente", "Procedimiento"];
     }
   
     setSourceOptions((prev) => ({ ...prev, [variable]: options }));
@@ -390,9 +415,9 @@ const DocumentConfigurator = ({ selectedTemplateId, selectedEntity }) => {
     ];
   
     if (selectedEntity === "servicio") {
-      options = ["Servicio", "Inspecciones", "Responsable", "Acompañante", "Cliente", "Normativa Cliente"];
+      options = ["Servicio", "Inspecciones", "Responsable", "Acompañante", "Cliente", "Normativa Cliente", "Procedimiento"];
     } else if (selectedEntity === "inspeccion") {
-      options = ["Inspección", "Servicio", "Responsable", "Acompañante", "Cliente", "Normativa Cliente"];
+      options = ["Inspección", "Servicio", "Responsable", "Acompañante", "Cliente", "Normativa Cliente", "Procedimiento"];
     }
   
     setSourceOptions((prev) => ({
@@ -498,6 +523,11 @@ const DocumentConfigurator = ({ selectedTemplateId, selectedEntity }) => {
         ...prev,
         [`${key}-${inputId}`]: rulesClient,
       }));
+    } else if (source === "Procedimiento") {
+      setTableFieldOptions((prev) => ({
+        ...prev,
+        [`${key}-${inputId}`]: procedures,
+      }));
     } else if (source === "Responsable" || source === "Acompañante") {
       setTableFieldOptions((prev) => ({
         ...prev,
@@ -593,6 +623,10 @@ const DocumentConfigurator = ({ selectedTemplateId, selectedEntity }) => {
     if (source === "Inspecciones" || source === "Inspección" || source === "Servicios") {
       combinedValue = `${source}-${period}-${serviceType}-${field}`;
     }
+    if (source === "Procedimiento") {
+      combinedValue = `${source}-${serviceType}-${field}`;
+    }
+    
   
     // Actualizar el valor combinado del input
     setTableIaDynamicInputs((prev) => ({
@@ -652,6 +686,16 @@ const DocumentConfigurator = ({ selectedTemplateId, selectedEntity }) => {
   const handleTableIaPromptChange = (tableName, rowIndex, colIndex, value) => {
     const key = `${tableName}_${rowIndex}_${colIndex}`;
   
+    // 1. Obtener modelo, prompt y ns actuales
+    const currentConfig = tableIaConfigurations[key] || {};
+    const currentModel = currentConfig.model || "";
+    const processedPrompt = value.replace(/\n/g, "\\n");
+    const ns = nsSelections?.[key] || "${ns}"; // <-- clave: usa el valor de ns seleccionado o el placeholder
+  
+    // 2. Construir valor final
+    const finalValue = `IA-${currentModel}-${processedPrompt}-${ns}`;
+  
+    // 3. Actualizar configuraciones de IA
     setTableIaConfigurations((prev) => ({
       ...prev,
       [key]: {
@@ -660,16 +704,21 @@ const DocumentConfigurator = ({ selectedTemplateId, selectedEntity }) => {
       },
     }));
   
-    // Actualizar el valor en la tabla con el formato "IA-NombreModelo-Prompt"
+    // 4. Actualizar valor en la tabla
     setTableData((prevTables) => {
       const updatedTable = { ...prevTables[tableName] };
-      const currentModel = tableIaConfigurations[key]?.model || "";
-      const modelName = aiModels.find((model) => model.model === currentModel)?.name || "ModeloIA";
-      const processedPrompt = value.replace(/\n/g, "\\n");
-      updatedTable.cuerpo[rowIndex][colIndex] = `IA-${modelName}-${processedPrompt}`;
-      return { ...prevTables, [tableName]: updatedTable };
+      const updatedBody = [...updatedTable.cuerpo];
+      updatedBody[rowIndex][colIndex] = finalValue;
+  
+      return {
+        ...prevTables,
+        [tableName]: {
+          ...updatedTable,
+          cuerpo: updatedBody,
+        },
+      };
     });
-  };  
+  };   
 
   const initializeIaSourceOptions = (variable) => {
     let options = [
@@ -682,9 +731,9 @@ const DocumentConfigurator = ({ selectedTemplateId, selectedEntity }) => {
     ];
   
     if (selectedEntity === "servicio") {
-      options = ["Servicio", "Inspecciones", "Responsable", "Acompañante", "Cliente", "Normativa Cliente"];
+      options = ["Servicio", "Inspecciones", "Responsable", "Acompañante", "Cliente", "Normativa Cliente", "Procedimiento"];
     } else if (selectedEntity === "inspeccion") {
-      options = ["Inspección", "Servicio", "Responsable", "Acompañante", "Cliente", "Normativa Cliente"];
+      options = ["Inspección", "Servicio", "Responsable", "Acompañante", "Cliente", "Normativa Cliente", "Procedimiento"];
     }
   
     setSourceOptions((prev) => ({ ...prev, [variable]: options }));
@@ -771,6 +820,11 @@ const DocumentConfigurator = ({ selectedTemplateId, selectedEntity }) => {
         ...prev,
         [`${variable}-${id}`]: rulesClient,
       }));
+    } else if (source === "Procedimiento") {
+      setIaFieldOptions((prev) => ({
+        ...prev,
+        [`${variable}-${id}`]: procedures,
+      }));
     } else if (source === "Responsable" || source === "Acompañante") {
       setIaFieldOptions((prev) => ({
         ...prev,
@@ -836,6 +890,10 @@ const DocumentConfigurator = ({ selectedTemplateId, selectedEntity }) => {
     // Si la fuente es "Inspecciones" o "Servicios", incluir período y tipo
     if (source === "Inspecciones" || source === "Inspección" || source === "Servicios") {
       combinedValue = `${source}-${period}-${serviceType}-${field}`;
+    }
+
+    if (source === "Procedimiento") {
+      combinedValue = `${source}-${serviceType}-${field}`;
     }
   
     // Actualizar el valor combinado del input
@@ -905,9 +963,9 @@ const DocumentConfigurator = ({ selectedTemplateId, selectedEntity }) => {
   
     // Personalizar opciones según la entidad seleccionada
     if (selectedEntity === "servicio") {
-      options = ["Servicio", "Inspecciones", "Responsable", "Acompañante", "Cliente", "Normativa Cliente"];
+      options = ["Servicio", "Inspecciones", "Responsable", "Acompañante", "Cliente", "Normativa Cliente", "Procedimiento"];
     } else if (selectedEntity === "inspeccion") {
-      options = ["Inspección", "Servicio", "Responsable", "Acompañante", "Cliente", "Normativa Cliente"];
+      options = ["Inspección", "Servicio", "Responsable", "Acompañante", "Cliente", "Normativa Cliente", "Procedimiento"];
     }
   
     // Actualizar las opciones en el estado `tableSourceOptions`
@@ -958,6 +1016,9 @@ const DocumentConfigurator = ({ selectedTemplateId, selectedEntity }) => {
     } else if (source === "Normativa Cliente") {
       // Opciones de campos para Cliente
       setFieldOptions((prev) => ({ ...prev, [variable]: rulesClient }));
+    } else if (source === "Procedimiento") {
+      // Opciones de campos para Cliente
+      setFieldOptions((prev) => ({ ...prev, [variable]: procedures }));
     } else if (source === "Responsable") {
       // Opciones de campos para Responsable
       setFieldOptions((prev) => ({ ...prev, [variable]: responsibleFields }));
@@ -1055,6 +1116,10 @@ const DocumentConfigurator = ({ selectedTemplateId, selectedEntity }) => {
     if (source === "Inspecciones" || source === "Inspección" || source === "Servicios") {
       combinedValue = `${source}-${period}-${serviceType}-${field}`;
     }
+
+    if (source === "Procedimiento") {
+      combinedValue = `${source}-${serviceType}-${field}`;
+    }
   
     setTableData((prevTables) => {
       const updatedTable = { ...prevTables[tableName] };
@@ -1079,6 +1144,10 @@ const DocumentConfigurator = ({ selectedTemplateId, selectedEntity }) => {
     // Incluir el período y tipo si la fuente es "Inspecciones" o "Servicios"
     if (source === "Inspecciones" || source === "Inspección" || source === "Servicios") {
       combinedValue = `${source}-${period}-${serviceType}-${field}`;
+    }
+
+    if (source === "Procedimiento") {
+      combinedValue = `${source}-${serviceType}-${field}`;
     }
   
     setVariableMappings((prevMappings) => ({
@@ -1155,9 +1224,11 @@ const DocumentConfigurator = ({ selectedTemplateId, selectedEntity }) => {
     const configuration = {
       templateId: selectedTemplateId,
       entity: selectedEntity,
-      variables: updatedMappings, // Usar el mapeo actualizado
+      variables: updatedMappings,
       tablas: preparedTables,
-      aiModels: preparedAiModels, // Incluir los modelos preparados
+      aiModels: preparedAiModels,
+      document_name: documentName,
+      document_type: documentType,
     };
   
     try {
@@ -1190,6 +1261,35 @@ const DocumentConfigurator = ({ selectedTemplateId, selectedEntity }) => {
   return (
     
     <div className="document-configurator mt-4">
+      <Card className="mt-4">
+        <Card.Header>
+          <h4 className="text-center">Información del Documento</h4>
+        </Card.Header>
+        <Card.Body>
+          <Row className="align-items-center mb-3"  style={{height: 'auto'}}>
+            <Col sm={6}>
+              <Form.Label>Nombre del Documento</Form.Label>
+              <Form.Control
+                type="text"
+                placeholder="Escribe el nombre del documento"
+                value={documentName}
+                onChange={(e) => setDocumentName(e.target.value)}
+              />
+            </Col>
+            <Col sm={6}>
+              <Form.Label>Formato del Documento</Form.Label>
+              <Form.Select
+                value={documentType}
+                onChange={(e) => setDocumentType(e.target.value)}
+              >
+                <option value="">-- Selecciona el formato --</option>
+                <option value="doc">DOC</option>
+                <option value="pdf">PDF</option>
+              </Form.Select>
+            </Col>
+          </Row>
+        </Card.Body>
+      </Card>
       <Card className="mt-4 mb-4">
         <Card.Header>
           <h4 className="text-center">Modelos de IA</h4>
@@ -1351,7 +1451,7 @@ const DocumentConfigurator = ({ selectedTemplateId, selectedEntity }) => {
             </>
             )}
 
-            {(showSourceDropdown[variable.nombre] && selectedSource[variable.nombre] === "Inspección") && (
+            {(showSourceDropdown[variable.nombre] && selectedSource[variable.nombre] === "Inspección" || showSourceDropdown[variable.nombre] && selectedSource[variable.nombre] === "Procedimiento") && (
             <>
                 <Col sm={12} className="mt-2">
                 <Form.Select
@@ -1525,7 +1625,7 @@ const DocumentConfigurator = ({ selectedTemplateId, selectedEntity }) => {
                     )}
 
                     {/* Selectores adicionales */}
-                    {(input.source === "Inspección") && (
+                    {(input.source === "Inspección" || input.source === "Procedimiento") && (
                       <>
                         <Col sm={6} className="mt-2">
                           <Form.Select
@@ -1791,7 +1891,7 @@ const DocumentConfigurator = ({ selectedTemplateId, selectedEntity }) => {
                             )}
 
                             {/* Selector intermedio para "Inspección" */}
-                            {(tableSelectedSource[`${table.nombre}_${rowIndex}_${colIndex}`] === "Inspección") && (
+                            {(tableSelectedSource[`${table.nombre}_${rowIndex}_${colIndex}`] === "Inspección" || tableSelectedSource[`${table.nombre}_${rowIndex}_${colIndex}`] === "Procedimiento") && (
                               <>
                         
                                 {/* Selector de Tipo de Servicio */}
@@ -1848,33 +1948,101 @@ const DocumentConfigurator = ({ selectedTemplateId, selectedEntity }) => {
 
                             {tableShowIaConfiguration[`${table.nombre}_${rowIndex}_${colIndex}`] && (
                               <>
-                                {/* Selector de modelo */}
+                              {/* Selector de modelo */}
+                              <Form.Select
+                                className="mt-2"
+                                value={tableIaConfigurations[`${table.nombre}_${rowIndex}_${colIndex}`]?.model || ""}
+                                onChange={(e) =>
+                                  handleTableIaModelChange(table.nombre, rowIndex, colIndex, e.target.value)
+                                }
+                              >
+                                <option value="">-- Selecciona un modelo --</option>
+                                {aiModels.map((model, index) => (
+                                  <option key={index} value={model.model}>
+                                    {model.name || model.model}
+                                  </option>
+                                ))}
+                              </Form.Select>
+
+                                {/* NUEVO: Selector Sí/No para incluir ${ns} */}
                                 <Form.Select
                                   className="mt-2"
-                                  value={tableIaConfigurations[`${table.nombre}_${rowIndex}_${colIndex}`]?.model || ""}
-                                  onChange={(e) =>
-                                    handleTableIaModelChange(table.nombre, rowIndex, colIndex, e.target.value)
-                                  }
+                                  value={tableIaConfigurations[`${table.nombre}_${rowIndex}_${colIndex}`]?.ns || ""}
+                                  onChange={(e) => {
+                                    const selectedNS = e.target.value.toUpperCase(); // Convertimos a mayúsculas
+                                    const key = `${table.nombre}_${rowIndex}_${colIndex}`;
+                                    const prevConfig = tableIaConfigurations[key] || {};
+                                    const model = prevConfig.model || "";
+                                    const prompt = (prevConfig.prompt || "").replace(/\n/g, "\\n");
+
+                                    const modelName = aiModels.find((m) => m.model === model)?.name || "ModeloIA";
+                                    const finalValue = `IA-${modelName}-${prompt}-${selectedNS}`;
+
+                                    // Guardamos la configuración del campo ns
+                                    setTableIaConfigurations((prev) => ({
+                                      ...prev,
+                                      [key]: {
+                                        ...prev[key],
+                                        ns: selectedNS,
+                                      },
+                                    }));
+
+                                    // Actualizamos el valor visible en la celda de la tabla
+                                    setTableData((prevTables) => {
+                                      const updated = { ...prevTables };
+                                      updated[table.nombre].cuerpo[rowIndex][colIndex] = finalValue;
+                                      return updated;
+                                    });
+
+                                    // Acción personalizada
+                                    if (selectedNS === "S") {
+                                      console.log(`⚡ Acción para SÍ: ${key}`);
+                                      // Aquí puedes agregar más lógica
+                                    } else if (selectedNS === "N") {
+                                      console.log(`🚫 Acción para NO: ${key}`);
+                                      // Aquí puedes agregar más lógica
+                                    }
+                                  }}
                                 >
-                                  <option value="">-- Selecciona un modelo --</option>
-                                  {aiModels.map((model, index) => (
-                                    <option key={index} value={model.model}>
-                                      {model.name || model.model}
-                                    </option>
-                                  ))}
+                                  <option value="">-- ¿Incluir NS? --</option>
+                                  <option value="S">Sí</option>
+                                  <option value="N">No</option>
                                 </Form.Select>
 
-                                {/* Textarea para el prompt */}
-                                <Form.Control
-                                  as="textarea"
-                                  className="mt-2"
-                                  placeholder="Escribe aquí el prompt"
-                                  rows={3}
-                                  value={tableIaConfigurations[`${table.nombre}_${rowIndex}_${colIndex}`]?.prompt || ""}
-                                  onChange={(e) =>
-                                    handleTableIaPromptChange(table.nombre, rowIndex, colIndex, e.target.value)
-                                  }
-                                />
+                                  {/* Textarea para el prompt */}
+                                  <Form.Control
+                                    as="textarea"
+                                    className="mt-2"
+                                    placeholder="Escribe aquí el prompt"
+                                    rows={3}
+                                    value={tableIaConfigurations[`${table.nombre}_${rowIndex}_${colIndex}`]?.prompt || ""}
+                                    onChange={(e) => {
+                                      const newPrompt = e.target.value;
+                                      const key = `${table.nombre}_${rowIndex}_${colIndex}`;
+                                      const prevConfig = tableIaConfigurations[key] || {};
+                                      const model = prevConfig.model || "";
+                                      const ns = prevConfig.ns || "";
+
+                                      const modelName = aiModels.find((m) => m.model === model)?.name || "ModeloIA";
+                                      const processedPrompt = newPrompt.replace(/\n/g, "\\n");
+                                      const finalValue = `IA-${modelName}-${processedPrompt}-${ns}`;
+
+                                      setTableIaConfigurations((prev) => ({
+                                        ...prev,
+                                        [key]: {
+                                          ...prev[key],
+                                          prompt: newPrompt,
+                                        },
+                                      }));
+
+                                      setTableData((prevTables) => {
+                                        const updated = { ...prevTables };
+                                        updated[table.nombre].cuerpo[rowIndex][colIndex] = finalValue;
+                                        return updated;
+                                      });
+                                    }}
+                                  />
+
                                 {/* Botón para agregar inputs */}
                                 <Col sm={12} className="text-center mt-3">
                                   <Button
