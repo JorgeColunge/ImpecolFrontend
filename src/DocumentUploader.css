@@ -20,7 +20,7 @@
   cursor: pointer;
   transition: background-color 0.3s ease;
   min-width: 70%;
-  height: 500px;
+  height: 650px;
   overflow-y: auto;
   background-color: #f8f8f8;
   scrollbar-width: none;
@@ -52,7 +52,7 @@
   background-color: #f9f9f9;
   overflow-y: auto;
   scrollbar-width: none;
-  max-height: 500px;
+  max-height: 650px;
 }
 
 .variables-area h3 {

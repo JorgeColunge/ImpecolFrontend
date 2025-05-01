@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { renderAsync } from "docx-preview"; // Para renderizar la vista previa
 import { Button } from "react-bootstrap";
 import mammoth from "mammoth"; // Para extraer texto del documento
@@ -9,20 +9,55 @@ const DocumentUploader = () => {
   const [docxPreview, setDocxPreview] = useState("");
   const [variables, setVariables] = useState([]);
   const [tables, setTables] = useState([]);
-  const [templateName, setTemplateName] = useState(""); // Estado para el nombre de la plantilla
+  const [templateName, setTemplateName] = useState("");
+  const [editorKey, setEditorKey] = useState(Date.now());
 
-  const handleFileChange = (uploadedFile) => {
+  useEffect(() => {
+    console.log("🧩 Cargando script de OnlyOffice...");
+    const script = document.createElement("script");
+    script.src = "http://localhost/web-apps/apps/api/documents/api.js";
+    script.async = true;
+    document.body.appendChild(script);
+    return () => {
+      document.body.removeChild(script);
+    };
+  }, []);  
+
+  const handleFileChange = async (uploadedFile) => {
     if (!uploadedFile) return;
-
-    if (
+  
+    setFile(uploadedFile);
+  
+    const isDocx =
       uploadedFile.type ===
-      "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-    ) {
-      setFile(uploadedFile);
-      renderDocx(uploadedFile);
-      extractVariablesAndTables(uploadedFile);
-    } else {
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+  
+    if (!isDocx) {
       alert("Por favor selecciona un archivo .docx");
+      return;
+    }
+  
+    try {
+      const formData = new FormData();
+      formData.append("file", uploadedFile);
+  
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/get-onlyoffice-config`, {
+        method: "POST",
+        body: formData,
+      });
+  
+      if (!response.ok) throw new Error("Error al obtener configuración OnlyOffice");
+  
+      const config = await response.json();
+  
+      // Extraer variables y tablas después de renderizar
+      extractVariablesAndTables(uploadedFile);
+      setEditorKey(Date.now());
+      await new Promise((resolve) => setTimeout(resolve, 100)); // Espera a que el DOM actualice
+      renderWithOnlyOffice(config);
+    } catch (error) {
+      console.error("❌ Error al procesar archivo:", error);
+      alert("No se pudo cargar el documento.");
     }
   };
 
@@ -181,25 +216,41 @@ const DocumentUploader = () => {
     e.preventDefault();
   };
 
+  const renderWithOnlyOffice = (config) => {
+    console.log("📦 Preparando editor OnlyOffice...");
+    const container = document.getElementById("onlyoffice-editor");
+  
+    if (!container) {
+      console.error("❌ No se encontró el contenedor #onlyoffice-editor");
+      return;
+    }
+  
+    if (!window.DocsAPI) {
+      console.error("❌ DocsAPI (OnlyOffice) no está disponible en window");
+      return;
+    }
+  
+    container.innerHTML = ""; // Limpieza por si acaso
+  
+    new window.DocsAPI.DocEditor("onlyoffice-editor", config);
+    console.log("✅ Editor OnlyOffice instanciado.");
+  };    
+
   return (
     <div className="document-uploader">
       <div className="upload-preview-container">
         <div
-          className={`preview-area upload-area ${
-            docxPreview ? "preview-loaded" : ""
-          }`}
+          className="preview-area upload-area"
           onClick={() => document.getElementById("fileInput").click()}
           onDrop={handleFileDrop}
           onDragOver={handleDragOver}
+          style={{ padding: 0 }}
         >
-          {docxPreview ? (
-            <div
-              className="docx-preview"
-              dangerouslySetInnerHTML={{ __html: docxPreview }}
-            ></div>
-          ) : (
-            <p>Haz clic o arrastra un archivo .docx aquí</p>
-          )}
+          <div
+            id="onlyoffice-editor"
+            key={editorKey}
+            style={{ height: "100vh", width: "10px" }}
+          ></div>
         </div>
         <div className="variables-area">
         <div className="mb-4">
