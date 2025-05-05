@@ -24,6 +24,25 @@ const DocumentUploader = () => {
     };
   }, []);
 
+  const waitForFileAvailable = async (url, maxRetries = 10) => {
+    console.log(`⏳ Verificando disponibilidad de archivo: ${url}`);
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        const response = await fetch(url, { method: "HEAD" });
+        if (response.ok) {
+          console.log(`✅ Archivo disponible en intento ${attempt}`);
+          return true;
+        } else {
+          console.warn(`⚠️ Archivo no disponible (intento ${attempt}): ${response.status}`);
+        }
+      } catch (err) {
+        console.warn(`⚠️ Error al intentar acceder al archivo (intento ${attempt}):`, err);
+      }
+      await new Promise((resolve) => setTimeout(resolve, 500)); // Espera 500ms
+    }
+    throw new Error("❌ El archivo no estuvo disponible después de varios intentos.");
+  };
+
   const handleFileChange = async (uploadedFile) => {
     if (!uploadedFile) return;
 
@@ -54,7 +73,7 @@ const DocumentUploader = () => {
       // Extraer variables y tablas después de renderizar
       extractVariablesAndTables(uploadedFile);
       setEditorKey(Date.now());
-      await new Promise((resolve) => setTimeout(resolve, 100)); // Espera a que el DOM actualice
+      await waitForFileAvailable(config.document.url, 10); // 10 intentos, 500ms cada uno
       renderWithOnlyOffice(config);
     } catch (error) {
       console.error("❌ Error al procesar archivo:", error);
