@@ -16,7 +16,7 @@ const DocumentUploader = () => {
     console.log("🧩 Cargando script de OnlyOffice...");
     const script = document.createElement("script");
     //script.src = "http://localhost/web-apps/apps/api/documents/api.js";
-    script.src = `http://services.impecol.com:8082/web-apps/apps/api/documents/api.js`;
+    script.src = "https://services.impecol.com/onlyoffice/web-apps/apps/api/documents/api.js";
     script.async = true;
     document.body.appendChild(script);
     return () => {
