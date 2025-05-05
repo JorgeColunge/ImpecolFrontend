@@ -15,41 +15,42 @@ const DocumentUploader = () => {
   useEffect(() => {
     console.log("🧩 Cargando script de OnlyOffice...");
     const script = document.createElement("script");
-    script.src = "http://localhost/web-apps/apps/api/documents/api.js";
+    //script.src = "http://localhost/web-apps/apps/api/documents/api.js";
+    script.src = `http://services.impecol.com:8082/web-apps/apps/api/documents/api.js`;
     script.async = true;
     document.body.appendChild(script);
     return () => {
       document.body.removeChild(script);
     };
-  }, []);  
+  }, []);
 
   const handleFileChange = async (uploadedFile) => {
     if (!uploadedFile) return;
-  
+
     setFile(uploadedFile);
-  
+
     const isDocx =
       uploadedFile.type ===
       "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
-  
+
     if (!isDocx) {
       alert("Por favor selecciona un archivo .docx");
       return;
     }
-  
+
     try {
       const formData = new FormData();
       formData.append("file", uploadedFile);
-  
+
       const response = await fetch(`${process.env.REACT_APP_API_URL}/api/get-onlyoffice-config`, {
         method: "POST",
         body: formData,
       });
-  
+
       if (!response.ok) throw new Error("Error al obtener configuración OnlyOffice");
-  
+
       const config = await response.json();
-  
+
       // Extraer variables y tablas después de renderizar
       extractVariablesAndTables(uploadedFile);
       setEditorKey(Date.now());
@@ -70,7 +71,7 @@ const DocumentUploader = () => {
       alert("Por favor ingresa un nombre para la plantilla.");
       return;
     }
-  
+
     // Crear el JSON para enviar al backend
     const templateData = {
       nombrePlantilla: templateName,
@@ -92,17 +93,17 @@ const DocumentUploader = () => {
         },
       })),
     };
-  
+
     const formData = new FormData();
     formData.append("templateData", JSON.stringify(templateData)); // Datos JSON
     formData.append("file", file); // Archivo original
-  
+
     try {
       const response = await fetch(`${process.env.REACT_APP_API_URL}/api/upload-template`, {
         method: "POST",
         body: formData,
       });
-  
+
       if (response.ok) {
         alert("Plantilla subida correctamente.");
       } else {
@@ -112,7 +113,7 @@ const DocumentUploader = () => {
       console.error("Error al subir la plantilla:", error);
       alert("Error al conectar con el servidor.");
     }
-  };  
+  };
 
   const renderDocx = (uploadedFile) => {
     const reader = new FileReader();
@@ -132,39 +133,39 @@ const DocumentUploader = () => {
         const arrayBuffer = event.target.result;
         const result = await mammoth.convertToHtml({ arrayBuffer });
         const htmlContent = result.value; // HTML del documento
-  
+
         // Extraer variables
         const textContent = await mammoth.extractRawText({ arrayBuffer });
         const text = textContent.value;
         const matches = text.match(/{{\s*[\wáéíóúüñÁÉÍÓÚÜÑ._-]+\s*}}/g) || [];
         setVariables(matches.map((v) => v.replace(/[{}]/g, "").trim()));
-  
+
         console.log("Variables extraídas:", matches);
-  
+
         // Extraer tablas
         const parser = new DOMParser();
         const doc = parser.parseFromString(htmlContent, "text/html");
         const tableElements = doc.querySelectorAll("table");
-  
+
         console.log("Tablas detectadas en el documento:", tableElements.length);
-  
+
         const extractedTables = Array.from(tableElements).map((table, index) => {
           console.log(`Procesando tabla ${index + 1}`);
-  
+
           const rows = Array.from(table.rows);
           console.log(`Filas en la tabla ${index + 1}:`, rows);
-  
+
           let header = [];
           let body = [];
           let bodyColumns = 0; // Para contar las columnas del cuerpo
-  
+
           rows.forEach((row, rowIndex) => {
             const cells = Array.from(row.cells).map((cell) =>
               cell.textContent.trim()
             );
-  
+
             console.log(`Fila ${rowIndex + 1}:`, cells);
-  
+
             if (cells.every((cell) => cell === "")) {
               // Si todas las celdas están vacías, pertenece al cuerpo
               body.push(cells);
@@ -177,10 +178,10 @@ const DocumentUploader = () => {
               });
             }
           });
-  
+
           console.log(`Encabezado de la tabla ${index + 1}:`, header);
           console.log(`Cuerpo de la tabla ${index + 1}:`, body);
-  
+
           return {
             nombre: `Tabla ${index + 1}`,
             encabezado: {
@@ -195,7 +196,7 @@ const DocumentUploader = () => {
             },
           };
         });
-  
+
         console.log("Tablas extraídas:", extractedTables);
         setTables(extractedTables);
       } catch (error) {
@@ -203,8 +204,8 @@ const DocumentUploader = () => {
       }
     };
     reader.readAsArrayBuffer(uploadedFile);
-  };  
-  
+  };
+
 
   const handleFileDrop = (e) => {
     e.preventDefault();
@@ -219,22 +220,22 @@ const DocumentUploader = () => {
   const renderWithOnlyOffice = (config) => {
     console.log("📦 Preparando editor OnlyOffice...");
     const container = document.getElementById("onlyoffice-editor");
-  
+
     if (!container) {
       console.error("❌ No se encontró el contenedor #onlyoffice-editor");
       return;
     }
-  
+
     if (!window.DocsAPI) {
       console.error("❌ DocsAPI (OnlyOffice) no está disponible en window");
       return;
     }
-  
+
     container.innerHTML = ""; // Limpieza por si acaso
-  
+
     new window.DocsAPI.DocEditor("onlyoffice-editor", config);
     console.log("✅ Editor OnlyOffice instanciado.");
-  };    
+  };
 
   return (
     <div className="document-uploader">
@@ -253,7 +254,7 @@ const DocumentUploader = () => {
           ></div>
         </div>
         <div className="variables-area">
-        <div className="mb-4">
+          <div className="mb-4">
             <h3>Nombre de la Plantilla</h3>
             <input
               type="text"
@@ -288,38 +289,38 @@ const DocumentUploader = () => {
                   }}
                 />
                 <table className="extracted-table">
-                <thead>
-                  {table.encabezado?.detalles.length > 0 &&
-                    table.encabezado.detalles.map((row, rowIndex) => (
-                      <tr key={rowIndex}>
-                        {row.cells.map((cell, cellIndex) => (
-                          <th
-                            key={cellIndex}
-                            colSpan={row.colspan && row.cells.length === 1 ? row.colspan : 1}
-                          >
-                            {cell}
-                          </th>
-                        ))}
+                  <thead>
+                    {table.encabezado?.detalles.length > 0 &&
+                      table.encabezado.detalles.map((row, rowIndex) => (
+                        <tr key={rowIndex}>
+                          {row.cells.map((cell, cellIndex) => (
+                            <th
+                              key={cellIndex}
+                              colSpan={row.colspan && row.cells.length === 1 ? row.colspan : 1}
+                            >
+                              {cell}
+                            </th>
+                          ))}
+                        </tr>
+                      ))}
+                  </thead>
+                  <tbody>
+                    {table.cuerpo?.detalles.length > 0 ? (
+                      table.cuerpo.detalles.map((row, rowIndex) => (
+                        <tr key={rowIndex}>
+                          {row.map((cell, cellIndex) => (
+                            <td key={cellIndex}>{cell}</td>
+                          ))}
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan={table.encabezado?.columnas || 1}>
+                          No hay datos en el cuerpo de la tabla.
+                        </td>
                       </tr>
-                    ))}
-                </thead>
-                <tbody>
-                  {table.cuerpo?.detalles.length > 0 ? (
-                    table.cuerpo.detalles.map((row, rowIndex) => (
-                      <tr key={rowIndex}>
-                        {row.map((cell, cellIndex) => (
-                          <td key={cellIndex}>{cell}</td>
-                        ))}
-                      </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td colSpan={table.encabezado?.columnas || 1}>
-                        No hay datos en el cuerpo de la tabla.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
+                    )}
+                  </tbody>
                 </table>
               </div>
             ))
