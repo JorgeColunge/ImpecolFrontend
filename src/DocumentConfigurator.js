@@ -123,6 +123,8 @@ const DocumentConfigurator = ({ selectedTemplateId, selectedEntity }) => {
       { label: "Cédula Cliente", value: "findings_signatures_client_id" },
       { label: "Cargo del cliente", value: "findings_signatures_client_position" },
       { label: "Hallazgos (Todo)", value: "findings_all" },
+      { label: "Fecha Hallazgo", value: "findings_findingsByType_date" },
+      { label: "Hora Hallazgo", value: "findings_findingsByType_time" },
       { label: "Lugar Hallazgo", value: "findings_findingsByType_place" },
       { label: "Descripción Hallazgo", value: "findings_findingsByType_description" },
       { label: "Foto Hallazgo", value: "findings_findingsByType_photo" },
