@@ -589,6 +589,7 @@ const handleSaveChanges = async () => {
       findingsByTypeProcessed[type] = findingsByType[type].map((finding) => ({
         ...finding,
         photo: finding.photoBlob ? null : finding.photoRelative, // Enviar la URL relativa si no hay nueva imagen
+        date: finding.date || inspectionData?.date, // <- asegura que se mantenga
       }));
     });
 
@@ -714,21 +715,34 @@ const dataURLtoBlob = (dataURL) => {
     const newFindingId = Date.now(); // ID único basado en el timestamp
     const newFindingKey = `${type}-${newFindingId}`; // Clave única para el hallazgo
   
+    const now = moment();
+    const date = inspectionData?.date
+      ? moment(inspectionData.date).format("DD-MM-YYYY") // ← nuevo formato aquí
+      : now.format("DD-MM-YYYY");
+    const time = now.format("HH:mm"); // Hora exacta
+  
     // Actualizar los hallazgos con el nuevo elemento
     setFindingsByType((prevFindings) => ({
       ...prevFindings,
       [type]: [
         ...(prevFindings[type] || []),
-        { id: newFindingId, place: '', description: '', photo: null },
+        {
+          id: newFindingId,
+          place: '',
+          description: '',
+          photo: null,
+          date,   // ✅ ahora en formato "02-05-2025"
+          time,
+        },
       ],
     }));
   
-    // Actualizar los estados de colapso para expandir el nuevo hallazgo
+    // Expandir el nuevo hallazgo
     setCollapseStates((prevStates) => ({
       ...prevStates,
-      [newFindingKey]: true, // Expandir el nuevo hallazgo
+      [newFindingKey]: true,
     }));
-  };  
+  };
   
 
   const handleFindingChange = (type, index, field, value) => {
