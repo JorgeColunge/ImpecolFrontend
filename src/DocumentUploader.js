@@ -38,7 +38,7 @@ const DocumentUploader = () => {
       } catch (err) {
         console.warn(`⚠️ Error al intentar acceder al archivo (intento ${attempt}):`, err);
       }
-      await new Promise((resolve) => setTimeout(resolve, 500)); // Espera 500ms
+      await new Promise((resolve) => setTimeout(resolve, 2000)); // Espera 500ms
     }
     throw new Error("❌ El archivo no estuvo disponible después de varios intentos.");
   };
@@ -236,7 +236,7 @@ const DocumentUploader = () => {
     e.preventDefault();
   };
 
-  const renderWithOnlyOffice = (config) => {
+  const renderWithOnlyOffice = async (config) => {
     console.log("📦 Preparando editor OnlyOffice...");
     const container = document.getElementById("onlyoffice-editor");
 
@@ -250,11 +250,70 @@ const DocumentUploader = () => {
       return;
     }
 
-    container.innerHTML = ""; // Limpieza por si acaso
+    // Verificar estructura de configuración
+    console.log("🧪 Verificando estructura de configuración:");
+    console.table({
+      fileType: config?.document?.fileType,
+      title: config?.document?.title,
+      url: config?.document?.url,
+      token: config?.token?.slice(0, 30) + "...",
+    });
 
-    new window.DocsAPI.DocEditor("onlyoffice-editor", config);
-    console.log("✅ Editor OnlyOffice instanciado.");
+    // Verificación HEAD antes de instanciar editor
+    try {
+      console.log(`🔍 Verificando acceso a documento: ${config.document.url}`);
+      const headResponse = await fetch(config.document.url, { method: "HEAD" });
+      const status = headResponse.status;
+      const contentType = headResponse.headers.get("Content-Type");
+      const contentLength = headResponse.headers.get("Content-Length");
+
+      console.log(`📡 HEAD Response: ${status} | Content-Type: ${contentType} | Size: ${contentLength} bytes`);
+
+      if (status !== 200) {
+        console.warn("⚠️ Archivo no disponible al hacer HEAD request. Se aborta renderizado.");
+        return;
+      }
+
+      if (!contentType?.includes("officedocument")) {
+        console.warn("⚠️ El Content-Type no es válido para .docx:", contentType);
+      }
+
+      if (parseInt(contentLength) < 2000) {
+        console.warn("⚠️ El archivo parece ser muy pequeño (<2KB). Podría estar incompleto.");
+      }
+    } catch (err) {
+      console.error("❌ Error al hacer HEAD request del documento:", err);
+      return;
+    }
+
+    // Limpiar contenedor antes de renderizar
+    container.innerHTML = "";
+
+    try {
+      const editor = new window.DocsAPI.DocEditor("onlyoffice-editor", config);
+      console.log("✅ Editor OnlyOffice instanciado correctamente.");
+
+      // Eventos útiles
+      if (editor.events) {
+        editor.events.on("onReady", () => {
+          console.log("🟢 Editor listo.");
+        });
+
+        editor.events.on("onDocumentStateChange", (event) => {
+          console.log("✏️ Estado del documento cambió:", event);
+        });
+
+        editor.events.on("onError", (error) => {
+          console.error("🚨 Error interno en OnlyOffice:", error);
+        });
+      } else {
+        console.warn("⚠️ No se encontraron eventos en editor.events");
+      }
+    } catch (e) {
+      console.error("❌ Excepción al instanciar DocsAPI.DocEditor:", e);
+    }
   };
+
 
   return (
     <div className="document-uploader">
