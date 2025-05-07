@@ -292,6 +292,7 @@ const DocumentUploader = () => {
 
     try {
       const editor = new window.DocsAPI.DocEditor("onlyoffice-editor", config);
+
       console.log("🧪 Verificando iframe OnlyOffice...");
       const iframe = container.querySelector("iframe");
 
@@ -303,13 +304,15 @@ const DocumentUploader = () => {
 
       console.log("✅ Editor OnlyOffice instanciado correctamente.");
       console.log("🧠 Métodos disponibles en editor:", Object.keys(editor));
-      console.log("🧪 Esperando evento 'onReady'...");
 
-      editor.events?.on("onReady", () => {
-        console.log("🟢 Editor listo (evento onReady activado)");
-
+      // Esperar que el editor esté completamente listo antes de acceder a `editor.events`
+      const waitForEvents = () => {
         if (editor.events) {
           console.log("🧠 Métodos disponibles en editor.events:", Object.keys(editor.events));
+
+          editor.events.on("onReady", () => {
+            console.log("🟢 Editor listo (evento onReady activado)");
+          });
 
           editor.events.on("onDocumentStateChange", (event) => {
             console.log("✏️ Estado del documento cambió:", event);
@@ -319,9 +322,13 @@ const DocumentUploader = () => {
             console.error("🚨 Error interno en OnlyOffice:", error);
           });
         } else {
-          console.warn("⚠️ Aún no se pudo acceder a editor.events en onReady");
+          console.warn("⌛ editor.events aún no está disponible, reintentando en 300ms...");
+          setTimeout(waitForEvents, 300);
         }
-      });
+      };
+
+      waitForEvents(); // Inicia el ciclo de espera hasta que editor.events esté definido
+
     } catch (e) {
       console.error("❌ Excepción al instanciar DocsAPI.DocEditor:", e);
     }
