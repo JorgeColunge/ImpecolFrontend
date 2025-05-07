@@ -237,109 +237,80 @@ const DocumentUploader = () => {
     e.preventDefault();
   };
 
-  const renderWithOnlyOffice = async (config) => {
-    console.log("📦 Preparando editor OnlyOffice...");
-    const container = document.getElementById("onlyoffice-editor");
+  const renderWithOnlyOffice = async () => {
+    console.log("🚀 Cargando documento de prueba público...");
 
+    const config = {
+      document: {
+        fileType: "doc", // ⚠️ Nota: este es un .doc, no .docx
+        title: "archivo-de-prueba.doc",
+        key: `test-${Date.now()}`,
+        url: "https://file-examples.com/wp-content/storage/2017/02/file-sample_100kB.docx"
+      },
+      documentType: "word",
+      editorConfig: {
+        mode: "edit",
+        user: {
+          id: "tester",
+          name: "Prueba pública"
+        },
+        events: {
+          onReady: () => {
+            console.log("🟢 Editor listo (evento onReady)");
+          },
+          onDocumentStateChange: (event) => {
+            console.log("✏️ Cambió el estado del documento:", event);
+          },
+          onError: (error) => {
+            console.error("🚨 Error interno en OnlyOffice:", error);
+          },
+          onRequestClose: () => {
+            console.log("❌ Cierre solicitado");
+          }
+        }
+      }
+    };
+
+    const container = document.getElementById("onlyoffice-editor");
     if (!container) {
       console.error("❌ No se encontró el contenedor #onlyoffice-editor");
       return;
     }
 
-    if (!window.DocsAPI) {
-      console.error("❌ DocsAPI (OnlyOffice) no está disponible en window");
-      return;
-    }
-
-    // Verificar estructura de configuración
-    console.log("🧪 Verificando estructura de configuración:");
-    console.table({
-      fileType: config?.document?.fileType,
-      title: config?.document?.title,
-      url: config?.document?.url,
-      token: config?.token?.slice(0, 30) + "...",
-    });
-
-    // Verificación HEAD antes de instanciar editor
+    // Verificación HEAD
     try {
-      console.log(`🔍 Verificando acceso a documento: ${config.document.url}`);
       const headResponse = await fetch(config.document.url, { method: "HEAD" });
       const status = headResponse.status;
-      const contentType = headResponse.headers.get("Content-Type");
-      const contentLength = headResponse.headers.get("Content-Length");
-
-      console.log(`📡 HEAD Response: ${status} | Content-Type: ${contentType} | Size: ${contentLength} bytes`);
-
-      if (status !== 200) {
-        console.warn("⚠️ Archivo no disponible al hacer HEAD request. Se aborta renderizado.");
-        return;
-      }
-
-      if (!contentType?.includes("officedocument")) {
-        console.warn("⚠️ El Content-Type no es válido para .docx:", contentType);
-      }
-
-      if (parseInt(contentLength) < 2000) {
-        console.warn("⚠️ El archivo parece ser muy pequeño (<2KB). Podría estar incompleto.");
-      }
+      const type = headResponse.headers.get("Content-Type");
+      const size = headResponse.headers.get("Content-Length");
+      console.log(`📡 HEAD Response: ${status} | Content-Type: ${type} | Size: ${size} bytes`);
     } catch (err) {
-      console.error("❌ Error al hacer HEAD request del documento:", err);
+      console.error("❌ Error en HEAD request:", err);
       return;
     }
 
-    // Limpiar contenedor antes de renderizar
-    container.innerHTML = "";
-
+    // Verificación binaria
     try {
-      // ✅ Definir eventos en la configuración (recomendado)
-      config.editorConfig.events = {
-        onReady: () => {
-          console.log("🟢 Editor listo (desde config)");
-        },
-        onDocumentStateChange: (event) => {
-          console.log("✏️ Estado del documento cambió:", event);
-        },
-        onError: (error) => {
-          console.error("🚨 Error interno:", error);
-        },
-        onRequestClose: () => {
-          console.log("❌ Solicitud de cierre del editor");
-        },
-        onRequestSave: () => {
-          console.log("💾 Solicitud de guardado");
-        }
-      };
+      const buffer = await fetch(config.document.url).then((res) => res.arrayBuffer());
+      const firstBytes = new Uint8Array(buffer.slice(0, 8));
+      console.log(`📄 Descargado. Bytes: ${buffer.byteLength}`);
+      console.log("🔍 Primeros 8 bytes:", Array.from(firstBytes).map(b => b.toString(16).padStart(2, "0")).join(" "));
+    } catch (err) {
+      console.error("❌ Error al descargar archivo:", err);
+      return;
+    }
 
-      try {
-        const arrayBuffer = await fetch(config.document.url).then(res => res.arrayBuffer());
-        const byteLength = arrayBuffer.byteLength;
-        const firstBytes = new Uint8Array(arrayBuffer.slice(0, 8));
-        console.log(`📄 Archivo descargado directamente: ${byteLength} bytes`);
-        console.log("🔍 Primeros 8 bytes del archivo:", Array.from(firstBytes).map(b => b.toString(16).padStart(2, '0')).join(' '));
-
-        // Validación básica: los archivos DOCX deben comenzar con la cabecera de ZIP (PK)
-        if (firstBytes[0] !== 0x50 || firstBytes[1] !== 0x4B) {
-          console.warn("⚠️ El archivo no parece ser un ZIP válido (.docx). ¿Está corrupto?");
-        }
-      } catch (err) {
-        console.error("❌ Error al descargar o verificar contenido del archivo:", err);
-      }
-
+    // Limpiar y renderizar
+    container.innerHTML = "";
+    try {
       const editor = new window.DocsAPI.DocEditor("onlyoffice-editor", config);
-      console.log("✅ Editor OnlyOffice instanciado correctamente.");
-
-      const iframe = document.getElementById("onlyoffice-editor")?.querySelector("iframe");
-      if (!iframe) {
-        console.warn("⚠️ No se encontró ningún iframe en el contenedor");
-      } else {
-        console.log("🖼️ Iframe encontrado. src:", iframe.src);
-      }
-
-      console.log("🧠 Métodos disponibles en editor:", Object.keys(editor));
+      console.log("✅ Editor instanciado correctamente.");
+      console.log("🧠 Métodos del editor:", Object.keys(editor));
     } catch (e) {
       console.error("❌ Excepción al instanciar DocsAPI.DocEditor:", e);
     }
   };
+
 
 
   return (
