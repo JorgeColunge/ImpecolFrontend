@@ -219,6 +219,10 @@ const DocumentUploader = () => {
 
   const renderWithOnlyOffice = (config) => {
     console.log("📦 Preparando editor OnlyOffice...");
+
+    // Log completo del config recibido
+    console.log("🧩 Config recibido para OnlyOffice:", JSON.stringify(config, null, 2));
+
     const container = document.getElementById("onlyoffice-editor");
 
     if (!container) {
@@ -231,10 +235,28 @@ const DocumentUploader = () => {
       return;
     }
 
+    // Validación explícita de campos importantes
+    if (!config.document?.url) {
+      console.error("❌ El campo 'url' del documento no está definido en el config.");
+      return;
+    }
+
+    if (!config.document?.fileType) {
+      console.warn("⚠️ Falta 'fileType' en config.document. Se espera algo como 'docx'.");
+    }
+
+    if (!config.document?.key) {
+      console.warn("⚠️ Falta 'key' en config.document. Este debe ser único por documento.");
+    }
+
     container.innerHTML = ""; // Limpieza por si acaso
 
-    new window.DocsAPI.DocEditor("onlyoffice-editor", config);
-    console.log("✅ Editor OnlyOffice instanciado.");
+    try {
+      new window.DocsAPI.DocEditor("onlyoffice-editor", config);
+      console.log("✅ Editor OnlyOffice instanciado correctamente.");
+    } catch (err) {
+      console.error("💥 Error al instanciar OnlyOffice DocEditor:", err);
+    }
   };
 
   return (
