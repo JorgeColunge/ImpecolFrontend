@@ -73,7 +73,7 @@ const DocumentUploader = () => {
       // Extraer variables y tablas después de renderizar
       extractVariablesAndTables(uploadedFile);
       setEditorKey(Date.now());
-      await new Promise((resolve) => setTimeout(resolve, 10000)); // ⏳ Espera inicial de 10 segundos
+      await new Promise((resolve) => setTimeout(resolve, 500)); // ⏳ Espera inicial de 10 segundos
       await waitForFileAvailable(config.document.url, 10);
       renderWithOnlyOffice(config);
     } catch (error) {
@@ -294,6 +294,7 @@ const DocumentUploader = () => {
       const editor = new window.DocsAPI.DocEditor("onlyoffice-editor", config);
       console.log("🧪 Verificando iframe OnlyOffice...");
       const iframe = container.querySelector("iframe");
+
       if (!iframe) {
         console.warn("⚠️ No se encontró ningún iframe dentro del contenedor");
       } else {
@@ -301,22 +302,14 @@ const DocumentUploader = () => {
       }
 
       console.log("✅ Editor OnlyOffice instanciado correctamente.");
+      console.log("🧠 Métodos disponibles en editor:", Object.keys(editor));
+      console.log("🧪 Esperando evento 'onReady'...");
 
-      // Verifica si `events` existe y muestra los métodos disponibles
-      setTimeout(() => {
+      editor.events?.on("onReady", () => {
+        console.log("🟢 Editor listo (evento onReady activado)");
+
         if (editor.events) {
           console.log("🧠 Métodos disponibles en editor.events:", Object.keys(editor.events));
-        } else {
-          console.warn("⚠️ editor.events sigue siendo undefined");
-        }
-      }, 300); // Pequeña espera por si el objeto tarda en inicializar
-
-      // Eventos útiles
-      setTimeout(() => {
-        if (editor.events) {
-          editor.events.on("onReady", () => {
-            console.log("🟢 Editor listo.");
-          });
 
           editor.events.on("onDocumentStateChange", (event) => {
             console.log("✏️ Estado del documento cambió:", event);
@@ -326,9 +319,9 @@ const DocumentUploader = () => {
             console.error("🚨 Error interno en OnlyOffice:", error);
           });
         } else {
-          console.warn("⚠️ No se encontraron eventos en editor.events");
+          console.warn("⚠️ Aún no se pudo acceder a editor.events en onReady");
         }
-      }, 500);
+      });
     } catch (e) {
       console.error("❌ Excepción al instanciar DocsAPI.DocEditor:", e);
     }
