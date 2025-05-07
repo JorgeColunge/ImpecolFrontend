@@ -73,7 +73,8 @@ const DocumentUploader = () => {
       // Extraer variables y tablas después de renderizar
       extractVariablesAndTables(uploadedFile);
       setEditorKey(Date.now());
-      await waitForFileAvailable(config.document.url, 10); // 10 intentos, 500ms cada uno
+      await new Promise((resolve) => setTimeout(resolve, 10000)); // ⏳ Espera inicial de 10 segundos
+      await waitForFileAvailable(config.document.url, 10);
       renderWithOnlyOffice(config);
     } catch (error) {
       console.error("❌ Error al procesar archivo:", error);
