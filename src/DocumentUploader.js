@@ -245,7 +245,7 @@ const DocumentUploader = () => {
         fileType: "doc", // ⚠️ Nota: este es un .doc, no .docx
         title: "archivo-de-prueba.doc",
         key: `test-${Date.now()}`,
-        url: "https://sample-files.com/downloads/documents/docx/sample-files.com-basic-text.docx"
+        url: "https://services.impecol.com:10000/temp/1746470839172-712851437.docx"
       },
       documentType: "word",
       editorConfig: {
