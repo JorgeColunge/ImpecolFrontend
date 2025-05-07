@@ -245,7 +245,7 @@ const DocumentUploader = () => {
         fileType: "doc", // ⚠️ Nota: este es un .doc, no .docx
         title: "archivo-de-prueba.doc",
         key: `test-${Date.now()}`,
-        url: "https://file-examples.com/wp-content/storage/2017/02/file-sample_100kB.docx"
+        url: "https://sample-files.com/downloads/documents/docx/sample-files.com-basic-text.docx"
       },
       documentType: "word",
       editorConfig: {
