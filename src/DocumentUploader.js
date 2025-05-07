@@ -310,6 +310,21 @@ const DocumentUploader = () => {
         }
       };
 
+      try {
+        const arrayBuffer = await fetch(config.document.url).then(res => res.arrayBuffer());
+        const byteLength = arrayBuffer.byteLength;
+        const firstBytes = new Uint8Array(arrayBuffer.slice(0, 8));
+        console.log(`📄 Archivo descargado directamente: ${byteLength} bytes`);
+        console.log("🔍 Primeros 8 bytes del archivo:", Array.from(firstBytes).map(b => b.toString(16).padStart(2, '0')).join(' '));
+
+        // Validación básica: los archivos DOCX deben comenzar con la cabecera de ZIP (PK)
+        if (firstBytes[0] !== 0x50 || firstBytes[1] !== 0x4B) {
+          console.warn("⚠️ El archivo no parece ser un ZIP válido (.docx). ¿Está corrupto?");
+        }
+      } catch (err) {
+        console.error("❌ Error al descargar o verificar contenido del archivo:", err);
+      }
+
       const editor = new window.DocsAPI.DocEditor("onlyoffice-editor", config);
       console.log("✅ Editor OnlyOffice instanciado correctamente.");
 
