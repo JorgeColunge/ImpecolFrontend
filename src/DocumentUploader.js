@@ -292,24 +292,43 @@ const DocumentUploader = () => {
 
     try {
       const editor = new window.DocsAPI.DocEditor("onlyoffice-editor", config);
+      console.log("🧪 Verificando iframe OnlyOffice...");
+      const iframe = container.querySelector("iframe");
+      if (!iframe) {
+        console.warn("⚠️ No se encontró ningún iframe dentro del contenedor");
+      } else {
+        console.log("🖼️ Iframe encontrado. src:", iframe.src);
+      }
+
       console.log("✅ Editor OnlyOffice instanciado correctamente.");
 
+      // Verifica si `events` existe y muestra los métodos disponibles
+      setTimeout(() => {
+        if (editor.events) {
+          console.log("🧠 Métodos disponibles en editor.events:", Object.keys(editor.events));
+        } else {
+          console.warn("⚠️ editor.events sigue siendo undefined");
+        }
+      }, 300); // Pequeña espera por si el objeto tarda en inicializar
+
       // Eventos útiles
-      if (editor.events) {
-        editor.events.on("onReady", () => {
-          console.log("🟢 Editor listo.");
-        });
+      setTimeout(() => {
+        if (editor.events) {
+          editor.events.on("onReady", () => {
+            console.log("🟢 Editor listo.");
+          });
 
-        editor.events.on("onDocumentStateChange", (event) => {
-          console.log("✏️ Estado del documento cambió:", event);
-        });
+          editor.events.on("onDocumentStateChange", (event) => {
+            console.log("✏️ Estado del documento cambió:", event);
+          });
 
-        editor.events.on("onError", (error) => {
-          console.error("🚨 Error interno en OnlyOffice:", error);
-        });
-      } else {
-        console.warn("⚠️ No se encontraron eventos en editor.events");
-      }
+          editor.events.on("onError", (error) => {
+            console.error("🚨 Error interno en OnlyOffice:", error);
+          });
+        } else {
+          console.warn("⚠️ No se encontraron eventos en editor.events");
+        }
+      }, 500);
     } catch (e) {
       console.error("❌ Excepción al instanciar DocsAPI.DocEditor:", e);
     }
