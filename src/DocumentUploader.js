@@ -24,25 +24,6 @@ const DocumentUploader = () => {
     };
   }, []);
 
-  const waitForFileAvailable = async (url, maxRetries = 10) => {
-    console.log(`⏳ Verificando disponibilidad de archivo: ${url}`);
-    for (let attempt = 1; attempt <= maxRetries; attempt++) {
-      try {
-        const response = await fetch(url, { method: "HEAD" });
-        if (response.ok) {
-          console.log(`✅ Archivo disponible en intento ${attempt}`);
-          return true;
-        } else {
-          console.warn(`⚠️ Archivo no disponible (intento ${attempt}): ${response.status}`);
-        }
-      } catch (err) {
-        console.warn(`⚠️ Error al intentar acceder al archivo (intento ${attempt}):`, err);
-      }
-      await new Promise((resolve) => setTimeout(resolve, 2000)); // Espera 500ms
-    }
-    throw new Error("❌ El archivo no estuvo disponible después de varios intentos.");
-  };
-
   const handleFileChange = async (uploadedFile) => {
     if (!uploadedFile) return;
 
@@ -73,8 +54,7 @@ const DocumentUploader = () => {
       // Extraer variables y tablas después de renderizar
       extractVariablesAndTables(uploadedFile);
       setEditorKey(Date.now());
-      await new Promise((resolve) => setTimeout(resolve, 500)); // ⏳ Espera inicial de 10 segundos
-      await waitForFileAvailable(config.document.url, 10);
+      await new Promise((resolve) => setTimeout(resolve, 100)); // Espera a que el DOM actualice
       renderWithOnlyOffice(config);
     } catch (error) {
       console.error("❌ Error al procesar archivo:", error);
@@ -237,81 +217,25 @@ const DocumentUploader = () => {
     e.preventDefault();
   };
 
-  const renderWithOnlyOffice = async () => {
-    console.log("🚀 Cargando documento de prueba público...");
-
-    const config = {
-      document: {
-        fileType: "doc", // ⚠️ Nota: este es un .doc, no .docx
-        title: "archivo-de-prueba.doc",
-        key: `test-${Date.now()}`,
-        url: "https://services.impecol.com:10000/temp/1746470839172-712851437.docx"
-      },
-      documentType: "word",
-      editorConfig: {
-        mode: "edit",
-        user: {
-          id: "tester",
-          name: "Prueba pública"
-        },
-        events: {
-          onReady: () => {
-            console.log("🟢 Editor listo (evento onReady)");
-          },
-          onDocumentStateChange: (event) => {
-            console.log("✏️ Cambió el estado del documento:", event);
-          },
-          onError: (error) => {
-            console.error("🚨 Error interno en OnlyOffice:", error);
-          },
-          onRequestClose: () => {
-            console.log("❌ Cierre solicitado");
-          }
-        }
-      }
-    };
-
+  const renderWithOnlyOffice = (config) => {
+    console.log("📦 Preparando editor OnlyOffice...");
     const container = document.getElementById("onlyoffice-editor");
+
     if (!container) {
       console.error("❌ No se encontró el contenedor #onlyoffice-editor");
       return;
     }
 
-    // Verificación HEAD
-    try {
-      const headResponse = await fetch(config.document.url, { method: "HEAD" });
-      const status = headResponse.status;
-      const type = headResponse.headers.get("Content-Type");
-      const size = headResponse.headers.get("Content-Length");
-      console.log(`📡 HEAD Response: ${status} | Content-Type: ${type} | Size: ${size} bytes`);
-    } catch (err) {
-      console.error("❌ Error en HEAD request:", err);
+    if (!window.DocsAPI) {
+      console.error("❌ DocsAPI (OnlyOffice) no está disponible en window");
       return;
     }
 
-    // Verificación binaria
-    try {
-      const buffer = await fetch(config.document.url).then((res) => res.arrayBuffer());
-      const firstBytes = new Uint8Array(buffer.slice(0, 8));
-      console.log(`📄 Descargado. Bytes: ${buffer.byteLength}`);
-      console.log("🔍 Primeros 8 bytes:", Array.from(firstBytes).map(b => b.toString(16).padStart(2, "0")).join(" "));
-    } catch (err) {
-      console.error("❌ Error al descargar archivo:", err);
-      return;
-    }
+    container.innerHTML = ""; // Limpieza por si acaso
 
-    // Limpiar y renderizar
-    container.innerHTML = "";
-    try {
-      const editor = new window.DocsAPI.DocEditor("onlyoffice-editor", config);
-      console.log("✅ Editor instanciado correctamente.");
-      console.log("🧠 Métodos del editor:", Object.keys(editor));
-    } catch (e) {
-      console.error("❌ Excepción al instanciar DocsAPI.DocEditor:", e);
-    }
+    new window.DocsAPI.DocEditor("onlyoffice-editor", config);
+    console.log("✅ Editor OnlyOffice instanciado.");
   };
-
-
 
   return (
     <div className="document-uploader">
