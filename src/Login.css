@@ -3,10 +3,6 @@ body {
   background-color: #f8f9fa;
 }
 
-.container-fluid {
-  background: linear-gradient(135deg, #6a11cb 0%, #2575fc 100%);
-}
-
 .row {
   height: 100vh;
 }
@@ -39,10 +35,13 @@ form .btn-primary:hover {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: white; /* Texto en blanco */
-  text-align: center; /* Centra el texto */
+  color: white;
+  /* Texto en blanco */
+  text-align: center;
+  /* Centra el texto */
   padding: 2rem;
-  border-radius: 0 8px 8px 0; /* Bordes redondeados a la derecha */
+  border-radius: 0 8px 8px 0;
+  /* Bordes redondeados a la derecha */
 }
 
 /* Estilo del título y descripción */
