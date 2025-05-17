@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { useParams,useLocation } from 'react-router-dom';
+import { useParams, useLocation } from 'react-router-dom';
 import { useNavigate } from 'react-router-dom';
 import { Button, Table, InputGroup, FormControl, Modal, Form } from 'react-bootstrap';
 import api from './Api'; // Usa el archivo de API con lógica offline integrada
@@ -8,7 +8,7 @@ import { initUsersDB, saveUsers, getUsers, getInspectionById, saveInspections } 
 import SignatureCanvas from 'react-signature-canvas';
 import "./Inspection.css";
 import { ArrowDownSquare, ArrowUpSquare, Eye, FileEarmarkArrowDown, FileEarmarkPlus, EnvelopePaper, Whatsapp, Radioactive, FileEarmarkExcel, FileEarmarkImage, FileEarmarkPdf, FileEarmarkWord, PencilSquare, QrCodeScan, XCircle } from 'react-bootstrap-icons';
-import  {useUnsavedChanges} from './UnsavedChangesContext'
+import { useUnsavedChanges } from './UnsavedChangesContext'
 import QrScannerComponent from './QrScannerComponent';
 import moment from 'moment';
 import { useSocket } from './SocketContext';
@@ -35,7 +35,7 @@ function Inspection() {
     longitude: '', // Nuevo campo para localización
     altitude: '', // Nuevo campo para localización
     timestamp: '', // Hora de la captura
-  });  
+  });
   const [stationModalOpenHorizontal, setStationModalOpenHorizontal] = useState(false);
   const [currentStationIdHorizontal, setCurrentStationIdHorizontal] = useState(null);
   const [collapseStates, setCollapseStates] = useState({});
@@ -74,61 +74,63 @@ function Inspection() {
   const [loadingConvertToPdf, setLoadingConvertToPdf] = useState(false);
   const [isExecuting, setIsExecuting] = useState(false);
   const [actions, setActions] = useState([]);
+  const [clientData, setClientData] = useState(null);
+  const [loadingWhatsApp, setLoadingWhatsApp] = useState(false);
   const navigate = useNavigate();
 
   const socket = useSocket(); // Obtenemos el socket
 
-useEffect(() => {
-  if (socket) {
-    socket.on("inspection_synced", ({ oldId, newId }) => {
-      console.log(`🔄 La inspección ${oldId} ha sido actualizada a ${newId}`);
+  useEffect(() => {
+    if (socket) {
+      socket.on("inspection_synced", ({ oldId, newId }) => {
+        console.log(`🔄 La inspección ${oldId} ha sido actualizada a ${newId}`);
 
-      if (inspectionId === oldId) {
-        console.log(`✅ Actualizando ID de la inspección actual: ${oldId} → ${newId}`);
+        if (inspectionId === oldId) {
+          console.log(`✅ Actualizando ID de la inspección actual: ${oldId} → ${newId}`);
 
-        // Actualizamos la URL sin recargar la página
-        navigate(`/inspection/${newId}`, { replace: true });
+          // Actualizamos la URL sin recargar la página
+          navigate(`/inspection/${newId}`, { replace: true });
 
-        // Actualizamos el estado para reflejar el nuevo ID
-        setInspectionData((prevData) => ({
-          ...prevData,
-          id: newId, // Reemplazamos el ID viejo con el nuevo
-        }));
+          // Actualizamos el estado para reflejar el nuevo ID
+          setInspectionData((prevData) => ({
+            ...prevData,
+            id: newId, // Reemplazamos el ID viejo con el nuevo
+          }));
 
-        // Reemplazamos en los hallazgos y firmas si es necesario
-        setFindingsByType((prevFindings) => {
-          const updatedFindings = { ...prevFindings };
-          for (const type in updatedFindings) {
-            updatedFindings[type] = updatedFindings[type].map(finding =>
-              finding.inspection_id === oldId ? { ...finding, inspection_id: newId } : finding
-            );
-          }
-          return updatedFindings;
-        });
-
-        setClientStations((prevStations) => {
-          const updatedStations = { ...prevStations };
-          for (const stationId in updatedStations) {
-            if (updatedStations[stationId].inspection_id === oldId) {
-              updatedStations[stationId].inspection_id = newId;
+          // Reemplazamos en los hallazgos y firmas si es necesario
+          setFindingsByType((prevFindings) => {
+            const updatedFindings = { ...prevFindings };
+            for (const type in updatedFindings) {
+              updatedFindings[type] = updatedFindings[type].map(finding =>
+                finding.inspection_id === oldId ? { ...finding, inspection_id: newId } : finding
+              );
             }
-          }
-          return updatedStations;
-        });
+            return updatedFindings;
+          });
 
-        setActions((prevActions) =>
-          prevActions.map((action) =>
-            action.inspection_id === oldId ? { ...action, inspection_id: newId } : action
-          )
-        );
-      }
-    });
+          setClientStations((prevStations) => {
+            const updatedStations = { ...prevStations };
+            for (const stationId in updatedStations) {
+              if (updatedStations[stationId].inspection_id === oldId) {
+                updatedStations[stationId].inspection_id = newId;
+              }
+            }
+            return updatedStations;
+          });
 
-    return () => {
-      socket.off("inspection_synced");
-    };
-  }
-}, [socket, inspectionId, navigate]);
+          setActions((prevActions) =>
+            prevActions.map((action) =>
+              action.inspection_id === oldId ? { ...action, inspection_id: newId } : action
+            )
+          );
+        }
+      });
+
+      return () => {
+        socket.off("inspection_synced");
+      };
+    }
+  }, [socket, inspectionId, navigate]);
 
   // Abrir el modal
   const handleOpenConvertToPdfModal = () => {
@@ -149,9 +151,9 @@ useEffect(() => {
       const response = await api.post("/convert-to-pdf", {
         generatedDocumentId: selectedDocForPdf.id,
       });
-  
+
       console.log("Respuesta recibida del backend:", response.data);
-  
+
       if (response.data.success) {
         console.log("Conversión exitosa. Datos del nuevo documento:", response.data.newDocument);
         setConvertToPdfModalOpen(false);
@@ -168,18 +170,18 @@ useEffect(() => {
       setLoadingConvertToPdf(false); // Ocultar spinner
     }
   };
-  
+
   const handleActionClick = async (configurationId) => {
     if (isExecuting) return;
     setIsExecuting(true);
-  
+
     try {
       const payload = { idEntity: inspectionId, id: configurationId, uniqueId: Date.now() };
       const response = await api.post(
         `${process.env.REACT_APP_API_URL}/api/create-document-inspeccion`,
         payload
       );
-  
+
       if (response.data.success) {
         showNotification("Acción ejecutada con éxito.");
         await fetchDocuments();
@@ -192,7 +194,7 @@ useEffect(() => {
     } finally {
       setIsExecuting(false);
     }
-  }; 
+  };
 
   const handleDownload = async () => {
     try {
@@ -216,25 +218,25 @@ useEffect(() => {
     setLoadingGoogleDrive(true); // Mostrar el spinner
     try {
       console.log("Iniciando pre-firmado del documento:", selectedDocument);
-  
+
       const response = await api.post("/PrefirmarArchivos", { url: selectedDocument.document_url });
       console.log("Respuesta de pre-firmado:", response.data);
-  
+
       if (response.data.signedUrl) {
         const preSignedUrl = response.data.signedUrl;
         console.log("URL prefirmada obtenida:", preSignedUrl);
-  
+
         console.log("Enviando solicitud para editar en Google Drive...");
         const googleDriveResponse = await api.post("/edit-googledrive", { s3Url: preSignedUrl });
         console.log("Respuesta de edición en Google Drive:", googleDriveResponse.data);
-  
+
         if (googleDriveResponse.data.success && googleDriveResponse.data.fileId) {
           const googleDriveEditUrl = `https://docs.google.com/document/d/${googleDriveResponse.data.fileId}/edit`;
           console.log("URL de edición en Google Drive:", googleDriveEditUrl);
-  
+
           // Abrir Google Drive en una nueva pestaña
           window.open(googleDriveEditUrl, "_blank", "noopener,noreferrer");
-  
+
           // Pasar información al nuevo componente
           const documentInfo = {
             id: selectedDocument.id,
@@ -243,9 +245,9 @@ useEffect(() => {
             google_drive_url: googleDriveEditUrl,
             google_drive_id: googleDriveResponse.data.fileId,
           };
-  
+
           console.log("Información del documento que se pasa al componente:", documentInfo);
-  
+
           navigate("/edit-google-drive", {
             state: {
               documentInfo,
@@ -266,10 +268,10 @@ useEffect(() => {
       setLoadingGoogleDrive(false); // Ocultar el spinner
     }
   };
-  
+
 
   const handleEditLocal = () => {
-    navigate("/edit-local-file", { state: {documentId: selectedDocument.id}});
+    navigate("/edit-local-file", { state: { documentId: selectedDocument.id } });
   };
 
   const handleDocumentClick = (documentUrl) => {
@@ -319,7 +321,7 @@ useEffect(() => {
       setClientSignaturePreview(dataURL); // Guardar la previsualización
     }
   };
-  
+
 
   const handleSignModalCancel = () => {
     setSignModalOpen(false);
@@ -331,7 +333,7 @@ useEffect(() => {
   const handleSignModalClose = () => {
     setSignModalOpen(false);
   };
-  
+
 
   const handleSignDataChange = (field, value) => {
     setSignData((prevData) => ({
@@ -355,22 +357,22 @@ useEffect(() => {
         return null; // Retorna null si hay un error
       }
     };
-  
+
     const fetchInspectionData = async () => {
       try {
         console.log('🔍 Verificando modo de conexión...');
-    
+
         let inspectionData;
-    
+
         if (isOffline()) {
           console.log('📴 Modo offline activado. Consultando IndexedDB...');
           inspectionData = await getInspectionById(inspectionId);
-    
+
           if (!inspectionData) {
             console.warn(`⚠️ Inspección ${inspectionId} no encontrada en IndexedDB.`);
             return setLoading(false);
           }
-    
+
           console.log('✅ Inspección cargada desde IndexedDB:', inspectionData);
 
           // 🔥 Convertir `inspection_type` de array a string separado por comas
@@ -381,39 +383,39 @@ useEffect(() => {
           console.log('🌐 Modo online. Consultando API...');
           const response = await api.get(`${process.env.REACT_APP_API_URL}/api/inspections/${inspectionId}`);
           inspectionData = response.data;
-    
+
           console.log('✅ Inspección obtenida desde API:', inspectionData);
-    
+
           // Guardar en IndexedDB para acceso offline en el futuro
           await saveInspections({ [inspectionData.service_id]: [inspectionData] });
           console.log('📥 Inspección almacenada en IndexedDB.');
         }
-    
+
         setInspectionData(inspectionData);
-    
+
         // Cargar observaciones generales
         setGeneralObservations(inspectionData.observations || '');
-    
+
         // Procesar hallazgos
         const initialFindings = inspectionData.findings?.findingsByType || {};
         for (const type of Object.keys(initialFindings)) {
           initialFindings[type] = await Promise.all(
             initialFindings[type].map(async (finding) => {
               if (!finding.photo) return { ...finding, photo: null, photoRelative: null, photoBlob: null };
-    
+
               let signedUrl = null;
               try {
                 signedUrl = await preSignUrl(finding.photo);
               } catch (error) {
                 console.error(`❌ Error al pre-firmar la URL del hallazgo ${finding.id}:`, error);
               }
-    
+
               return { ...finding, photo: signedUrl, photoRelative: finding.photo || null, photoBlob: null };
             })
           );
         }
         setFindingsByType(initialFindings);
-    
+
         // Cargar firmas y pre-firmar URLs
         const signatures = inspectionData.findings?.signatures || {};
         if (signatures.technician?.signature) {
@@ -422,7 +424,7 @@ useEffect(() => {
         if (signatures.client?.signature) {
           setClientSignaturePreview(await preSignUrl(signatures.client.signature) || signatures.client.signature);
         }
-        
+
         // Cargar datos del cliente
         if (signatures.client) {
           setSignData({
@@ -431,38 +433,44 @@ useEffect(() => {
             position: signatures.client.position || '',
           });
         }
-    
+
         // Procesar hallazgos en estaciones
         const clientStationsData = {};
         for (const finding of inspectionData.findings?.stationsFindings || []) {
           try {
             const signedUrl = finding.photo ? await preSignUrl(finding.photo) : null;
             if (!finding.stationId) continue;
-    
+
             clientStationsData[finding.stationId] = { ...finding, photo: signedUrl, photoRelative: finding.photo || null, photoBlob: null };
           } catch (error) {
             console.error(`❌ Error procesando hallazgo en estación ${finding.stationId}:`, error);
           }
         }
         setClientStations(clientStationsData);
-    
+
         // Cargar estaciones relacionadas
         if (!isOffline() && inspectionData.service_id) {
           const serviceResponse = await api.get(`${process.env.REACT_APP_API_URL}/api/services/${inspectionData.service_id}`);
           const clientId = serviceResponse.data.client_id;
-    
+
+          console.log("cliente id: ", clientId)
+          const clientResponse = await api.get(`${process.env.REACT_APP_API_URL}/api/clients/${clientId}`);
+          const clientData = clientResponse.data;
+          console.log("datos del cliente: ", clientData)
+          setClientData(clientResponse.data);
           if (clientId) {
             const stationsResponse = await api.get(`${process.env.REACT_APP_API_URL}/api/stations/client/${clientId}`);
             setStations(stationsResponse.data);
+
           }
         }
-    
+
         // Cargar productos disponibles
         if (!isOffline()) {
           const productsResponse = await api.get(`${process.env.REACT_APP_API_URL}/api/products`);
           setAvailableProducts(productsResponse.data);
         }
-    
+
         setLoading(false);
         console.log('✅ Carga de datos de inspección completada.');
       } catch (error) {
@@ -470,8 +478,8 @@ useEffect(() => {
         setLoading(false);
       }
     };
-    
-    
+
+
     const fetchActions = async () => {
       try {
         const response = await api.get(`${process.env.REACT_APP_API_URL}/api/actions-inspections`, {
@@ -485,9 +493,9 @@ useEffect(() => {
 
     fetchDocuments();
     fetchActions();
-  
+
     fetchInspectionData();
-  }, [inspectionId]); 
+  }, [inspectionId]);
 
   const fetchDocuments = async () => {
     try {
@@ -503,7 +511,7 @@ useEffect(() => {
   const handleQrScan = (scannedValue) => {
     console.log("Valor recibido del escáner QR:", scannedValue);
     const normalizedValue = scannedValue.toLowerCase();
-  
+
     if (currentQrStationType === "Jardineria") {
       setSearchTermJardineria(normalizedValue);
       console.log("Estado de búsqueda actualizado (Jardineria):", normalizedValue);
@@ -517,15 +525,15 @@ useEffect(() => {
       setSearchTermHogar(normalizedValue);
       console.log("Estado de búsqueda actualizado (Hogar):", normalizedValue);
     }
-  
+
     setQrScannerOpen(false); // Cierra el modal
-  };  
-  
+  };
+
   const handleOpenQrScanner = (type) => {
     setCurrentQrStationType(type); // Define el tipo antes de abrir el escáner
     setQrScannerOpen(true); // Abre el modal de escáner QR
   };
-    
+
   useEffect(() => {
     return () => {
       if (stationFinding.photo) {
@@ -542,166 +550,166 @@ useEffect(() => {
     const handleResize = () => {
       setIsMobile(window.innerWidth <= 768); // Ancho típico para dispositivos móviles
     };
-  
+
     // Escuchar cambios en el tamaño de la ventana
     window.addEventListener('resize', handleResize);
-  
+
     // Ejecutar al montar el componente
     handleResize();
-  
+
     return () => {
       window.removeEventListener('resize', handleResize);
     };
   }, []);
 
   const detectChanges = () => {
-  const changes = {
-    generalObservations: generalObservations !== inspectionData?.observations,
-    findingsByType: JSON.stringify(findingsByType) !== JSON.stringify(inspectionData?.findings?.findingsByType),
-    productsByType: JSON.stringify(productsByType) !== JSON.stringify(inspectionData?.findings?.productsByType),
-    stationsFindings: JSON.stringify(clientStations) !== JSON.stringify(
-      inspectionData?.findings?.stationsFindings.reduce((acc, finding) => {
-        acc[finding.stationId] = finding;
-        return acc;
-      }, {})
-    ),
+    const changes = {
+      generalObservations: generalObservations !== inspectionData?.observations,
+      findingsByType: JSON.stringify(findingsByType) !== JSON.stringify(inspectionData?.findings?.findingsByType),
+      productsByType: JSON.stringify(productsByType) !== JSON.stringify(inspectionData?.findings?.productsByType),
+      stationsFindings: JSON.stringify(clientStations) !== JSON.stringify(
+        inspectionData?.findings?.stationsFindings.reduce((acc, finding) => {
+          acc[finding.stationId] = finding;
+          return acc;
+        }, {})
+      ),
+    };
+
+    console.log('Cambios detectados:', changes);
+    return Object.values(changes).some((change) => change); // Retorna true si hay algún cambio
   };
 
-  console.log('Cambios detectados:', changes);
-  return Object.values(changes).some((change) => change); // Retorna true si hay algún cambio
-};
+  const handleSaveChanges = async () => {
+    try {
+      const formData = new FormData();
 
-const handleSaveChanges = async () => {
-  try {
-    const formData = new FormData();
+      // Información básica
+      formData.append("inspectionId", inspectionId);
+      formData.append("generalObservations", generalObservations);
 
-    // Información básica
-    formData.append("inspectionId", inspectionId);
-    formData.append("generalObservations", generalObservations);
+      // Incluir el ID del usuario explícitamente
+      formData.append("userId", storedUserInfo?.id_usuario || null);
+      formData.append("exitTime", moment().format("HH:mm"));
 
-    // Incluir el ID del usuario explícitamente
-    formData.append("userId", storedUserInfo?.id_usuario || null);
-    formData.append("exitTime", moment().format("HH:mm"));
+      // Procesar findingsByType
+      const findingsByTypeProcessed = {};
+      Object.keys(findingsByType).forEach((type) => {
+        findingsByTypeProcessed[type] = findingsByType[type].map((finding) => ({
+          ...finding,
+          photo: finding.photoBlob ? null : finding.photoRelative, // Enviar la URL relativa si no hay nueva imagen
+          date: finding.date || inspectionData?.date, // <- asegura que se mantenga
+        }));
+      });
 
-    // Procesar findingsByType
-    const findingsByTypeProcessed = {};
-    Object.keys(findingsByType).forEach((type) => {
-      findingsByTypeProcessed[type] = findingsByType[type].map((finding) => ({
-        ...finding,
-        photo: finding.photoBlob ? null : finding.photoRelative, // Enviar la URL relativa si no hay nueva imagen
-        date: finding.date || inspectionData?.date, // <- asegura que se mantenga
-      }));
-    });
+      formData.append("findingsByType", JSON.stringify(findingsByTypeProcessed));
 
-    formData.append("findingsByType", JSON.stringify(findingsByTypeProcessed));
-    
-    // Procesar productsByType con ID
-    const productsByTypeProcessed = {};
-    Object.keys(productsByType).forEach((type) => {
-      const productData = productsByType[type];
-      if (productData) {
-        productsByTypeProcessed[type] = {
-          id: productData.id || null, // Incluir el ID
-          product: productData.product || '',
-          dosage: productData.dosage || '',
-        };
-      }
-    });
-
-    formData.append("productsByType", JSON.stringify(productsByTypeProcessed));
-
-    // Procesar stationsFindings
-    const stationsFindingsArray = Object.entries(clientStations).map(([stationId, finding]) => ({
-      ...finding,
-      stationId,
-      photo: finding.photoBlob ? null : finding.photoRelative, // Enviar la URL relativa si no hay nueva imagen
-    }));
-
-    formData.append("stationsFindings", JSON.stringify(stationsFindingsArray));
-
-    // Ajuste en las firmas: eliminar el prefijo completo si existe
-    const removePrefix = (url) => {
-      const prefix = "";
-      return url && url.startsWith(prefix) ? url.replace(prefix, "") : url;
-    };
-
-    // Construir el objeto signatures
-    const signatures = {
-      client: {
-        id: signData.id,
-        name: signData.name,
-        position: signData.position,
-        signature: clientSignature instanceof Blob ? null : removePrefix(clientSignaturePreview), // Usar la URL si no hay nueva firma
-      },
-      technician: {
-        id: storedUserInfo?.id_usuario || null,
-        name: `${storedUserInfo?.name || ""} ${storedUserInfo?.lastname || ""}`.trim(),
-        role: userRol || "No disponible",
-        signature: techSignature instanceof Blob ? null : removePrefix(techSignaturePreview), // Usar la URL si no hay nueva firma
-      },
-    };
-
-    formData.append("signatures", JSON.stringify(signatures));
-
-    // Agregar imágenes como campos separados
-    if (techSignature instanceof Blob) {
-      formData.append("tech_signature", techSignature, "tech_signature.jpg");
-    }
-    if (clientSignature instanceof Blob) {
-      formData.append("client_signature", clientSignature, "client_signature.jpg");
-    }
-
-    // Agregar imágenes de findings
-    Object.keys(findingsByType).forEach((type) => {
-      findingsByType[type].forEach((finding) => {
-        if (finding.photoBlob) {
-          formData.append("findingsImages", finding.photoBlob, `${finding.id}.jpg`);
+      // Procesar productsByType con ID
+      const productsByTypeProcessed = {};
+      Object.keys(productsByType).forEach((type) => {
+        const productData = productsByType[type];
+        if (productData) {
+          productsByTypeProcessed[type] = {
+            id: productData.id || null, // Incluir el ID
+            product: productData.product || '',
+            dosage: productData.dosage || '',
+          };
         }
       });
-    });
 
-    // Agregar imágenes de stationsFindings
-    stationsFindingsArray.forEach((finding) => {
-      if (finding.photoBlob) {
-        formData.append("stationImages", finding.photoBlob, `${finding.stationId}.jpg`);
+      formData.append("productsByType", JSON.stringify(productsByTypeProcessed));
+
+      // Procesar stationsFindings
+      const stationsFindingsArray = Object.entries(clientStations).map(([stationId, finding]) => ({
+        ...finding,
+        stationId,
+        photo: finding.photoBlob ? null : finding.photoRelative, // Enviar la URL relativa si no hay nueva imagen
+      }));
+
+      formData.append("stationsFindings", JSON.stringify(stationsFindingsArray));
+
+      // Ajuste en las firmas: eliminar el prefijo completo si existe
+      const removePrefix = (url) => {
+        const prefix = "";
+        return url && url.startsWith(prefix) ? url.replace(prefix, "") : url;
+      };
+
+      // Construir el objeto signatures
+      const signatures = {
+        client: {
+          id: signData.id,
+          name: signData.name,
+          position: signData.position,
+          signature: clientSignature instanceof Blob ? null : removePrefix(clientSignaturePreview), // Usar la URL si no hay nueva firma
+        },
+        technician: {
+          id: storedUserInfo?.id_usuario || null,
+          name: `${storedUserInfo?.name || ""} ${storedUserInfo?.lastname || ""}`.trim(),
+          role: userRol || "No disponible",
+          signature: techSignature instanceof Blob ? null : removePrefix(techSignaturePreview), // Usar la URL si no hay nueva firma
+        },
+      };
+
+      formData.append("signatures", JSON.stringify(signatures));
+
+      // Agregar imágenes como campos separados
+      if (techSignature instanceof Blob) {
+        formData.append("tech_signature", techSignature, "tech_signature.jpg");
       }
-    });
+      if (clientSignature instanceof Blob) {
+        formData.append("client_signature", clientSignature, "client_signature.jpg");
+      }
 
-    // Enviar datos al backend
-    await api.post(`/inspections/${inspectionId}/save`, formData, {
-      headers: { "Content-Type": "multipart/form-data" },
-    });
+      // Agregar imágenes de findings
+      Object.keys(findingsByType).forEach((type) => {
+        findingsByType[type].forEach((finding) => {
+          if (finding.photoBlob) {
+            formData.append("findingsImages", finding.photoBlob, `${finding.id}.jpg`);
+          }
+        });
+      });
 
-    showNotification("Cambios guardados exitosamente.");
+      // Agregar imágenes de stationsFindings
+      stationsFindingsArray.forEach((finding) => {
+        if (finding.photoBlob) {
+          formData.append("stationImages", finding.photoBlob, `${finding.stationId}.jpg`);
+        }
+      });
 
-    // Resetear el estado de cambios no guardados
-    setHasUnsavedChanges(false);
-    setUnsavedRoute(null); // Opcional: Resetear la ruta de cambios
-  } catch (error) {
-    console.error("Error guardando los cambios:", error);
+      // Enviar datos al backend
+      await api.post(`/inspections/${inspectionId}/save`, formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
 
-    if (error.message.includes("Offline")) {
-      showNotification(
-        "Cambios guardados localmente. Se sincronizarán automáticamente cuando vuelva la conexión."
-      );
-    } else {
-      showNotification("Hubo un error al guardar los cambios.");
+      showNotification("Cambios guardados exitosamente.");
+
+      // Resetear el estado de cambios no guardados
+      setHasUnsavedChanges(false);
+      setUnsavedRoute(null); // Opcional: Resetear la ruta de cambios
+    } catch (error) {
+      console.error("Error guardando los cambios:", error);
+
+      if (error.message.includes("Offline")) {
+        showNotification(
+          "Cambios guardados localmente. Se sincronizarán automáticamente cuando vuelva la conexión."
+        );
+      } else {
+        showNotification("Hubo un error al guardar los cambios.");
+      }
     }
-  }
-};
+  };
 
-const dataURLtoBlob = (dataURL) => {
-  const byteString = atob(dataURL.split(',')[1]);
-  const mimeString = dataURL.split(',')[0].split(':')[1].split(';')[0];
-  const ab = new ArrayBuffer(byteString.length);
-  const ia = new Uint8Array(ab);
+  const dataURLtoBlob = (dataURL) => {
+    const byteString = atob(dataURL.split(',')[1]);
+    const mimeString = dataURL.split(',')[0].split(':')[1].split(';')[0];
+    const ab = new ArrayBuffer(byteString.length);
+    const ia = new Uint8Array(ab);
 
-  for (let i = 0; i < byteString.length; i++) {
-    ia[i] = byteString.charCodeAt(i);
-  }
+    for (let i = 0; i < byteString.length; i++) {
+      ia[i] = byteString.charCodeAt(i);
+    }
 
-  return new Blob([ab], { type: mimeString });
-};
+    return new Blob([ab], { type: mimeString });
+  };
 
 
   const handleStationChange = (stationId, field, value) => {
@@ -714,13 +722,13 @@ const dataURLtoBlob = (dataURL) => {
   const handleAddFinding = (type) => {
     const newFindingId = Date.now(); // ID único basado en el timestamp
     const newFindingKey = `${type}-${newFindingId}`; // Clave única para el hallazgo
-  
+
     const now = moment();
     const date = inspectionData?.date
       ? moment(inspectionData.date).format("DD-MM-YYYY") // ← nuevo formato aquí
       : now.format("DD-MM-YYYY");
     const time = now.format("HH:mm"); // Hora exacta
-  
+
     // Actualizar los hallazgos con el nuevo elemento
     setFindingsByType((prevFindings) => ({
       ...prevFindings,
@@ -736,14 +744,14 @@ const dataURLtoBlob = (dataURL) => {
         },
       ],
     }));
-  
+
     // Expandir el nuevo hallazgo
     setCollapseStates((prevStates) => ({
       ...prevStates,
       [newFindingKey]: true,
     }));
   };
-  
+
 
   const handleFindingChange = (type, index, field, value) => {
     setFindingsByType((prevFindings) => {
@@ -761,9 +769,9 @@ const dataURLtoBlob = (dataURL) => {
       showNotification('Seleccione un archivo válido de tipo imagen.');
       return;
     }
-  
+
     const photoURL = URL.createObjectURL(file);
-  
+
     setFindingsByType((prevFindings) => {
       const updatedFindings = [...prevFindings[type]];
       updatedFindings[index] = {
@@ -776,12 +784,12 @@ const dataURLtoBlob = (dataURL) => {
       setUnsavedRoute(location.pathname);
       return { ...prevFindings, [type]: updatedFindings };
     });
-  };    
+  };
 
   const handleProductChange = (type, field, value) => {
     setProductsByType((prevProducts) => {
       const updatedProduct = { ...prevProducts[type] };
-  
+
       if (field === 'product') {
         const selectedProduct = availableProducts.find((product) => product.name === value);
         updatedProduct.product = value;
@@ -789,30 +797,30 @@ const dataURLtoBlob = (dataURL) => {
       } else {
         updatedProduct[field] = value;
       }
-  
+
       return {
         ...prevProducts,
         [type]: updatedProduct,
       };
     });
-  
+
     // Marcar cambios detectados
     setHasUnsavedChanges(true);
     setUnsavedRoute(location.pathname);
-  };  
+  };
 
   const getFilteredProducts = (type) => {
     if (!availableProducts || !type) {
       console.log("No hay productos disponibles o el tipo de inspección está vacío.");
       return [];
     }
-  
+
     console.log("Filtrando productos para el tipo de inspección:", type);
     console.log("Productos disponibles antes del filtrado:", availableProducts);
-  
+
     return availableProducts.filter((product) => {
       console.log("Evaluando producto:", product);
-  
+
       if (!product.category) {
         console.warn(
           `Producto omitido (${product.name}) porque no tiene categoría definida.`,
@@ -820,19 +828,19 @@ const dataURLtoBlob = (dataURL) => {
         );
         return false; // Omitimos productos sin categoría
       }
-  
+
       try {
         // Limpiar las categorías, eliminar corchetes y dividir en un array
         const cleanedCategory = product.category
           .replace(/[\{\}\[\]"]/g, "") // Elimina `{`, `}`, `[`, `]`, y comillas
           .split(",")
           .map((cat) => cat.trim().toLowerCase()); // Convierte a minúsculas para comparación
-  
+
         console.log(
           `Categorías procesadas del producto (${product.name}):`,
           cleanedCategory
         );
-  
+
         // Verificar si alguna categoría coincide con el tipo de inspección
         const match = cleanedCategory.some((category) => {
           const isMatch = category === type.toLowerCase();
@@ -842,12 +850,12 @@ const dataURLtoBlob = (dataURL) => {
           );
           return isMatch;
         });
-  
+
         console.log(
           `Resultado del filtrado para el producto (${product.name}):`,
           match ? "Incluido" : "Excluido"
         );
-  
+
         return match;
       } catch (error) {
         console.error(
@@ -858,26 +866,26 @@ const dataURLtoBlob = (dataURL) => {
         return false; // Omitir producto en caso de error
       }
     });
-  };  
-  
+  };
+
   const handleOpenStationModal = async (stationId) => {
     const station = stations.find((s) => s.id === stationId); // Buscar la estación
     if (!station) return;
-  
+
     const captureGeolocation = (callback) => {
       if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(
           (position) => {
             const { latitude, longitude, altitude } = position.coords;
             const timestamp = new Date().toISOString();
-  
+
             const locationData = {
               latitude,
               longitude,
               altitude: altitude || "No disponible",
               timestamp,
             };
-  
+
             console.log("Datos de geolocalización obtenidos:", locationData);
             callback(locationData);
           },
@@ -902,12 +910,12 @@ const dataURLtoBlob = (dataURL) => {
         });
       }
     };
-  
+
     if (station.type === "Localización") {
       const timestamp = moment().format('DD-MM-YYYY HH:mm');
       // Obtener geolocalización y guardar directamente en StationFindings
       captureGeolocation((locationData) => {
-        
+
         // Guardar los datos directamente en clientStations
         setClientStations((prevStations) => ({
           ...prevStations,
@@ -919,7 +927,7 @@ const dataURLtoBlob = (dataURL) => {
       });
       return;
     }
-  
+
     if (station.type === "Control") {
       // Capturar geolocalización antes de abrir el modal
       captureGeolocation((locationData) => {
@@ -934,7 +942,7 @@ const dataURLtoBlob = (dataURL) => {
       });
     }
   };
-  
+
   const handleCloseStationModal = () => {
     setCurrentStationId(null);
     setStationModalOpen(false);
@@ -948,7 +956,7 @@ const dataURLtoBlob = (dataURL) => {
 
     });
   };
-  
+
   const handleStationFindingChange = (field, value) => {
     setStationFinding((prevFinding) => {
       const updatedFinding = {
@@ -963,8 +971,8 @@ const dataURLtoBlob = (dataURL) => {
       return updatedFinding; // Retornar el nuevo estado
     });
   };
-  
-  
+
+
 
   const handleStationFindingPhotoChange = (file) => {
     if (!file || !file.type.startsWith('image/')) {
@@ -972,16 +980,16 @@ const dataURLtoBlob = (dataURL) => {
       showNotification('Seleccione un archivo válido de tipo imagen.');
       return;
     }
-  
+
     // Crear una URL temporal para la previsualización
     const photoURL = URL.createObjectURL(file);
-  
+
     setStationFinding((prevFinding) => {
       // Liberar la URL anterior si existía
       if (prevFinding.photo && prevFinding.photo.startsWith('blob:')) {
         URL.revokeObjectURL(prevFinding.photo);
       }
-  
+
       return {
         ...prevFinding,
         photo: photoURL, // Nueva URL para previsualización
@@ -992,10 +1000,10 @@ const dataURLtoBlob = (dataURL) => {
     // Marcar cambios detectados
     setHasUnsavedChanges(true);
     setUnsavedRoute(location.pathname);
-  
+
     console.log('Nueva imagen seleccionada:', file);
-  };  
-  
+  };
+
   const handleSaveStationFinding = () => {
     setClientStations((prevStations) => ({
       ...prevStations,
@@ -1003,71 +1011,71 @@ const dataURLtoBlob = (dataURL) => {
     }));
     handleCloseStationModal();
   };
-  
+
   // Manejador de estado de colapso
-const handleCollapseToggle = (currentKey) => {
-  setCollapseStates({ [currentKey]: !collapseStates[currentKey] }); // Solo permite un hallazgo expandido
-};
+  const handleCollapseToggle = (currentKey) => {
+    setCollapseStates({ [currentKey]: !collapseStates[currentKey] }); // Solo permite un hallazgo expandido
+  };
 
-const handleViewStation = (stationId) => {
-  setViewStationData(clientStations[stationId] || {});
-  setViewStationModalOpen(true);
-};
+  const handleViewStation = (stationId) => {
+    setViewStationData(clientStations[stationId] || {});
+    setViewStationModalOpen(true);
+  };
 
-const handleViewStationJardineria = (stationId) => {
-  setViewStationData(clientStations[stationId] || {});
-  setStationType('Jardineria');
-  setViewStationModalOpen(true);
-};
+  const handleViewStationJardineria = (stationId) => {
+    setViewStationData(clientStations[stationId] || {});
+    setStationType('Jardineria');
+    setViewStationModalOpen(true);
+  };
 
-const handleViewStationHogar = (stationId) => {
-  setViewStationData(clientStations[stationId] || {});
-  setStationType('Hogar');
-  setViewStationModalOpen(true);
-};
+  const handleViewStationHogar = (stationId) => {
+    setViewStationData(clientStations[stationId] || {});
+    setStationType('Hogar');
+    setViewStationModalOpen(true);
+  };
 
-const handleViewStationHorizontal = (stationId) => {
-  setViewStationData(clientStations[stationId] || {});
-  setStationType('Horizontal');
-  setViewStationModalOpen(true);
-};
+  const handleViewStationHorizontal = (stationId) => {
+    setViewStationData(clientStations[stationId] || {});
+    setStationType('Horizontal');
+    setViewStationModalOpen(true);
+  };
 
-const handleViewStationEmpresarial = (stationId) => {
-  setViewStationData(clientStations[stationId] || {});
-  setStationType('Empresarial');
-  setViewStationModalOpen(true);
-};
+  const handleViewStationEmpresarial = (stationId) => {
+    setViewStationData(clientStations[stationId] || {});
+    setStationType('Empresarial');
+    setViewStationModalOpen(true);
+  };
 
-const handleShowConfirmDelete = (type, index) => {
-  setConfirmDelete({ show: true, type, index });
-};
+  const handleShowConfirmDelete = (type, index) => {
+    setConfirmDelete({ show: true, type, index });
+  };
 
-const handleCloseConfirmDelete = () => {
-  setConfirmDelete({ show: false, type: null, index: null });
-};
+  const handleCloseConfirmDelete = () => {
+    setConfirmDelete({ show: false, type: null, index: null });
+  };
 
-const handleDeleteFinding = () => {
-  const { type, index } = confirmDelete;
+  const handleDeleteFinding = () => {
+    const { type, index } = confirmDelete;
 
-  if (!type || index === null || index === undefined) {
-    console.error(`El tipo ${type} o el índice ${index} no son válidos.`);
-    handleCloseConfirmDelete();
-    return;
-  }
-
-  setFindingsByType((prevFindings) => {
-    const updatedFindings = { ...prevFindings };
-    updatedFindings[type].splice(index, 1);
-
-    if (updatedFindings[type].length === 0) {
-      delete updatedFindings[type];
+    if (!type || index === null || index === undefined) {
+      console.error(`El tipo ${type} o el índice ${index} no son válidos.`);
+      handleCloseConfirmDelete();
+      return;
     }
 
-    return updatedFindings;
-  });
+    setFindingsByType((prevFindings) => {
+      const updatedFindings = { ...prevFindings };
+      updatedFindings[type].splice(index, 1);
 
-  handleCloseConfirmDelete();
-};
+      if (updatedFindings[type].length === 0) {
+        delete updatedFindings[type];
+      }
+
+      return updatedFindings;
+    });
+
+    handleCloseConfirmDelete();
+  };
 
   if (loading) return <div>Cargando detalles de la inspección...</div>;
 
@@ -1081,11 +1089,11 @@ const handleDeleteFinding = () => {
   const { inspection_type, inspection_sub_type, date, time, service_id, exit_time } = inspectionData;
 
   const parsedInspectionTypes = inspection_type
-  ? [...inspection_type.split(",").map((type) => type.trim()), 
-    "Observaciones Cliente", 
-    "Observaciones Inspector", 
-    "Observaciones SST"]
-  : ["Observaciones Cliente", "Observaciones Inspector", "Observaciones SST"];
+    ? [...inspection_type.split(",").map((type) => type.trim()),
+      "Observaciones Cliente",
+      "Observaciones Inspector",
+      "Observaciones SST"]
+    : ["Observaciones Cliente", "Observaciones Inspector", "Observaciones SST"];
 
   return (
     <div className="container mt-4">
@@ -1120,43 +1128,43 @@ const handleDeleteFinding = () => {
                   }
                 }}
                 placeholder="Ingrese sus observaciones generales aquí"
-                disabled={techSignaturePreview   || userRol === 'Cliente'}
+                disabled={techSignaturePreview || userRol === 'Cliente'}
               ></textarea>
             </div>
 
             {/* Columna 2: Documentos */}
             <div className="col-md-6">
-            <h5>Documentos</h5>
-            {documents.length > 0 ? (
-              <div className="row" style={{ minHeight: 0, height: 'auto' }}>
-                {documents.map((doc, index) => (
-                  <div className="col-6 col-md-3 text-center mb-3" key={index}>
-                    <button
-                      className="btn p-0"
-                      style={{ background: "none", border: "none", cursor: "pointer" }}
-                      onClick={() => handleDocumentClick(doc)}
-                    >
-                      {doc.document_type === "doc" ? (
-                        <FileEarmarkWord size={40} color="blue" title="Documento Word" />
-                      ) : doc.document_type === "xlsx" ? (
-                        <FileEarmarkExcel size={40} color="green" title="Hoja de cálculo Excel" />
-                      ) : doc.document_type === "pdf" ? (
-                        <FileEarmarkPdf size={40} color="red" title="Documento PDF" />
-                      ) : ["jpg", "jpeg", "png"].includes(doc.document_type) ? (
-                        <FileEarmarkImage size={40} color="orange" title="Imagen" />
-                      ) : (
-                        <FileEarmarkArrowDown size={40} color="gray" title="Archivo" />
-                      )}
-                      <div className="mt-2">
-                        <small>{doc.document_name}</small>
-                      </div>
-                    </button>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p>No se encontraron documentos relacionados con esta inspección.</p>
-            )}
+              <h5>Documentos</h5>
+              {documents.length > 0 ? (
+                <div className="row" style={{ minHeight: 0, height: 'auto' }}>
+                  {documents.map((doc, index) => (
+                    <div className="col-6 col-md-3 text-center mb-3" key={index}>
+                      <button
+                        className="btn p-0"
+                        style={{ background: "none", border: "none", cursor: "pointer" }}
+                        onClick={() => handleDocumentClick(doc)}
+                      >
+                        {doc.document_type === "doc" ? (
+                          <FileEarmarkWord size={40} color="blue" title="Documento Word" />
+                        ) : doc.document_type === "xlsx" ? (
+                          <FileEarmarkExcel size={40} color="green" title="Hoja de cálculo Excel" />
+                        ) : doc.document_type === "pdf" ? (
+                          <FileEarmarkPdf size={40} color="red" title="Documento PDF" />
+                        ) : ["jpg", "jpeg", "png"].includes(doc.document_type) ? (
+                          <FileEarmarkImage size={40} color="orange" title="Imagen" />
+                        ) : (
+                          <FileEarmarkArrowDown size={40} color="gray" title="Archivo" />
+                        )}
+                        <div className="mt-2">
+                          <small>{doc.document_name}</small>
+                        </div>
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p>No se encontraron documentos relacionados con esta inspección.</p>
+              )}
 
               {/* Mostrar las acciones debajo de los documentos */}
               <div className="mt-3">
@@ -1236,7 +1244,7 @@ const handleDeleteFinding = () => {
           <div className="card-header">{type}</div>
           <div className="card-body">
 
-          {type === 'Jardineria' && stations.length > 0 && (
+            {type === 'Jardineria' && stations.length > 0 && (
               <div className="mt-1">
                 <div style={{ display: 'none' }}>
                   <input
@@ -1313,9 +1321,8 @@ const handleDeleteFinding = () => {
                               </div>
                             </div>
                             <div
-                              className={`finding-details ${
-                                collapseStates[currentKey] ? "d-block" : "d-none"
-                              } mt-2`}
+                              className={`finding-details ${collapseStates[currentKey] ? "d-block" : "d-none"
+                                } mt-2`}
                             >
                               {clientStations[station.id] ? (
                                 <>
@@ -1338,7 +1345,7 @@ const handleDeleteFinding = () => {
                                     className="btn btn-outline-success"
                                     onClick={() => handleOpenStationModal(station.id)}
                                     disabled={
-                                      (techSignaturePreview  ) ||
+                                      (techSignaturePreview) ||
                                       userRol === "Cliente"
                                     }
                                   >
@@ -1352,7 +1359,7 @@ const handleDeleteFinding = () => {
                                     className="btn btn-outline-success"
                                     onClick={() => handleOpenStationModal(station.id)}
                                     disabled={
-                                      (techSignaturePreview  ) ||
+                                      (techSignaturePreview) ||
                                       userRol === "Cliente"
                                     }
                                   >
@@ -1454,7 +1461,7 @@ const handleDeleteFinding = () => {
                                       className="btn btn-link p-0"
                                       onClick={() => handleOpenStationModal(station.id)}
                                       disabled={
-                                        (techSignaturePreview  ) ||
+                                        (techSignaturePreview) ||
                                         userRol === "Cliente" || station.type === 'Localización'
                                       }
                                       style={{ border: "none", background: "none" }}
@@ -1463,15 +1470,15 @@ const handleDeleteFinding = () => {
                                         className="mx-2"
                                         size={"20px"}
                                         color={
-                                          (techSignaturePreview  ) ||
-                                          userRol === "Cliente"
+                                          (techSignaturePreview) ||
+                                            userRol === "Cliente"
                                             ? "gray"
                                             : "green"
                                         }
                                         type="button"
                                         title={
-                                          (techSignaturePreview  ) ||
-                                          userRol === "Cliente"
+                                          (techSignaturePreview) ||
+                                            userRol === "Cliente"
                                             ? "Inspección firmada, edición bloqueada"
                                             : "Editar"
                                         }
@@ -1487,7 +1494,7 @@ const handleDeleteFinding = () => {
                                       className="btn btn-outline-success"
                                       onClick={() => handleOpenStationModal(station.id)}
                                       disabled={
-                                        (techSignaturePreview  ) ||
+                                        (techSignaturePreview) ||
                                         userRol === "Cliente"
                                       }
                                     >
@@ -1582,9 +1589,8 @@ const handleDeleteFinding = () => {
                               </div>
                             </div>
                             <div
-                              className={`finding-details ${
-                                collapseStates[currentKey] ? "d-block" : "d-none"
-                              } mt-2`}
+                              className={`finding-details ${collapseStates[currentKey] ? "d-block" : "d-none"
+                                } mt-2`}
                             >
                               {clientStations[station.id] ? (
                                 <>
@@ -1607,7 +1613,7 @@ const handleDeleteFinding = () => {
                                     className="btn btn-outline-success"
                                     onClick={() => handleOpenStationModal(station.id)}
                                     disabled={
-                                      (techSignaturePreview  ) ||
+                                      (techSignaturePreview) ||
                                       userRol === "Cliente"
                                     }
                                   >
@@ -1621,7 +1627,7 @@ const handleDeleteFinding = () => {
                                     className="btn btn-outline-success"
                                     onClick={() => handleOpenStationModal(station.id)}
                                     disabled={
-                                      (techSignaturePreview  ) ||
+                                      (techSignaturePreview) ||
                                       userRol === "Cliente"
                                     }
                                   >
@@ -1723,7 +1729,7 @@ const handleDeleteFinding = () => {
                                       className="btn btn-link p-0"
                                       onClick={() => handleOpenStationModal(station.id)}
                                       disabled={
-                                        (techSignaturePreview  ) ||
+                                        (techSignaturePreview) ||
                                         userRol === "Cliente" || station.type === 'Localización'
                                       }
                                       style={{ border: "none", background: "none" }}
@@ -1732,15 +1738,15 @@ const handleDeleteFinding = () => {
                                         className="mx-2"
                                         size={"20px"}
                                         color={
-                                          (techSignaturePreview  ) ||
-                                          userRol === "Cliente"
+                                          (techSignaturePreview) ||
+                                            userRol === "Cliente"
                                             ? "gray"
                                             : "green"
                                         }
                                         type="button"
                                         title={
-                                          (techSignaturePreview  ) ||
-                                          userRol === "Cliente"
+                                          (techSignaturePreview) ||
+                                            userRol === "Cliente"
                                             ? "Inspección firmada, edición bloqueada"
                                             : "Editar"
                                         }
@@ -1756,7 +1762,7 @@ const handleDeleteFinding = () => {
                                       className="btn btn-outline-success"
                                       onClick={() => handleOpenStationModal(station.id)}
                                       disabled={
-                                        (techSignaturePreview  ) ||
+                                        (techSignaturePreview) ||
                                         userRol === "Cliente"
                                       }
                                     >
@@ -1851,9 +1857,8 @@ const handleDeleteFinding = () => {
                               </div>
                             </div>
                             <div
-                              className={`finding-details ${
-                                collapseStates[currentKey] ? "d-block" : "d-none"
-                              } mt-2`}
+                              className={`finding-details ${collapseStates[currentKey] ? "d-block" : "d-none"
+                                } mt-2`}
                             >
                               {clientStations[station.id] ? (
                                 <>
@@ -1876,7 +1881,7 @@ const handleDeleteFinding = () => {
                                     className="btn btn-outline-success"
                                     onClick={() => handleOpenStationModal(station.id)}
                                     disabled={
-                                      (techSignaturePreview  ) ||
+                                      (techSignaturePreview) ||
                                       userRol === "Cliente"
                                     }
                                   >
@@ -1890,7 +1895,7 @@ const handleDeleteFinding = () => {
                                     className="btn btn-outline-success"
                                     onClick={() => handleOpenStationModal(station.id)}
                                     disabled={
-                                      (techSignaturePreview  ) ||
+                                      (techSignaturePreview) ||
                                       userRol === "Cliente"
                                     }
                                   >
@@ -1992,7 +1997,7 @@ const handleDeleteFinding = () => {
                                       className="btn btn-link p-0"
                                       onClick={() => handleOpenStationModal(station.id)}
                                       disabled={
-                                        (techSignaturePreview  ) ||
+                                        (techSignaturePreview) ||
                                         userRol === "Cliente" || station.type === 'Localización'
                                       }
                                       style={{ border: "none", background: "none" }}
@@ -2001,15 +2006,15 @@ const handleDeleteFinding = () => {
                                         className="mx-2"
                                         size={"20px"}
                                         color={
-                                          (techSignaturePreview  ) ||
-                                          userRol === "Cliente"
+                                          (techSignaturePreview) ||
+                                            userRol === "Cliente"
                                             ? "gray"
                                             : "green"
                                         }
                                         type="button"
                                         title={
-                                          (techSignaturePreview  ) ||
-                                          userRol === "Cliente"
+                                          (techSignaturePreview) ||
+                                            userRol === "Cliente"
                                             ? "Inspección firmada, edición bloqueada"
                                             : "Editar"
                                         }
@@ -2025,7 +2030,7 @@ const handleDeleteFinding = () => {
                                       className="btn btn-outline-success"
                                       onClick={() => handleOpenStationModal(station.id)}
                                       disabled={
-                                        (techSignaturePreview  ) ||
+                                        (techSignaturePreview) ||
                                         userRol === "Cliente"
                                       }
                                     >
@@ -2121,9 +2126,8 @@ const handleDeleteFinding = () => {
                               </div>
                             </div>
                             <div
-                              className={`finding-details ${
-                                collapseStates[currentKey] ? "d-block" : "d-none"
-                              } mt-2`}
+                              className={`finding-details ${collapseStates[currentKey] ? "d-block" : "d-none"
+                                } mt-2`}
                             >
                               {clientStations[station.id] ? (
                                 <>
@@ -2146,7 +2150,7 @@ const handleDeleteFinding = () => {
                                     className="btn btn-outline-success"
                                     onClick={() => handleOpenStationModal(station.id)}
                                     disabled={
-                                      (techSignaturePreview  ) ||
+                                      (techSignaturePreview) ||
                                       userRol === "Cliente"
                                     }
                                   >
@@ -2160,7 +2164,7 @@ const handleDeleteFinding = () => {
                                     className="btn btn-outline-success"
                                     onClick={() => handleOpenStationModal(station.id)}
                                     disabled={
-                                      (techSignaturePreview  ) ||
+                                      (techSignaturePreview) ||
                                       userRol === "Cliente"
                                     }
                                   >
@@ -2262,7 +2266,7 @@ const handleDeleteFinding = () => {
                                       className="btn btn-link p-0"
                                       onClick={() => handleOpenStationModal(station.id)}
                                       disabled={
-                                        (techSignaturePreview  ) ||
+                                        (techSignaturePreview) ||
                                         userRol === "Cliente" || station.type === 'Localización'
                                       }
                                       style={{ border: "none", background: "none" }}
@@ -2271,15 +2275,15 @@ const handleDeleteFinding = () => {
                                         className="mx-2"
                                         size={"20px"}
                                         color={
-                                          (techSignaturePreview  ) ||
-                                          userRol === "Cliente"
+                                          (techSignaturePreview) ||
+                                            userRol === "Cliente"
                                             ? "gray"
                                             : "green"
                                         }
                                         type="button"
                                         title={
-                                          (techSignaturePreview  ) ||
-                                          userRol === "Cliente"
+                                          (techSignaturePreview) ||
+                                            userRol === "Cliente"
                                             ? "Inspección firmada, edición bloqueada"
                                             : "Editar"
                                         }
@@ -2295,7 +2299,7 @@ const handleDeleteFinding = () => {
                                       className="btn btn-outline-success"
                                       onClick={() => handleOpenStationModal(station.id)}
                                       disabled={
-                                        (techSignaturePreview  ) ||
+                                        (techSignaturePreview) ||
                                         userRol === "Cliente"
                                       }
                                     >
@@ -2317,61 +2321,146 @@ const handleDeleteFinding = () => {
             <hr></hr>
             <h6 className='mt-2'>Hallazgos</h6>
             <div className="table-responsive findings-container">
-            {(findingsByType[type] || []).map((finding, idx) => {
-              const currentKey = `${type}-${finding.id}`; // Usar el ID único como clave
-              const findingTitle = finding.place && finding.place.trim() !== '' 
-                ? `Hallazgo ${finding.place}` 
-                : `Hallazgo ${idx + 1}`; // Mostrar 'Hallazgo' seguido del índice si 'place' está vacío
+              {(findingsByType[type] || []).map((finding, idx) => {
+                const currentKey = `${type}-${finding.id}`; // Usar el ID único como clave
+                const findingTitle = finding.place && finding.place.trim() !== ''
+                  ? `Hallazgo ${finding.place}`
+                  : `Hallazgo ${idx + 1}`; // Mostrar 'Hallazgo' seguido del índice si 'place' está vacío
 
-              return (
-                <div key={currentKey} className="finding-item mb-3 mx-1">
-                  {/* Para dispositivos móviles: función de colapso */}
-                  {isMobile ? (
-                    <>
-                      <div className="d-flex justify-content-between align-items-center" >
-                        <strong>{findingTitle}</strong>
-                        <div
-                          className="icon-toggle"
-                          onClick={() =>
-                            setCollapseStates({ [currentKey]: !collapseStates[currentKey] })
-                          }
-                          style={{ cursor: "pointer", display: "inline-block" }}
-                        >
-                          {collapseStates[currentKey] ? (
-                            <ArrowUpSquare title="Ocultar" />
-                          ) : (
-                            <ArrowDownSquare title="Expandir" />
-                          )}
+                return (
+                  <div key={currentKey} className="finding-item mb-3 mx-1">
+                    {/* Para dispositivos móviles: función de colapso */}
+                    {isMobile ? (
+                      <>
+                        <div className="d-flex justify-content-between align-items-center" >
+                          <strong>{findingTitle}</strong>
+                          <div
+                            className="icon-toggle"
+                            onClick={() =>
+                              setCollapseStates({ [currentKey]: !collapseStates[currentKey] })
+                            }
+                            style={{ cursor: "pointer", display: "inline-block" }}
+                          >
+                            {collapseStates[currentKey] ? (
+                              <ArrowUpSquare title="Ocultar" />
+                            ) : (
+                              <ArrowDownSquare title="Expandir" />
+                            )}
+                          </div>
                         </div>
-                      </div>
 
-                      <div
-                        className={`finding-details ${
-                          collapseStates[currentKey] ? "d-block" : "d-none"
-                        }`} 
-                      >
-                        <div className="col-md-2 mt-3 mb-0 ms-auto text-end">
-                      <XCircle
-                        size={"18px"}
-                        color={(techSignaturePreview   && userRol !== 'Cliente' ) || (userRol !== 'Cliente' && type === 'Observaciones Cliente') || (userRol !== 'Supervisor Técnico' && type === 'Observaciones Inspector') ||(userRol !== 'SST' && type === 'Observaciones SST') ||(userRol === 'Cliente' && type !== 'Observaciones Cliente' && type !== 'Observaciones SST' && type !== 'Observaciones Inspector') ? "gray" : "red"} // Cambiar color si está bloqueado
-                        onClick={() => {
-                          if ((techSignaturePreview   && userRol !== 'Cliente' ) || (userRol !== 'Cliente' && type === 'Observaciones Cliente') || (userRol !== 'Supervisor Técnico' && type === 'Observaciones Inspector') ||(userRol !== 'SST' && type === 'Observaciones SST') ||(userRol === 'Cliente' && type !== 'Observaciones Cliente' && type !== 'Observaciones SST' && type !== 'Observaciones Inspector')) {
-                            return;
-                          }
-                          handleShowConfirmDelete(type, idx);
-                        }}
-                        style={{
-                          cursor: (techSignaturePreview   && userRol !== 'Cliente' ) || (userRol !== 'Cliente' && type === 'Observaciones Cliente') || (userRol !== 'Supervisor Técnico' && type === 'Observaciones Inspector') ||(userRol !== 'SST' && type === 'Observaciones SST') ||(userRol === 'Cliente' && type !== 'Observaciones Cliente' && type !== 'Observaciones SST' && type !== 'Observaciones Inspector') ? "not-allowed" : "pointer", // Cambiar cursor si está bloqueado
-                        }}
-                        title={
-                          (techSignaturePreview   && userRol !== 'Cliente' ) || (userRol !== 'Cliente' && type === 'Observaciones Cliente') || (userRol !== 'Supervisor Técnico' && type === 'Observaciones Inspector') ||(userRol !== 'SST' && type === 'Observaciones SST') ||(userRol === 'Cliente' && type !== 'Observaciones Cliente' && type !== 'Observaciones SST' && type !== 'Observaciones Inspector')
-                            ? "Inspección firmada, acción bloqueada"
-                            : "Eliminar hallazgo"
-                        }
-                      />
-                      </div>
+                        <div
+                          className={`finding-details ${collapseStates[currentKey] ? "d-block" : "d-none"
+                            }`}
+                        >
+                          <div className="col-md-2 mt-3 mb-0 ms-auto text-end">
+                            <XCircle
+                              size={"18px"}
+                              color={(techSignaturePreview && userRol !== 'Cliente') || (userRol !== 'Cliente' && type === 'Observaciones Cliente') || (userRol !== 'Supervisor Técnico' && type === 'Observaciones Inspector') || (userRol !== 'SST' && type === 'Observaciones SST') || (userRol === 'Cliente' && type !== 'Observaciones Cliente' && type !== 'Observaciones SST' && type !== 'Observaciones Inspector') ? "gray" : "red"} // Cambiar color si está bloqueado
+                              onClick={() => {
+                                if ((techSignaturePreview && userRol !== 'Cliente') || (userRol !== 'Cliente' && type === 'Observaciones Cliente') || (userRol !== 'Supervisor Técnico' && type === 'Observaciones Inspector') || (userRol !== 'SST' && type === 'Observaciones SST') || (userRol === 'Cliente' && type !== 'Observaciones Cliente' && type !== 'Observaciones SST' && type !== 'Observaciones Inspector')) {
+                                  return;
+                                }
+                                handleShowConfirmDelete(type, idx);
+                              }}
+                              style={{
+                                cursor: (techSignaturePreview && userRol !== 'Cliente') || (userRol !== 'Cliente' && type === 'Observaciones Cliente') || (userRol !== 'Supervisor Técnico' && type === 'Observaciones Inspector') || (userRol !== 'SST' && type === 'Observaciones SST') || (userRol === 'Cliente' && type !== 'Observaciones Cliente' && type !== 'Observaciones SST' && type !== 'Observaciones Inspector') ? "not-allowed" : "pointer", // Cambiar cursor si está bloqueado
+                              }}
+                              title={
+                                (techSignaturePreview && userRol !== 'Cliente') || (userRol !== 'Cliente' && type === 'Observaciones Cliente') || (userRol !== 'Supervisor Técnico' && type === 'Observaciones Inspector') || (userRol !== 'SST' && type === 'Observaciones SST') || (userRol === 'Cliente' && type !== 'Observaciones Cliente' && type !== 'Observaciones SST' && type !== 'Observaciones Inspector')
+                                  ? "Inspección firmada, acción bloqueada"
+                                  : "Eliminar hallazgo"
+                              }
+                            />
+                          </div>
+                          <div className="row mt-3" style={{ minHeight: 0, height: 'auto' }}>
+                            <div className="col-md-2" >
+                              <label htmlFor={`place-${type}-${idx}`} className="form-label">
+                                Lugar
+                              </label>
+                              <input
+                                id={`place-${type}-${idx}`}
+                                type="text"
+                                className="form-control table-input"
+                                value={finding.place}
+                                onChange={(e) =>
+                                  handleFindingChange(type, idx, "place", e.target.value)
+                                }
+                                placeholder="Lugar"
+                                disabled={(techSignaturePreview && userRol !== 'Cliente') || (userRol !== 'Cliente' && type === 'Observaciones Cliente') || (userRol !== 'Supervisor Técnico' && type === 'Observaciones Inspector') || (userRol !== 'SST' && type === 'Observaciones SST') || (userRol === 'Cliente' && type !== 'Observaciones Cliente' && type !== 'Observaciones SST' && type !== 'Observaciones Inspector')}
+                              />
+                            </div>
+                            <div className="col-md-8">
+                              <label
+                                htmlFor={`description-${type}-${idx}`}
+                                className="form-label"
+                              >
+                                Descripción
+                              </label>
+                              <textarea
+                                id={`description-${type}-${idx}`}
+                                className="form-control table-textarea"
+                                rows="2"
+                                value={finding.description}
+                                onChange={(e) =>
+                                  handleFindingChange(type, idx, "description", e.target.value)
+                                }
+                                placeholder="Descripción"
+                                disabled={(techSignaturePreview && userRol !== 'Cliente') || (userRol !== 'Cliente' && type === 'Observaciones Cliente') || (userRol !== 'Supervisor Técnico' && type === 'Observaciones Inspector') || (userRol !== 'SST' && type === 'Observaciones SST') || (userRol === 'Cliente' && type !== 'Observaciones Cliente' && type !== 'Observaciones SST' && type !== 'Observaciones Inspector')}
+                              ></textarea>
+                            </div>
+                            <div className="col-md-2">
+                              <label className="form-label">Foto</label>
+                              <div className="image-upload-container">
+                                {finding.photo ? (
+                                  <img
+                                    src={finding.photo}
+                                    alt={`Preview ${idx}`}
+                                    className="image-preview"
+                                  />
+                                ) : (
+                                  <div className="drag-drop-area">
+                                    <span>Arrastra o selecciona una imagen</span>
+                                  </div>
+                                )}
+                                <input
+                                  type="file"
+                                  className="image-input"
+                                  disabled={(techSignaturePreview && userRol !== 'Cliente') || (userRol !== 'Cliente' && type === 'Observaciones Cliente') || (userRol !== 'Supervisor Técnico' && type === 'Observaciones Inspector') || (userRol !== 'SST' && type === 'Observaciones SST') || (userRol === 'Cliente' && type !== 'Observaciones Cliente' && type !== 'Observaciones SST' && type !== 'Observaciones Inspector')}
+                                  onChange={(e) =>
+                                    handleFindingPhotoChange(type, idx, e.target.files[0])
+                                  }
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </>
+                    ) : (
+                      // Para tablet y computadoras: mostrar todo expandido
+                      <div className="finding-details d-block">
+                        <div className="col-md-2 mt-0 mb-0 ms-auto text-end">
+                          <XCircle
+                            size={"20px"}
+                            color={(techSignaturePreview && userRol !== 'Cliente') || (userRol !== 'Cliente' && type === 'Observaciones Cliente') || (userRol !== 'Supervisor Técnico' && type === 'Observaciones Inspector') || (userRol !== 'SST' && type === 'Observaciones SST') || (userRol === 'Cliente' && type !== 'Observaciones Cliente' && type !== 'Observaciones SST' && type !== 'Observaciones Inspector') ? "gray" : "red"} // Cambiar color si está bloqueado
+                            onClick={() => {
+                              if ((techSignaturePreview && userRol !== 'Cliente') || (userRol !== 'Cliente' && type === 'Observaciones Cliente') || (userRol !== 'Supervisor Técnico' && type === 'Observaciones Inspector') || (userRol !== 'SST' && type === 'Observaciones SST') || (userRol === 'Cliente' && type !== 'Observaciones Cliente' && type !== 'Observaciones SST' && type !== 'Observaciones Inspector')) {
+                                return;
+                              }
+                              handleShowConfirmDelete(type, idx);
+                            }}
+                            style={{
+                              cursor: (techSignaturePreview && userRol !== 'Cliente') || (userRol !== 'Cliente' && type === 'Observaciones Cliente') || (userRol !== 'Supervisor Técnico' && type === 'Observaciones Inspector') || (userRol !== 'SST' && type === 'Observaciones SST') || (userRol === 'Cliente' && type !== 'Observaciones Cliente' && type !== 'Observaciones SST' && type !== 'Observaciones Inspector') ? "not-allowed" : "pointer", // Cambiar cursor si está bloqueado
+                            }}
+                            title={
+                              (techSignaturePreview && userRol !== 'Cliente') || (userRol !== 'Cliente' && type === 'Observaciones Cliente') || (userRol !== 'Supervisor Técnico' && type === 'Observaciones Inspector') || (userRol !== 'SST' && type === 'Observaciones SST') || (userRol === 'Cliente' && type !== 'Observaciones Cliente' && type !== 'Observaciones SST' && type !== 'Observaciones Inspector')
+                                ? "Inspección firmada, acción bloqueada"
+                                : "Eliminar hallazgo"
+                            }
+                          />
+                        </div>
                         <div className="row mt-3" style={{ minHeight: 0, height: 'auto' }}>
-                          <div className="col-md-2" >
+                          <div className="col-md-2">
                             <label htmlFor={`place-${type}-${idx}`} className="form-label">
                               Lugar
                             </label>
@@ -2384,7 +2473,7 @@ const handleDeleteFinding = () => {
                                 handleFindingChange(type, idx, "place", e.target.value)
                               }
                               placeholder="Lugar"
-                              disabled={(techSignaturePreview   && userRol !== 'Cliente' ) || (userRol !== 'Cliente' && type === 'Observaciones Cliente') || (userRol !== 'Supervisor Técnico' && type === 'Observaciones Inspector') ||(userRol !== 'SST' && type === 'Observaciones SST') ||(userRol === 'Cliente' && type !== 'Observaciones Cliente' && type !== 'Observaciones SST' && type !== 'Observaciones Inspector')}
+                              disabled={(techSignaturePreview && userRol !== 'Cliente') || (userRol !== 'Cliente' && type === 'Observaciones Cliente') || (userRol !== 'Supervisor Técnico' && type === 'Observaciones Inspector') || (userRol !== 'SST' && type === 'Observaciones SST') || (userRol === 'Cliente' && type !== 'Observaciones Cliente' && type !== 'Observaciones SST' && type !== 'Observaciones Inspector')}
                             />
                           </div>
                           <div className="col-md-8">
@@ -2403,7 +2492,7 @@ const handleDeleteFinding = () => {
                                 handleFindingChange(type, idx, "description", e.target.value)
                               }
                               placeholder="Descripción"
-                              disabled={(techSignaturePreview   && userRol !== 'Cliente' ) || (userRol !== 'Cliente' && type === 'Observaciones Cliente') || (userRol !== 'Supervisor Técnico' && type === 'Observaciones Inspector') ||(userRol !== 'SST' && type === 'Observaciones SST') ||(userRol === 'Cliente' && type !== 'Observaciones Cliente' && type !== 'Observaciones SST' && type !== 'Observaciones Inspector')}
+                              disabled={(techSignaturePreview && userRol !== 'Cliente') || (userRol !== 'Cliente' && type === 'Observaciones Cliente') || (userRol !== 'Supervisor Técnico' && type === 'Observaciones Inspector') || (userRol !== 'SST' && type === 'Observaciones SST') || (userRol === 'Cliente' && type !== 'Observaciones Cliente' && type !== 'Observaciones SST' && type !== 'Observaciones Inspector')}
                             ></textarea>
                           </div>
                           <div className="col-md-2">
@@ -2423,7 +2512,7 @@ const handleDeleteFinding = () => {
                               <input
                                 type="file"
                                 className="image-input"
-                                disabled={(techSignaturePreview   && userRol !== 'Cliente' ) || (userRol !== 'Cliente' && type === 'Observaciones Cliente') || (userRol !== 'Supervisor Técnico' && type === 'Observaciones Inspector') ||(userRol !== 'SST' && type === 'Observaciones SST') ||(userRol === 'Cliente' && type !== 'Observaciones Cliente' && type !== 'Observaciones SST' && type !== 'Observaciones Inspector')}
+                                disabled={(techSignaturePreview && userRol !== 'Cliente') || (userRol !== 'Cliente' && type === 'Observaciones Cliente') || (userRol !== 'Supervisor Técnico' && type === 'Observaciones Inspector') || (userRol !== 'SST' && type === 'Observaciones SST') || (userRol === 'Cliente' && type !== 'Observaciones Cliente' && type !== 'Observaciones SST' && type !== 'Observaciones Inspector')}
                                 onChange={(e) =>
                                   handleFindingPhotoChange(type, idx, e.target.files[0])
                                 }
@@ -2432,131 +2521,45 @@ const handleDeleteFinding = () => {
                           </div>
                         </div>
                       </div>
-                    </>
-                  ) : (
-                    // Para tablet y computadoras: mostrar todo expandido
-                    <div className="finding-details d-block">
-                      <div className="col-md-2 mt-0 mb-0 ms-auto text-end">
-                      <XCircle
-                        size={"20px"}
-                        color={(techSignaturePreview   && userRol !== 'Cliente' ) || (userRol !== 'Cliente' && type === 'Observaciones Cliente') || (userRol !== 'Supervisor Técnico' && type === 'Observaciones Inspector') ||(userRol !== 'SST' && type === 'Observaciones SST') ||(userRol === 'Cliente' && type !== 'Observaciones Cliente' && type !== 'Observaciones SST' && type !== 'Observaciones Inspector') ? "gray" : "red"} // Cambiar color si está bloqueado
-                        onClick={() => {
-                          if ((techSignaturePreview   && userRol !== 'Cliente' ) || (userRol !== 'Cliente' && type === 'Observaciones Cliente') || (userRol !== 'Supervisor Técnico' && type === 'Observaciones Inspector') ||(userRol !== 'SST' && type === 'Observaciones SST') ||(userRol === 'Cliente' && type !== 'Observaciones Cliente' && type !== 'Observaciones SST' && type !== 'Observaciones Inspector')) {
-                            return;
-                          }
-                          handleShowConfirmDelete(type, idx);
-                        }}
-                        style={{
-                          cursor: (techSignaturePreview   && userRol !== 'Cliente' ) || (userRol !== 'Cliente' && type === 'Observaciones Cliente') || (userRol !== 'Supervisor Técnico' && type === 'Observaciones Inspector') ||(userRol !== 'SST' && type === 'Observaciones SST') ||(userRol === 'Cliente' && type !== 'Observaciones Cliente' && type !== 'Observaciones SST' && type !== 'Observaciones Inspector') ? "not-allowed" : "pointer", // Cambiar cursor si está bloqueado
-                        }}
-                        title={
-                          (techSignaturePreview   && userRol !== 'Cliente' ) || (userRol !== 'Cliente' && type === 'Observaciones Cliente') || (userRol !== 'Supervisor Técnico' && type === 'Observaciones Inspector') ||(userRol !== 'SST' && type === 'Observaciones SST') ||(userRol === 'Cliente' && type !== 'Observaciones Cliente' && type !== 'Observaciones SST' && type !== 'Observaciones Inspector')
-                            ? "Inspección firmada, acción bloqueada"
-                            : "Eliminar hallazgo"
-                        }
-                      />
-                      </div>
-                      <div className="row mt-3" style={{ minHeight: 0, height: 'auto' }}>
-                        <div className="col-md-2">
-                          <label htmlFor={`place-${type}-${idx}`} className="form-label">
-                            Lugar
-                          </label>
-                          <input
-                            id={`place-${type}-${idx}`}
-                            type="text"
-                            className="form-control table-input"
-                            value={finding.place}
-                            onChange={(e) =>
-                              handleFindingChange(type, idx, "place", e.target.value)
-                            }
-                            placeholder="Lugar"
-                            disabled={(techSignaturePreview   && userRol !== 'Cliente' ) || (userRol !== 'Cliente' && type === 'Observaciones Cliente') || (userRol !== 'Supervisor Técnico' && type === 'Observaciones Inspector') ||(userRol !== 'SST' && type === 'Observaciones SST') ||(userRol === 'Cliente' && type !== 'Observaciones Cliente' && type !== 'Observaciones SST' && type !== 'Observaciones Inspector')}
-                          />
-                        </div>
-                        <div className="col-md-8">
-                          <label
-                            htmlFor={`description-${type}-${idx}`}
-                            className="form-label"
-                          >
-                            Descripción
-                          </label>
-                          <textarea
-                            id={`description-${type}-${idx}`}
-                            className="form-control table-textarea"
-                            rows="2"
-                            value={finding.description}
-                            onChange={(e) =>
-                              handleFindingChange(type, idx, "description", e.target.value)
-                            }
-                            placeholder="Descripción"
-                            disabled={(techSignaturePreview   && userRol !== 'Cliente' ) || (userRol !== 'Cliente' && type === 'Observaciones Cliente') || (userRol !== 'Supervisor Técnico' && type === 'Observaciones Inspector') ||(userRol !== 'SST' && type === 'Observaciones SST') ||(userRol === 'Cliente' && type !== 'Observaciones Cliente' && type !== 'Observaciones SST' && type !== 'Observaciones Inspector')}
-                          ></textarea>
-                        </div>
-                        <div className="col-md-2">
-                          <label className="form-label">Foto</label>
-                          <div className="image-upload-container">
-                            {finding.photo ? (
-                              <img
-                                src={finding.photo}
-                                alt={`Preview ${idx}`}
-                                className="image-preview"
-                              />
-                            ) : (
-                              <div className="drag-drop-area">
-                                <span>Arrastra o selecciona una imagen</span>
-                              </div>
-                            )}
-                            <input
-                              type="file"
-                              className="image-input"
-                              disabled={(techSignaturePreview   && userRol !== 'Cliente' ) || (userRol !== 'Cliente' && type === 'Observaciones Cliente') || (userRol !== 'Supervisor Técnico' && type === 'Observaciones Inspector') ||(userRol !== 'SST' && type === 'Observaciones SST') ||(userRol === 'Cliente' && type !== 'Observaciones Cliente' && type !== 'Observaciones SST' && type !== 'Observaciones Inspector')}
-                              onChange={(e) =>
-                                handleFindingPhotoChange(type, idx, e.target.files[0])
-                              }
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
 
             <button
               className="btn btn-outline-success mb-3"
               onClick={() => handleAddFinding(type)}
-              disabled={(techSignaturePreview   && userRol !== 'Cliente' ) || (userRol !== 'Cliente' && type === 'Observaciones Cliente') || (userRol !== 'Supervisor Técnico' && type === 'Observaciones Inspector') ||(userRol !== 'SST' && type === 'Observaciones SST') ||(userRol === 'Cliente' && type !== 'Observaciones Cliente' && type !== 'Observaciones SST' && type !== 'Observaciones Inspector')}
+              disabled={(techSignaturePreview && userRol !== 'Cliente') || (userRol !== 'Cliente' && type === 'Observaciones Cliente') || (userRol !== 'Supervisor Técnico' && type === 'Observaciones Inspector') || (userRol !== 'SST' && type === 'Observaciones SST') || (userRol === 'Cliente' && type !== 'Observaciones Cliente' && type !== 'Observaciones SST' && type !== 'Observaciones Inspector')}
             >
               + Agregar Hallazgo
             </button>
 
             {type !== 'Observaciones Cliente' && type !== 'Observaciones Inspector' && type !== 'Observaciones SST' && (
               <>
-            {/* Producto */}
-            <hr></hr>
-            <h6 className='mt-2'>Producto</h6>
-            <div className="row" style={{ minHeight: 0, height: 'auto' }}>
-              <div className="col-md-12 mb-3">
-                <select
-                  id={`product-${type}`}
-                  className="form-select"
-                  value={productsByType[type]?.product || ''}
-                  onChange={(e) => handleProductChange(type, 'product', e.target.value)}
-                  disabled={techSignaturePreview   || userRol === 'Cliente'}
-                >
-                  <option value="">Seleccione un producto</option>
-                  {getFilteredProducts(type).map((product) => (
-                    <option key={product.id} value={product.name}>
-                      {product.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-            </>
-           )}
+                {/* Producto */}
+                <hr></hr>
+                <h6 className='mt-2'>Producto</h6>
+                <div className="row" style={{ minHeight: 0, height: 'auto' }}>
+                  <div className="col-md-12 mb-3">
+                    <select
+                      id={`product-${type}`}
+                      className="form-select"
+                      value={productsByType[type]?.product || ''}
+                      onChange={(e) => handleProductChange(type, 'product', e.target.value)}
+                      disabled={techSignaturePreview || userRol === 'Cliente'}
+                    >
+                      <option value="">Seleccione un producto</option>
+                      {getFilteredProducts(type).map((product) => (
+                        <option key={product.id} value={product.name}>
+                          {product.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         </div>
       ))}
@@ -2566,14 +2569,14 @@ const handleDeleteFinding = () => {
         <div className="card-header">Firmas</div>
         <div className="card-body">
           {/* Mostrar solo el botón si no hay firmas */}
-          {!techSignaturePreview? (
+          {!techSignaturePreview ? (
             userRol !== 'Cliente' && (
-            <div className="text-center">
-              <button className="btn btn-outline-success" onClick={() => setSignModalOpen(true)}>
-                Firmar
-              </button>
-            </div>
-          )
+              <div className="text-center">
+                <button className="btn btn-outline-success" onClick={() => setSignModalOpen(true)}>
+                  Firmar
+                </button>
+              </div>
+            )
           ) : (
             <>
               {/* Mostrar la información completa si hay firmas */}
@@ -2600,22 +2603,22 @@ const handleDeleteFinding = () => {
 
       <Modal show={stationModalOpen} onHide={handleCloseStationModal} size="lg">
         <Modal.Header closeButton>
-            <Modal.Title>Agregar Hallazgo para la Estación</Modal.Title>
+          <Modal.Title>Agregar Hallazgo para la Estación</Modal.Title>
         </Modal.Header>
         <Modal.Body>
-            <div className="mb-3">
+          <div className="mb-3">
             <label className="form-label">Descripción</label>
             <textarea
-                className="form-control"
-                rows="3"
-                value={stationFinding.description || ''}
-                
-                onChange={(e) => handleStationFindingChange('description', e.target.value)}
-                placeholder="Ingrese una descripción del hallazgo"
-                disabled={techSignaturePreview   || userRol === 'Cliente'}
+              className="form-control"
+              rows="3"
+              value={stationFinding.description || ''}
+
+              onChange={(e) => handleStationFindingChange('description', e.target.value)}
+              placeholder="Ingrese una descripción del hallazgo"
+              disabled={techSignaturePreview || userRol === 'Cliente'}
             ></textarea>
-            </div>
-            <div className="mb-3">
+          </div>
+          <div className="mb-3">
             <label className="form-label">Fotografía</label>
             <div className="image-upload-container">
               {stationFinding.photo ? (
@@ -2632,7 +2635,7 @@ const handleDeleteFinding = () => {
               <input
                 type="file"
                 className="image-input"
-                disabled={techSignaturePreview   || userRol === 'Cliente'}
+                disabled={techSignaturePreview || userRol === 'Cliente'}
                 onChange={(e) => {
                   const file = e.target.files[0];
                   if (file) {
@@ -2644,18 +2647,18 @@ const handleDeleteFinding = () => {
           </div>
         </Modal.Body>
         <Modal.Footer>
-            <button className="btn btn-secondary" onClick={handleCloseStationModal}>
+          <button className="btn btn-secondary" onClick={handleCloseStationModal}>
             Cancelar
-            </button>
-            <button className="btn btn-success" onClick={handleSaveStationFinding}>
+          </button>
+          <button className="btn btn-success" onClick={handleSaveStationFinding}>
             Guardar Hallazgo
-            </button>
+          </button>
         </Modal.Footer>
-        </Modal>
+      </Modal>
 
-        
 
-        <Modal show={viewStationModalOpen} onHide={() => setViewStationModalOpen(false)} size="lg">
+
+      <Modal show={viewStationModalOpen} onHide={() => setViewStationModalOpen(false)} size="lg">
         <Modal.Header closeButton>
           <Modal.Title>Detalles de la Estación</Modal.Title>
         </Modal.Header>
@@ -2680,8 +2683,8 @@ const handleDeleteFinding = () => {
         </Modal.Footer>
       </Modal>
 
-       {/* Modal de firma */}
-       <Modal show={signModalOpen} onHide={handleSignModalCancel} size="lg">
+      {/* Modal de firma */}
+      <Modal show={signModalOpen} onHide={handleSignModalCancel} size="lg">
         <Modal.Header closeButton>
           <Modal.Title>Firmar Inspección</Modal.Title>
         </Modal.Header>
@@ -2705,7 +2708,7 @@ const handleDeleteFinding = () => {
                 style={{ cursor: "pointer" }}
                 title="Limpiar Firma Técnico"
                 onClick={handleClearTechSignature}
-                disabled={techSignaturePreview   || userRol === 'Cliente'}
+                disabled={techSignaturePreview || userRol === 'Cliente'}
               />
             </div>
             <div className="mt-4 text-center">
@@ -2837,6 +2840,54 @@ const handleDeleteFinding = () => {
           <Button variant="warning" className="w-100" onClick={handleEditLocal}>
             Editar Localmente
           </Button>
+          <Button
+            variant="info"
+            className="mt-3 w-100"
+            onClick={async () => {
+              try {
+                setLoadingWhatsApp(true);
+                const response = await api.post("/PrefirmarArchivos", { url: selectedDocument.document_url });
+                const preSignedUrl = response.data.signedUrl;
+
+                if (!preSignedUrl) {
+                  alert("No se pudo obtener la URL prefirmada.");
+                  return;
+                }
+
+                console.log("Datos del Cliente: ", clientData)
+
+                const payload = {
+                  nombre: clientData?.name,
+                  telefono: `57${clientData?.phone}`,
+                  documento: preSignedUrl,
+                  nombreDocumento: selectedDocument?.document_name || "Acta de servicio"
+                };
+
+                const sendResponse = await api.post("/enviar-botix-acta", payload);
+
+                if (sendResponse.data.success) {
+                  alert("Documento enviado por WhatsApp exitosamente.");
+                } else {
+                  alert("Error al enviar el documento por WhatsApp.");
+                }
+
+              } catch (error) {
+                console.error("Error al enviar documento por WhatsApp:", error);
+                alert("Hubo un error al enviar el documento.");
+              } finally {
+                setLoadingWhatsApp(false);
+              }
+            }}
+          >
+            {loadingWhatsApp ? (
+              <>
+                <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                Enviando...
+              </>
+            ) : (
+              "Enviar por WhatsApp"
+            )}
+          </Button>
         </Modal.Body>
       </Modal>
 
@@ -2856,9 +2907,8 @@ const handleDeleteFinding = () => {
               .map((doc) => (
                 <li
                   key={doc.id}
-                  className={`list-group-item ${
-                    selectedDocForPdf?.id === doc.id ? "active" : ""
-                  }`}
+                  className={`list-group-item ${selectedDocForPdf?.id === doc.id ? "active" : ""
+                    }`}
                   onClick={() => setSelectedDocForPdf(doc)}
                   style={{ cursor: "pointer" }}
                 >
