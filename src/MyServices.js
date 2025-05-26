@@ -345,7 +345,7 @@ function MyServices() {
   }, {});
 
   const formatDate = (date) => {
-    const eventDate = moment(date);
+    const eventDate = moment.utc(date).local();
     if (eventDate.isSame(today, 'day')) return 'Hoy';
     if (eventDate.isSame(moment().add(1, 'days'), 'day')) return 'Mañana';
     return eventDate.format('DD-MM-YYYY');
