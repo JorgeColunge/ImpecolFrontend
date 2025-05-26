@@ -46,7 +46,7 @@ function MyServices() {
   const toggleActions = (uniqueKey) => {
     setExpandedCardId((prevKey) => (prevKey === uniqueKey ? null : uniqueKey)); // Alterna el estado abierto/cerrado del menú
   };
-  
+
   const handleClickOutside = (event) => {
     // Si el clic no es dentro del menú desplegable, ciérralo
     if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
@@ -60,15 +60,15 @@ function MyServices() {
 
   // Si el estado contiene un serviceId, selecciona automáticamente ese servicio y abre el modal.
   useEffect(() => {
-      if (serviceIdFromState) {
-          const service = services.find(s => s.id === serviceIdFromState);
-          if (service) {
-              setSelectedService(service);
-              setShowServiceModal(true);
-          }
+    if (serviceIdFromState) {
+      const service = services.find(s => s.id === serviceIdFromState);
+      if (service) {
+        setSelectedService(service);
+        setShowServiceModal(true);
       }
+    }
   }, [serviceIdFromState, services]);
-  
+
   useEffect(() => {
     // Agregar evento de clic al documento cuando hay un menú desplegable abierto
     if (expandedCardId !== null) {
@@ -76,7 +76,7 @@ function MyServices() {
     } else {
       document.removeEventListener("mousedown", handleClickOutside);
     }
-  
+
     // Cleanup al desmontar
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
@@ -85,83 +85,83 @@ function MyServices() {
 
   useEffect(() => {
     if (socket) {
-        socket.on("newEvent", async (newEvent) => {
-            console.log("Nuevo evento recibido:", newEvent);
+      socket.on("newEvent", async (newEvent) => {
+        console.log("Nuevo evento recibido:", newEvent);
 
-            try {
-                // Consultar los detalles del evento si no están completos en `newEvent`
-                const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/service-schedule/${newEvent.id}`);
-                const detailedEvent = response.data;
+        try {
+          // Consultar los detalles del evento si no están completos en `newEvent`
+          const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/service-schedule/${newEvent.id}`);
+          const detailedEvent = response.data;
 
-                // Formatea el evento y actualiza el estado
-                setScheduledEvents((prevEvents) => [
-                    ...prevEvents,
-                    {
-                        ...detailedEvent,
-                        start: detailedEvent.start,
-                        end: detailedEvent.end,
-                        color: detailedEvent.color || '#007bff',
-                    },
-                ]);
+          // Formatea el evento y actualiza el estado
+          setScheduledEvents((prevEvents) => [
+            ...prevEvents,
+            {
+              ...detailedEvent,
+              start: detailedEvent.start,
+              end: detailedEvent.end,
+              color: detailedEvent.color || '#007bff',
+            },
+          ]);
 
-                // Opcional: Mostrar notificación o alerta
-                showNotification("Nuevo Evento", "Se ha añadido un nuevo evento al calendario.");
-            } catch (error) {
-                console.error("Error al obtener detalles del evento:", error);
-            }
-        });
+          // Opcional: Mostrar notificación o alerta
+          showNotification("Nuevo Evento", "Se ha añadido un nuevo evento al calendario.");
+        } catch (error) {
+          console.error("Error al obtener detalles del evento:", error);
+        }
+      });
     }
 
     // Limpieza al desmontar
     return () => {
-        if (socket) {
-            socket.off("newEvent");
-        }
+      if (socket) {
+        socket.off("newEvent");
+      }
     };
-}, [socket]);
+  }, [socket]);
 
   const handleShowClientModal = (clientId) => {
     setSelectedClientId(clientId);
     setShowClientModal(true);
   };
-  
+
   const handleCloseClientModal = () => {
     setShowClientModal(false);
     setSelectedClientId(null);
-  };  
+  };
 
   useEffect(() => {
     if (socket) {
       socket.on("inspection_synced", ({ oldId, newId }) => {
         console.log(`🔄 La inspección ${oldId} ha sido actualizada a ${newId}`);
-  
+
         setInspections((prevInspections) => {
           // Crear una copia del estado de inspecciones
           const updatedInspections = { ...prevInspections };
-  
+
           // Buscar en qué servicio está la inspección con oldId
           for (const serviceId in updatedInspections) {
             const inspectionsList = updatedInspections[serviceId];
-  
+
             // Buscar la inspección que tiene el oldId
             const index = inspectionsList.findIndex((inspection) => inspection.id === oldId);
-  
+
             if (index !== -1) {
               // Si encontramos la inspección, actualizamos su ID
               updatedInspections[serviceId][index] = {
                 ...inspectionsList[index],
                 id: newId, // Reemplazar ID viejo con el nuevo
               };
-  
+
               console.log(`✅ Inspección ${oldId} actualizada a ${newId} en el frontend.`);
               break; // No necesitamos seguir buscando
             }
           }
-  
+
           return updatedInspections; // Devolvemos la versión actualizada
         });
       });
-  
+
       return () => {
         socket.off("inspection_synced");
       };
@@ -173,149 +173,149 @@ function MyServices() {
       try {
         if (navigator.onLine) {
           console.log("🌐 Modo online: obteniendo servicios desde el servidor...");
-  
+
           const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/services`);
           const userServices = response.data.filter(service => {
             const isResponsible = service.responsible === userId;
             const isCompanion = service.companion?.includes(`"${userId}"`);
             return isResponsible || isCompanion;
           });
-  
+
           console.log("✅ Servicios filtrados para el usuario:", userServices);
-  
+
           // Obtener nombres de los clientes
           const clientData = {};
           for (const service of userServices) {
-              if (service.client_id && !clientData[service.client_id]) {
-                  try {
-                      const clientResponse = await axios.get(`${process.env.REACT_APP_API_URL}/api/clients/${service.client_id}`);
-                      clientData[service.client_id] = clientResponse.data.name; // Asegurar que solo se almacene el nombre como string
-                  } catch (error) {
-                      console.error(`⚠️ Error obteniendo cliente ${service.client_id}:`, error);
-                  }
+            if (service.client_id && !clientData[service.client_id]) {
+              try {
+                const clientResponse = await axios.get(`${process.env.REACT_APP_API_URL}/api/clients/${service.client_id}`);
+                clientData[service.client_id] = clientResponse.data.name; // Asegurar que solo se almacene el nombre como string
+              } catch (error) {
+                console.error(`⚠️ Error obteniendo cliente ${service.client_id}:`, error);
               }
+            }
           }
-  
+
           // Guardar en IndexedDB
           await saveServices(userServices, clientData);
           console.log("📥 Servicios y clientes almacenados en IndexedDB.");
-  
+
           // Actualizar el estado con los datos
           setClientNames(clientData);
           setServices(userServices);
           fetchAllInspections(userServices);
         } else {
           console.log("📴 Modo offline: obteniendo datos desde IndexedDB...");
-  
+
           const { services, clients } = await getServices();
-  
+
           console.log("📂 Servicios obtenidos desde IndexedDB:", services);
           console.log("📂 Clientes obtenidos desde IndexedDB:", clients);
-  
+
           if (!services || services.length === 0) {
             console.error("❌ No se encontraron servicios en IndexedDB.");
           }
-  
+
           setClientNames(clients);
           setServices(services);
           fetchAllInspections(services);
         }
       } catch (error) {
         console.error("❌ Error al obtener servicios:", error);
-        
+
         if (error instanceof TypeError && error.message.includes("Failed to convert value to 'Response'")) {
           console.error("⚠️ Error del Service Worker detectado: posible fallo de red o solicitud interceptada.");
         }
-  
+
         setLoading(false);
       } finally {
         setLoading(false);
       }
     };
-  
+
     fetchMyServices();
   }, [userId]);
 
   useEffect(() => {
     const fetchScheduledEvents = async () => {
-        try {
-            const userServiceIds = services.map(service => service.id).join(",");
+      try {
+        const userServiceIds = services.map(service => service.id).join(",");
 
-            console.log("📌 Lista de service_id del usuario:", userServiceIds);
+        console.log("📌 Lista de service_id del usuario:", userServiceIds);
 
-            if (!userServiceIds) {
-                console.log("❌ No hay servicios asignados al usuario. No se solicitarán eventos.");
-                return;
-            }
-
-            if (navigator.onLine) {
-                console.log("🌐 Modo online: obteniendo eventos desde el servidor...");
-                const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/service-service-schedule?serviceIds=${userServiceIds}`);
-
-                console.log("✅ Respuesta de la API de eventos:", response.data);
-
-                // Guardar eventos en IndexedDB para uso offline
-                await saveEvents(response.data);
-
-                setScheduledEvents(response.data);
-            } else {
-                console.log("📴 Modo offline: obteniendo eventos desde IndexedDB...");
-                const offlineEvents = await getEvents();
-                setScheduledEvents(offlineEvents);
-            }
-
-        } catch (error) {
-            console.error("❌ Error al obtener eventos programados:", error);
+        if (!userServiceIds) {
+          console.log("❌ No hay servicios asignados al usuario. No se solicitarán eventos.");
+          return;
         }
+
+        if (navigator.onLine) {
+          console.log("🌐 Modo online: obteniendo eventos desde el servidor...");
+          const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/service-service-schedule?serviceIds=${userServiceIds}`);
+
+          console.log("✅ Respuesta de la API de eventos:", response.data);
+
+          // Guardar eventos en IndexedDB para uso offline
+          await saveEvents(response.data);
+
+          setScheduledEvents(response.data);
+        } else {
+          console.log("📴 Modo offline: obteniendo eventos desde IndexedDB...");
+          const offlineEvents = await getEvents();
+          setScheduledEvents(offlineEvents);
+        }
+
+      } catch (error) {
+        console.error("❌ Error al obtener eventos programados:", error);
+      }
     };
 
     if (services.length > 0) {
-        console.log("📢 Se han obtenido servicios, procediendo a solicitar eventos...");
-        fetchScheduledEvents();
+      console.log("📢 Se han obtenido servicios, procediendo a solicitar eventos...");
+      fetchScheduledEvents();
     } else {
-        console.log("⚠️ Aún no hay servicios cargados, esperando actualización...");
+      console.log("⚠️ Aún no hay servicios cargados, esperando actualización...");
     }
-}, [services]); // Se ejecuta cuando los servicios cambian
+  }, [services]); // Se ejecuta cuando los servicios cambian
 
-useEffect(() => {
-  const fetchTechnicians = async () => {
+  useEffect(() => {
+    const fetchTechnicians = async () => {
       try {
-          if (navigator.onLine) {
-              console.log("🌐 Modo online: obteniendo técnicos desde el servidor...");
-              const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/users?role=Technician`);
+        if (navigator.onLine) {
+          console.log("🌐 Modo online: obteniendo técnicos desde el servidor...");
+          const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/users?role=Technician`);
 
-              console.log("✅ Respuesta de la API de técnicos:", response.data);
+          console.log("✅ Respuesta de la API de técnicos:", response.data);
 
-              // Guardar técnicos en IndexedDB para modo offline
-              await saveTechnicians(response.data);
+          // Guardar técnicos en IndexedDB para modo offline
+          await saveTechnicians(response.data);
 
-              setTechnicians(response.data);
-          } else {
-              console.log("📴 Modo offline: obteniendo técnicos desde IndexedDB...");
-              const offlineTechnicians = await getTechnicians();
-              setTechnicians(offlineTechnicians);
-          }
+          setTechnicians(response.data);
+        } else {
+          console.log("📴 Modo offline: obteniendo técnicos desde IndexedDB...");
+          const offlineTechnicians = await getTechnicians();
+          setTechnicians(offlineTechnicians);
+        }
 
       } catch (error) {
-          console.error("❌ Error al obtener técnicos:", error);
+        console.error("❌ Error al obtener técnicos:", error);
       }
-  };
+    };
 
-  fetchTechnicians();
-}, []);
+    fetchTechnicians();
+  }, []);
 
-useEffect(() => {
-  const syncOnReconnect = () => {
-    console.log("🌐 Conexión restaurada, sincronizando inspecciones...");
-    syncPendingInspections();
-  };
+  useEffect(() => {
+    const syncOnReconnect = () => {
+      console.log("🌐 Conexión restaurada, sincronizando inspecciones...");
+      syncPendingInspections();
+    };
 
-  window.addEventListener("online", syncOnReconnect);
+    window.addEventListener("online", syncOnReconnect);
 
-  return () => {
-    window.removeEventListener("online", syncOnReconnect);
-  };
-}, []);
+    return () => {
+      window.removeEventListener("online", syncOnReconnect);
+    };
+  }, []);
 
 
   const today = moment().startOf('day');
@@ -326,7 +326,7 @@ useEffect(() => {
       const serviceEvents = scheduledEvents
         .filter(event => event.service_id === service.id)
         .filter(event => {
-          const eventDate = moment(event.date);
+          const eventDate = moment.utc(event.date).local();
           return eventDate.isBetween(today, nextWeek, null, '[]');
         });
 
@@ -353,85 +353,85 @@ useEffect(() => {
 
   const fetchAllInspections = async (services) => {
     try {
-        if (navigator.onLine) {
-            console.log("🌐 Modo online: obteniendo inspecciones de todos los servicios...");
-            
-            const inspectionsByService = {};
-            
-            for (const service of services) {
-                try {
-                    const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/inspections_service/${service.id}`);
-                    console.log(`✅ Inspecciones para servicio ${service.id}:`, response.data);
+      if (navigator.onLine) {
+        console.log("🌐 Modo online: obteniendo inspecciones de todos los servicios...");
 
-                    const formattedInspections = response.data.map((inspection) => ({
-                        ...inspection,
-                        date: moment.utc(inspection.date).startOf('day').format("DD/MM/YYYY"),
-                        time: inspection.time ? moment(inspection.time, "HH:mm:ss").format("HH:mm") : "--",
-                        exit_time: inspection.exit_time ? moment(inspection.exit_time, "HH:mm:ss").format("HH:mm") : "--",
-                        observations: inspection.observations || "Sin observaciones",
-                    }));
+        const inspectionsByService = {};
 
-                    inspectionsByService[service.id] = formattedInspections;
-                } catch (error) {
-                    console.error(`❌ Error obteniendo inspecciones para el servicio ${service.id}:`, error);
-                    inspectionsByService[service.id] = []; // Si hay error, asegurarse de que exista la clave
-                }
-            }
+        for (const service of services) {
+          try {
+            const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/inspections_service/${service.id}`);
+            console.log(`✅ Inspecciones para servicio ${service.id}:`, response.data);
 
-            // Guardar en IndexedDB para modo offline
-            await saveInspections(inspectionsByService);
+            const formattedInspections = response.data.map((inspection) => ({
+              ...inspection,
+              date: moment.utc(inspection.date).startOf('day').format("DD/MM/YYYY"),
+              time: inspection.time ? moment(inspection.time, "HH:mm:ss").format("HH:mm") : "--",
+              exit_time: inspection.exit_time ? moment(inspection.exit_time, "HH:mm:ss").format("HH:mm") : "--",
+              observations: inspection.observations || "Sin observaciones",
+            }));
 
-            // Actualizar estado en el frontend
-            setInspections(inspectionsByService);
-
-        } else {
-            console.log("📴 Modo offline: obteniendo inspecciones desde IndexedDB...");
-            
-            const offlineInspections = await getInspections();
-            
-            console.log("✅ Inspecciones recuperadas desde IndexedDB:", offlineInspections);
-            
-            setInspections(offlineInspections); // 🔥 Ahora está en formato `{ service_id: [inspections] }`
+            inspectionsByService[service.id] = formattedInspections;
+          } catch (error) {
+            console.error(`❌ Error obteniendo inspecciones para el servicio ${service.id}:`, error);
+            inspectionsByService[service.id] = []; // Si hay error, asegurarse de que exista la clave
+          }
         }
 
+        // Guardar en IndexedDB para modo offline
+        await saveInspections(inspectionsByService);
+
+        // Actualizar estado en el frontend
+        setInspections(inspectionsByService);
+
+      } else {
+        console.log("📴 Modo offline: obteniendo inspecciones desde IndexedDB...");
+
+        const offlineInspections = await getInspections();
+
+        console.log("✅ Inspecciones recuperadas desde IndexedDB:", offlineInspections);
+
+        setInspections(offlineInspections); // 🔥 Ahora está en formato `{ service_id: [inspections] }`
+      }
+
     } catch (error) {
-        console.error("❌ Error cargando inspecciones:", error);
+      console.error("❌ Error cargando inspecciones:", error);
     }
   };
 
   const fetchInspections = async (serviceId) => {
     try {
-        if (navigator.onLine) {
-            console.log(`🌐 Modo online: obteniendo inspecciones desde el servidor para el servicio ${serviceId}...`);
-            const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/inspections_service/${serviceId}`);
-            console.log("✅ Respuesta de la API de inspecciones:", response.data);
+      if (navigator.onLine) {
+        console.log(`🌐 Modo online: obteniendo inspecciones desde el servidor para el servicio ${serviceId}...`);
+        const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/inspections_service/${serviceId}`);
+        console.log("✅ Respuesta de la API de inspecciones:", response.data);
 
-            // Formatear inspecciones antes de guardar
-            const formattedInspections = response.data.map((inspection) => ({
-                ...inspection,
-                date: moment(inspection.date).format("DD/MM/YYYY"),
-                time: inspection.time ? moment(inspection.time, "HH:mm:ss").format("HH:mm") : "--",
-                exit_time: inspection.exit_time ? moment(inspection.exit_time, "HH:mm:ss").format("HH:mm") : "--",
-                observations: inspection.observations || "Sin observaciones",
-                findings: inspection.findings ? JSON.parse(inspection.findings) : [],
-            }));
+        // Formatear inspecciones antes de guardar
+        const formattedInspections = response.data.map((inspection) => ({
+          ...inspection,
+          date: moment(inspection.date).format("DD/MM/YYYY"),
+          time: inspection.time ? moment(inspection.time, "HH:mm:ss").format("HH:mm") : "--",
+          exit_time: inspection.exit_time ? moment(inspection.exit_time, "HH:mm:ss").format("HH:mm") : "--",
+          observations: inspection.observations || "Sin observaciones",
+          findings: inspection.findings ? JSON.parse(inspection.findings) : [],
+        }));
 
-            console.log("📋 Inspecciones formateadas antes de guardar:", formattedInspections);
+        console.log("📋 Inspecciones formateadas antes de guardar:", formattedInspections);
 
-            // Guardar en IndexedDB
-            await saveInspections(formattedInspections);
+        // Guardar en IndexedDB
+        await saveInspections(formattedInspections);
 
-            setInspections(formattedInspections);
-        } else {
-            console.log(`📴 Modo offline: obteniendo inspecciones desde IndexedDB para el servicio ${serviceId}...`);
-            const offlineInspections = await getInspections(serviceId);
-            setInspections(offlineInspections);
-        }
+        setInspections(formattedInspections);
+      } else {
+        console.log(`📴 Modo offline: obteniendo inspecciones desde IndexedDB para el servicio ${serviceId}...`);
+        const offlineInspections = await getInspections(serviceId);
+        setInspections(offlineInspections);
+      }
 
     } catch (error) {
-        console.error("❌ Error fetching inspections:", error);
+      console.error("❌ Error fetching inspections:", error);
     }
-};
+  };
 
   const handleServiceClick = (service) => {
     setSelectedService(service);
@@ -475,12 +475,12 @@ useEffect(() => {
 
   const handleSaveInspection = async () => {
     console.log("📌 Iniciando guardado de inspección...");
-  
+
     if (!Array.isArray(newInspection.inspection_type) || newInspection.inspection_type.length === 0) {
       showNotification("Error", "Debe seleccionar al menos un tipo de Inspección.");
       return;
     }
-  
+
     if (
       newInspection.inspection_type.includes("Desratización") &&
       !newInspection.inspection_sub_type
@@ -488,45 +488,45 @@ useEffect(() => {
       showNotification("Error", "Debe seleccionar un Sub tipo para Desratización.");
       return;
     }
-  
+
     const inspectionData = {
       inspection_type: newInspection.inspection_type,
       inspection_sub_type: newInspection.inspection_type.includes("Desratización")
         ? newInspection.inspection_sub_type
         : null,
       service_id: selectedService.id,
-      date: moment().format("YYYY-MM-DD"), 
+      date: moment().format("YYYY-MM-DD"),
       time: moment().format("HH:mm:ss"),
       observations: newInspection.observations || "Sin observaciones",
       status: "pending",  // Indica que está pendiente de sincronización
       createdBy: userId,
     };
-  
+
     console.log("📋 Inspección generada:", inspectionData);
-  
+
     if (!navigator.onLine) {
       console.log("📴 Modo offline detectado. Guardando inspección en IndexedDB...");
-  
+
       try {
         const idLocal = await savePendingInspection(inspectionData);
-  
+
         if (idLocal) {
           showNotification("Guardado", "Inspección almacenada para sincronización.");
           handleCloseAddInspectionModal();
-  
+
           // 🔄 Redirigir usando el ID local
           navigate(`/inspection/${idLocal}`);
         }
-  
+
       } catch (error) {
         console.error("❌ Error al guardar inspección en IndexedDB:", error);
       }
-  
+
     } else {
       try {
         console.log("🌐 Enviando inspección al servidor...");
         const response = await axios.post(`${process.env.REACT_APP_API_URL}/api/inspections`, inspectionData);
-  
+
         if (response.data.success) {
           console.log(`✅ Inspección guardada correctamente con ID ${response.data.inspection.id}`);
           showNotification("Éxito", "Inspección guardada exitosamente.");
@@ -541,8 +541,8 @@ useEffect(() => {
       }
     }
   };
-  
-  
+
+
 
   const parseServiceType = (serviceType) => {
     if (!serviceType) return [];
@@ -567,8 +567,8 @@ useEffect(() => {
       return field.replace(/[\{\}"]/g, "").split(",").join(", "); // Agregar un espacio después de la coma
     }
   };
-  
-  
+
+
 
   if (loading) return <div>Cargando servicios...</div>;
 
@@ -601,7 +601,7 @@ useEffect(() => {
                         <hr />
 
                         <div className="mt-2">
-                          <Stopwatch className="text-primary me-2" /> 
+                          <Stopwatch className="text-primary me-2" />
                           <span className="text-secondary">
                             {service.duration} Horas
                           </span>
@@ -633,7 +633,7 @@ useEffect(() => {
                             {technicians.find((tech) => tech.id === service.responsible)?.name || "No asignado"}
                           </h6>
                         </div>
-                        
+
                       </Card.Body>
 
                       {/* Pie de Tarjeta: Acciones */}
@@ -651,9 +651,8 @@ useEffect(() => {
                         </small>
                         {expandedCardId === `${service.id}-${index}` && (
                           <div
-                            className={`menu-actions ${
-                              expandedCardId === `${service.id}-${index}` ? "expand" : "collapse"
-                            }`}
+                            className={`menu-actions ${expandedCardId === `${service.id}-${index}` ? "expand" : "collapse"
+                              }`}
                           >
                             <button
                               className="btn d-block"
@@ -711,7 +710,7 @@ useEffect(() => {
                     {selectedService.client_id && (
                       <Building
                         className='ms-2 mt-1'
-                        style={{cursor: "pointer"}}
+                        style={{ cursor: "pointer" }}
                         size={22}
                         onClick={(e) => {
                           e.stopPropagation(); // Evita que se activen otros eventos del Card
@@ -735,26 +734,26 @@ useEffect(() => {
                 <p className="text-muted">{selectedService.description || "No especificada"}</p>
               </div>
 
-                {/* Áreas */}
-                {selectedService.intervention_areas && (() => {
+              {/* Áreas */}
+              {selectedService.intervention_areas && (() => {
                 const areasMatches = selectedService.intervention_areas.match(/"([^"]+)"/g);
                 return areasMatches && areasMatches.length > 0;
-                })() && (
-                <div className="d-flex gap-3">
-                  <div className="flex-fill bg-white shadow-sm rounded p-3 w-50">
-                    <h5 className="text-secondary mb-3">
-                      <GeoAlt className="me-2" /> Áreas de Intervención
-                    </h5>
-                    <p>
-                      {(() => {
-                        const areaMatches = selectedService.intervention_areas.match(/"([^"]+)"/g);
-                        return areaMatches
-                          ? areaMatches.map((item) => item.replace(/"/g, "")).join(", ")
-                          : "No especificadas";
-                      })()}
-                    </p>
+              })() && (
+                  <div className="d-flex gap-3">
+                    <div className="flex-fill bg-white shadow-sm rounded p-3 w-50">
+                      <h5 className="text-secondary mb-3">
+                        <GeoAlt className="me-2" /> Áreas de Intervención
+                      </h5>
+                      <p>
+                        {(() => {
+                          const areaMatches = selectedService.intervention_areas.match(/"([^"]+)"/g);
+                          return areaMatches
+                            ? areaMatches.map((item) => item.replace(/"/g, "")).join(", ")
+                            : "No especificadas";
+                        })()}
+                      </p>
+                    </div>
                   </div>
-                </div>
                 )}
 
               {/* Tabla de inspecciones */}
@@ -822,76 +821,76 @@ useEffect(() => {
       {/* Modal para añadir una nueva inspección */}
       <Modal show={showAddInspectionModal} onHide={handleCloseAddInspectionModal}>
         <Modal.Header closeButton>
-            <Modal.Title>Añadir Inspección</Modal.Title>
+          <Modal.Title>Añadir Inspección</Modal.Title>
         </Modal.Header>
         <Modal.Body>
-            <Form>
+          <Form>
             {/* Selección de Tipo de Inspección */}
             <Form.Group controlId="formInspectionType" className="mt-3">
-                <Form.Label>Tipo de Inspección</Form.Label>
-                <div>
+              <Form.Label>Tipo de Inspección</Form.Label>
+              <div>
                 {parseServiceType(selectedService?.service_type || "").map((type, idx) => (
-                    <Form.Check
+                  <Form.Check
                     key={idx}
                     type="checkbox"
                     label={type.replace(/"/g, "")} // Elimina comillas en el texto
                     value={type.replace(/"/g, "")} // Elimina comillas en el valor
                     onChange={(e) => {
-                        const { value, checked } = e.target;
-                        setNewInspection((prevInspection) => ({
+                      const { value, checked } = e.target;
+                      setNewInspection((prevInspection) => ({
                         ...prevInspection,
                         inspection_type: checked
-                            ? [...(prevInspection.inspection_type || []), value]
-                            : prevInspection.inspection_type.filter((t) => t !== value),
-                        }));
+                          ? [...(prevInspection.inspection_type || []), value]
+                          : prevInspection.inspection_type.filter((t) => t !== value),
+                      }));
                     }}
-                    />
+                  />
                 ))}
-                </div>
+              </div>
             </Form.Group>
 
             {/* Sub tipo de inspección */}
             {Array.isArray(newInspection.inspection_type) &&
-            newInspection.inspection_type.includes("Desratización") && (
+              newInspection.inspection_type.includes("Desratización") && (
                 <Form.Group controlId="formInspectionSubType" className="mt-3">
-                <Form.Label>Sub tipo</Form.Label>
-                <Form.Control
+                  <Form.Label>Sub tipo</Form.Label>
+                  <Form.Control
                     as="select"
                     value={newInspection.inspection_sub_type}
                     onChange={(e) =>
-                    setNewInspection((prevInspection) => ({
+                      setNewInspection((prevInspection) => ({
                         ...prevInspection,
                         inspection_sub_type: e.target.value,
-                    }))
+                      }))
                     }
-                >
+                  >
                     <option value="">Seleccione una opción</option>
                     <option value="Control">Control</option>
                     <option value="Seguimiento">Seguimiento</option>
-                </Form.Control>
+                  </Form.Control>
                 </Form.Group>
-            )}
-            </Form>
+              )}
+          </Form>
         </Modal.Body>
         <Modal.Footer>
-            <Button variant="dark" onClick={handleCloseAddInspectionModal}>
+          <Button variant="dark" onClick={handleCloseAddInspectionModal}>
             Cancelar
-            </Button>
-            <Button variant="success" onClick={handleSaveInspection}>
+          </Button>
+          <Button variant="success" onClick={handleSaveInspection}>
             Guardar Inspección
-            </Button>
+          </Button>
         </Modal.Footer>
-        </Modal>
+      </Modal>
 
-        <Modal
+      <Modal
         show={notification.show}
-        onHide={() => setNotification({ show: false, title:'', message: '' })}
+        onHide={() => setNotification({ show: false, title: '', message: '' })}
         centered
         backdrop="static"
         keyboard={false}
       >
         <ModalTitle>
-        <p className="m-0">{notification.title}</p>
+          <p className="m-0">{notification.title}</p>
         </ModalTitle>
         <Modal.Body className="text-center">
           <p className="m-0">{notification.message}</p>

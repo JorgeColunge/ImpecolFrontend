@@ -2846,20 +2846,13 @@ function Inspection() {
             onClick={async () => {
               try {
                 setLoadingWhatsApp(true);
-                const response = await api.post("/PrefirmarArchivos", { url: selectedDocument.document_url });
-                const preSignedUrl = response.data.signedUrl;
-
-                if (!preSignedUrl) {
-                  alert("No se pudo obtener la URL prefirmada.");
-                  return;
-                }
 
                 console.log("Datos del Cliente: ", clientData)
 
                 const payload = {
                   nombre: clientData?.name,
                   telefono: `57${clientData?.phone}`,
-                  documento: preSignedUrl,
+                  documento: selectedDocument.document_url,
                   nombreDocumento: selectedDocument?.document_name || "Acta de servicio"
                 };
 
