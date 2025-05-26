@@ -326,7 +326,7 @@ function MyServices() {
       const serviceEvents = scheduledEvents
         .filter(event => event.service_id === service.id)
         .filter(event => {
-          const eventDate = moment.utc(event.date).local();
+          const eventDate = moment(event.date);
           return eventDate.isBetween(today, nextWeek, null, '[]');
         });
 
