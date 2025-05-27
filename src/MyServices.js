@@ -327,6 +327,16 @@ function MyServices() {
         .filter(event => event.service_id === service.id)
         .filter(event => {
           const eventDate = moment.utc(event.date).local().startOf('day');
+
+          console.log({
+            event_id: event.id,
+            raw_date: event.date,
+            parsed_local: eventDate.format(),
+            today: today.format(),
+            nextWeek: nextWeek.format(),
+            isBetween: eventDate.isBetween(today, nextWeek, null, '[]')
+          });
+
           return eventDate.isBetween(today, nextWeek, null, '[]');
         });
 
