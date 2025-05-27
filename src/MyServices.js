@@ -348,7 +348,7 @@ function MyServices() {
     .sort((a, b) => moment(a.scheduledDate) - moment(b.scheduledDate));
 
   const groupedServicesByDate = filteredScheduledServices.reduce((acc, service) => {
-    const dateKey = moment(service.scheduledDate).format('YYYY-MM-DD');
+    const dateKey = moment.utc(service.scheduledDate).format('YYYY-MM-DD');
     if (!acc[dateKey]) acc[dateKey] = [];
     acc[dateKey].push(service);
     return acc;
