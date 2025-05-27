@@ -318,15 +318,15 @@ function MyServices() {
   }, []);
 
 
-  const today = moment().startOf('day');
-  const nextWeek = moment().add(7, 'days').endOf('day');
+  const today = moment().utc().startOf('day');
+  const nextWeek = moment().utc().add(7, 'days').endOf('day');
 
   const filteredScheduledServices = services
     .flatMap(service => {
       const serviceEvents = scheduledEvents
         .filter(event => event.service_id === service.id)
         .filter(event => {
-          const eventDate = moment.utc(event.date).local().startOf('day');
+          const eventDate = moment.utc(event.date).startOf('day');
 
           console.log({
             event_id: event.id,
@@ -355,9 +355,10 @@ function MyServices() {
   }, {});
 
   const formatDate = (dateStr) => {
-    const eventDate = moment.utc(dateStr).local().startOf('day');
-    const today = moment().startOf('day');
-    const tomorrow = moment().add(1, 'days').startOf('day');
+    const eventDate = moment.utc(dateStr).startOf('day');
+    const today = moment().utc().startOf('day');
+    const tomorrow = moment().utc().add(1, 'days').startOf('day');
+
     if (eventDate.isSame(today, 'day')) return 'Hoy';
     if (eventDate.isSame(tomorrow, 'day')) return 'Mañana';
     return eventDate.format('DD-MM-YYYY');
