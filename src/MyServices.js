@@ -326,7 +326,9 @@ function MyServices() {
       const serviceEvents = scheduledEvents
         .filter(event => event.service_id === service.id)
         .filter(event => {
-          const eventDate = moment(event.date);
+          const eventDate = moment(event.date, 'YYYY-MM-DD');
+          // Aquí agregas el log
+          console.log(`🕒 Evento: ${event.date} → ${eventDate.format()} | Hoy: ${today.format()} | Mañana: ${moment().add(1, 'days').format()}`);
           return eventDate.isBetween(today, nextWeek, null, '[]');
         });
 
@@ -345,8 +347,8 @@ function MyServices() {
   }, {});
 
   const formatDate = (date) => {
-    const eventDate = moment.utc(date).local();
-    if (eventDate.isSame(today, 'day')) return 'Hoy';
+    const eventDate = moment(date, 'YYYY-MM-DD'); // ← igual que arriba, sin UTC
+    if (eventDate.isSame(moment(), 'day')) return 'Hoy';
     if (eventDate.isSame(moment().add(1, 'days'), 'day')) return 'Mañana';
     return eventDate.format('DD-MM-YYYY');
   };
