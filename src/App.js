@@ -36,6 +36,7 @@ import WordEditor from './WordEditor';
 import CompanyStations from './CompanyStations';
 import UnsavedChangesModal from './UnsavedChangesModal';
 import Consumption from './Consumption';
+import Actions from './Actions';
 import { UnsavedChangesProvider } from './UnsavedChangesContext';
 import { syncRequests } from './offlineHandler';
 import { saveUsers, getUsers, syncUsers, syncUsersOnStart, saveServices, saveEvents, saveTechnicians, saveInspections, syncPendingInspections } from './indexedDBHandler';
@@ -396,6 +397,7 @@ function App() {
                 <Route path="/stations/client/:client_id" element={isAuthorized(["Supervisor Técnico", "Administrador", "Superadministrador"]) ? <CompanyStations /> : <Navigate to="/login" />} />
                 <Route path="/rules" element={isAuthorized(["Supervisor Técnico", "Administrador", "Superadministrador"]) ? <Rules /> : <Navigate to="/login" />} />
                 <Route path="/consumption" element={isAuthorized(["Supervisor Técnico", "Administrador", "Superadministrador"]) ? <Consumption /> : <Navigate to="/login" />} />
+                <Route path="/actions" element={isAuthorized(["Supervisor Técnico", "Administrador", "Superadministrador"]) ? <Actions /> : <Navigate to="/login" />} />
               </Routes>
             </div>
           </div>

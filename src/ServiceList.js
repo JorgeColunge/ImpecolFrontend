@@ -2042,6 +2042,27 @@ function ServiceList() {
         </Modal.Footer>
       </Modal>
 
+      {isExecuting && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            zIndex: 2050,
+            width: "100vw",
+            height: "100vh",
+            backgroundColor: "rgba(255, 255, 255, 0.7)",
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+          }}
+        >
+          <div className="spinner-border text-secondary" role="status" style={{ width: "5rem", height: "5rem" }}>
+            <span className="visually-hidden">Cargando...</span>
+          </div>
+        </div>
+      )}
+
     </div>
 
   );

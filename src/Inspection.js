@@ -76,6 +76,9 @@ function Inspection() {
   const [actions, setActions] = useState([]);
   const [clientData, setClientData] = useState(null);
   const [loadingWhatsApp, setLoadingWhatsApp] = useState(false);
+  const [loadingCorreo, setLoadingCorreo] = useState(false);
+  const [showModal, setShowModal] = useState(false);
+  const [pdfUrl, setPdfUrl] = useState(null);
   const navigate = useNavigate();
 
   const socket = useSocket(); // Obtenemos el socket
@@ -161,11 +164,11 @@ function Inspection() {
         await fetchDocuments();
       } else {
         console.error("Error en la conversión del documento:", response.data.message);
-        alert(response.data.message || "Ocurrió un error al convertir el documento.");
+        showNotification(response.data.message || "Ocurrió un error al convertir el documento.");
       }
     } catch (error) {
       console.error("Error al conectar con el servidor:", error);
-      alert("Error de conexión con el servidor al intentar convertir el documento.");
+      showNotification("Error de conexión con el servidor al intentar convertir el documento.");
     } finally {
       setLoadingConvertToPdf(false); // Ocultar spinner
     }
@@ -206,11 +209,11 @@ function Inspection() {
         link.download = 'document'; // Cambia el nombre del archivo si es necesario
         link.click();
       } else {
-        alert('No se pudo obtener la URL prefirmada.');
+        showNotification("No se pudo obtener la URL prefirmada.");
       }
     } catch (error) {
       console.error('Error al obtener la URL prefirmada para descargar:', error);
-      alert('Hubo un error al procesar la solicitud.');
+      showNotification('Hubo un error al procesar la solicitud.');
     }
   };
 
@@ -255,15 +258,15 @@ function Inspection() {
           });
         } else {
           console.error("No se pudo obtener el archivo en Google Drive:", googleDriveResponse.data);
-          alert("No se pudo obtener el archivo en Google Drive.");
+          showNotification("No se pudo obtener el archivo en Google Drive.");
         }
       } else {
         console.error("No se pudo obtener la URL prefirmada.");
-        alert("No se pudo obtener la URL prefirmada.");
+        showNotification("No se pudo obtener la URL prefirmada.");
       }
     } catch (error) {
       console.error("Error al procesar la solicitud de Google Drive:", error);
-      alert("Hubo un error al procesar la solicitud.");
+      showNotification("Hubo un error al procesar la solicitud.");
     } finally {
       setLoadingGoogleDrive(false); // Ocultar el spinner
     }
@@ -580,6 +583,8 @@ function Inspection() {
   };
 
   const handleSaveChanges = async () => {
+    if (isExecuting) return;
+    setIsExecuting(true);
     try {
       const formData = new FormData();
 
@@ -695,6 +700,8 @@ function Inspection() {
       } else {
         showNotification("Hubo un error al guardar los cambios.");
       }
+    } finally {
+      setIsExecuting(false);
     }
   };
 
@@ -891,7 +898,7 @@ function Inspection() {
           },
           (error) => {
             console.error("Error al obtener la ubicación:", error);
-            alert("No se pudo obtener la ubicación.");
+            showNotification("No se pudo obtener la ubicación.");
             callback({
               latitude: "No disponible",
               longitude: "No disponible",
@@ -901,7 +908,7 @@ function Inspection() {
           }
         );
       } else {
-        alert("La geolocalización no está soportada en este navegador.");
+        showNotification("La geolocalización no está soportada en este navegador.");
         callback({
           latitude: "No disponible",
           longitude: "No disponible",
@@ -1077,7 +1084,26 @@ function Inspection() {
     handleCloseConfirmDelete();
   };
 
-  if (loading) return <div>Cargando detalles de la inspección...</div>;
+  if (loading) return
+  <div
+    style={{
+      position: "fixed",
+      top: 0,
+      left: 0,
+      zIndex: 1050,
+      width: "100vw",
+      height: "100vh",
+      backgroundColor: "rgba(255, 255, 255, 0.7)",
+      display: "flex",
+      justifyContent: "center",
+      alignItems: "center",
+    }}
+  >
+    <div className="spinner-border text-secondary" role="status" style={{ width: "5rem", height: "5rem" }}>
+      <span className="visually-hidden">Cargando datos de la Inspección...</span>
+    </div>
+  </div>
+    ;
 
   if (!inspectionData)
     return (
@@ -2792,57 +2818,40 @@ function Inspection() {
           <Modal.Title>Acciones del Documento</Modal.Title>
         </Modal.Header>
         <Modal.Body>
-          <Button
-            variant="primary"
-            className="mb-3 w-100"
-            onClick={async () => {
-              try {
-                const response = await api.post("/PrefirmarArchivos", { url: selectedDocument.document_url });
-                if (response.data.signedUrl) {
-                  const preSignedUrl = response.data.signedUrl;
+          {selectedDocument?.document_type === "pdf" && (
+            <Button
+              variant="primary"
+              className="mb-3 w-100"
+              onClick={async () => {
+                try {
+                  const response = await api.post("/PrefirmarArchivosPDF", {
+                    url: selectedDocument.document_url,
+                  });
 
-                  if (selectedDocument.document_type === "pdf") {
-                    // Abrir la URL prefirmada en una nueva pestaña si es un PDF
-                    window.open(preSignedUrl, "_blank", "noopener,noreferrer");
+                  if (response.data.signedUrl) {
+                    setPdfUrl(response.data.signedUrl);
+                    setShowModal(true);
                   } else {
-                    // Navegar a la lógica actual para otros tipos de documentos
-                    navigate(`/view-document?url=${encodeURIComponent(preSignedUrl)}`);
+                    showNotification("No se pudo obtener la URL prefirmada.");
                   }
-                } else {
-                  alert("No se pudo obtener la URL prefirmada.");
+                } catch (error) {
+                  console.error("Error al obtener la URL prefirmada:", error);
+                  showNotification("Hubo un error al procesar la solicitud.");
                 }
-              } catch (error) {
-                console.error("Error al obtener la URL prefirmada:", error);
-                alert("Hubo un error al procesar la solicitud.");
-              }
-            }}
-          >
-            Ver
-          </Button>
+              }}
+            >
+              Ver
+            </Button>
+          )}
           <Button variant="secondary" className="mb-3 w-100" onClick={handleDownload}>
             Descargar
+          </Button>
+          <Button variant="warning" className="mb-3 w-100" onClick={handleEditLocal}>
+            Actualizar
           </Button>
           <Button
             variant="success"
             className="mb-3 w-100"
-            onClick={handleEditGoogleDrive}
-            disabled={loadingGoogleDrive} // Deshabilitar el botón mientras se procesa
-          >
-            {loadingGoogleDrive ? (
-              <>
-                <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-                Procesando...
-              </>
-            ) : (
-              "Editar en Google Drive"
-            )}
-          </Button>
-          <Button variant="warning" className="w-100" onClick={handleEditLocal}>
-            Editar Localmente
-          </Button>
-          <Button
-            variant="info"
-            className="mt-3 w-100"
             onClick={async () => {
               try {
                 setLoadingWhatsApp(true);
@@ -2859,14 +2868,14 @@ function Inspection() {
                 const sendResponse = await api.post("/enviar-botix-acta", payload);
 
                 if (sendResponse.data.success) {
-                  alert("Documento enviado por WhatsApp exitosamente.");
+                  showNotification("Documento enviado por WhatsApp exitosamente.");
                 } else {
-                  alert("Error al enviar el documento por WhatsApp.");
+                  showNotification("Error al enviar el documento por WhatsApp.");
                 }
 
               } catch (error) {
                 console.error("Error al enviar documento por WhatsApp:", error);
-                alert("Hubo un error al enviar el documento.");
+                showNotification("Hubo un error al enviar el documento.");
               } finally {
                 setLoadingWhatsApp(false);
               }
@@ -2874,11 +2883,52 @@ function Inspection() {
           >
             {loadingWhatsApp ? (
               <>
-                <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true" style={{ width: "1rem", height: "1rem" }}></span>
                 Enviando...
               </>
             ) : (
               "Enviar por WhatsApp"
+            )}
+          </Button>
+          <Button
+            variant="info"
+            className="mb-3 w-100"
+            onClick={async () => {
+              try {
+                setLoadingCorreo(true);
+                console.log("Datos del Cliente (Correo): ", clientData);
+
+                const payload = {
+                  nombre: clientData?.name,
+                  telefono: `57${clientData?.phone}`,
+                  correo: clientData?.email,
+                  documento: selectedDocument.document_url,
+                  nombreDocumento: selectedDocument?.document_name || "Acta de servicio"
+                };
+
+                const sendResponse = await api.post("/enviar-acta-por-correo", payload);
+
+                if (sendResponse.data.success) {
+                  showNotification("📧 Documento enviado por correo exitosamente.");
+                } else {
+                  showNotification("❌ Error al enviar el documento por correo.");
+                }
+
+              } catch (error) {
+                console.error("❌ Error al enviar documento por correo:", error);
+                showNotification("Hubo un error al enviar el documento por correo.");
+              } finally {
+                setLoadingCorreo(false);
+              }
+            }}
+          >
+            {loadingCorreo ? (
+              <>
+                <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true" style={{ width: "1rem", height: "1rem" }}></span>
+                Enviando...
+              </>
+            ) : (
+              "Enviar por Correo"
             )}
           </Button>
         </Modal.Body>
@@ -2925,6 +2975,7 @@ function Inspection() {
                   className="spinner-border spinner-border-sm me-2"
                   role="status"
                   aria-hidden="true"
+                  style={{ width: "1rem", height: "1rem" }}
                 ></span>
                 Convirtiendo...
               </>
@@ -2934,6 +2985,51 @@ function Inspection() {
           </Button>
         </Modal.Footer>
       </Modal>
+
+      <Modal
+        show={showModal}
+        onHide={() => setShowModal(false)}
+        size="xl"
+        centered
+      >
+        <Modal.Body
+          style={{
+            height: "100vh",
+            overflow: "hidden",
+            padding: 0, // opcional: elimina padding si no lo necesitas
+          }}>
+          {pdfUrl && (
+            <iframe
+              src={pdfUrl}
+              title="Vista previa PDF"
+              width="100%"
+              height="100%"
+              style={{ border: "none" }}
+            ></iframe>
+          )}
+        </Modal.Body>
+      </Modal>
+
+      {isExecuting && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            zIndex: 1050,
+            width: "100vw",
+            height: "100vh",
+            backgroundColor: "rgba(255, 255, 255, 0.7)",
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+          }}
+        >
+          <div className="spinner-border text-secondary" role="status" style={{ width: "5rem", height: "5rem" }}>
+            <span className="visually-hidden">Cargando...</span>
+          </div>
+        </div>
+      )}
 
     </div>
   );
