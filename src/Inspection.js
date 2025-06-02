@@ -4,7 +4,8 @@ import { useNavigate } from 'react-router-dom';
 import { Button, Table, InputGroup, FormControl, Modal, Form } from 'react-bootstrap';
 import api from './Api'; // Usa el archivo de API con lógica offline integrada
 import { saveRequest, isOffline } from './offlineHandler';
-import { initUsersDB, saveUsers, getUsers, getInspectionById, saveInspections } from './indexedDBHandler';
+import { initUsersDB, saveUsers, getUsers, getInspectionById, saveInspections, saveProducts, getProducts } from './indexedDBHandler';
+import { compressImage } from './imageHelpers';
 import SignatureCanvas from 'react-signature-canvas';
 import "./Inspection.css";
 import { ArrowDownSquare, ArrowUpSquare, Eye, FileEarmarkArrowDown, FileEarmarkPlus, EnvelopePaper, Whatsapp, Radioactive, FileEarmarkExcel, FileEarmarkImage, FileEarmarkPdf, FileEarmarkWord, PencilSquare, QrCodeScan, XCircle } from 'react-bootstrap-icons';
@@ -419,6 +420,8 @@ function Inspection() {
         }
         setFindingsByType(initialFindings);
 
+        setProductsByType(inspectionData.findings?.productsByType || {});
+
         // Cargar firmas y pre-firmar URLs
         const signatures = inspectionData.findings?.signatures || {};
         if (signatures.technician?.signature) {
@@ -469,9 +472,22 @@ function Inspection() {
         }
 
         // Cargar productos disponibles
-        if (!isOffline()) {
-          const productsResponse = await api.get(`${process.env.REACT_APP_API_URL}/api/products`);
-          setAvailableProducts(productsResponse.data);
+        try {
+          if (isOffline()) {
+            console.log('📴 Offline: leyendo productos desde IndexedDB...');
+            const offlineProducts = await getProducts();
+            setAvailableProducts(offlineProducts);
+          } else {
+            console.log('🌐 Online: descargando productos...');
+            const { data: productsFromServer } = await api.get(`${process.env.REACT_APP_API_URL}/api/products`);
+            setAvailableProducts(productsFromServer);
+
+            // Cachear para el futuro
+            await saveProducts(productsFromServer);
+          }
+        } catch (prodErr) {
+          console.error('❌ Error al cargar productos:', prodErr);
+          setAvailableProducts([]);               // evita crashes de UI
         }
 
         setLoading(false);
@@ -771,13 +787,14 @@ function Inspection() {
     });
   };
 
-  const handleFindingPhotoChange = (type, index, file) => {
+  const handleFindingPhotoChange = async (type, index, file) => {
     if (!file || !file.type.startsWith('image/')) {
       showNotification('Seleccione un archivo válido de tipo imagen.');
       return;
     }
 
-    const photoURL = URL.createObjectURL(file);
+    const compressed = await compressImage(file);
+    const photoURL = URL.createObjectURL(compressed);
 
     setFindingsByType((prevFindings) => {
       const updatedFindings = [...prevFindings[type]];

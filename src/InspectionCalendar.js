@@ -9,6 +9,7 @@ import ClientInfoModal from './ClientInfoModal';
 import esLocale from '@fullcalendar/core/locales/es';
 import { Button, Modal, Form, Col, Row, Table } from 'react-bootstrap';
 import { ChevronLeft, ChevronRight, Plus, GearFill, InfoCircle, Bug, GeoAlt, FileText, Clipboard, PlusCircle, PencilSquare, Trash, Building, BuildingFill, EyeFill } from 'react-bootstrap-icons';
+import { getCachedMonth, setCachedMonth } from './indexedDBHandler';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import './InspectionCalendar.css';
 import moment from 'moment-timezone';
@@ -134,14 +135,39 @@ const InspectionCalendar = () => {
         };
     }, [socket]);
 
+    // se dispara al montar solamente
     useEffect(() => {
-        const fetchData = async () => {
-            await fetchScheduleAndServices();
-            await fetchServices(); // Carga todos los servicios
-            await fetchUsers();
+        (async () => {
+            await fetchServices(); // catálogo completo
+            await fetchUsers();    // lista de operarios
+        })();
+    }, []);                    // ← sin dependencias
+
+    useEffect(() => {
+        /* se dispara cada vez que cambia mesComp ('02/2025', ‘03/2025’, …) */
+        let abort = false;
+
+        (async () => {
+            setIsLoading(true);
+
+            /* 1️⃣  Intento de leer en IndexedDB */
+            const cached = await getCachedMonth(mesComp);
+            if (cached && !abort) {
+                setAllEvents(cached);
+                setEvents(cached);                // filtro por usuarios se aplicará con el otro useEffect
+                setIsLoading(false);              // UI lista inmediatamente
+            }
+
+            /* 2️⃣  En segundo plano (o en primer plano si no había caché) */
+            await fetchScheduleAndServices({ refresh: !cached, abortFn: () => abort });
+
+        })();
+
+        return () => {
+            abort = true;                       // para no setState cuando desmonta / cambia
         };
-        fetchData();
-    }, [mesComp]);  // 🔥 Se ejecuta cada vez que `mesComp` cambie    
+    }, [mesComp]);
+
 
     // Efecto para filtrar eventos al cambiar los usuarios seleccionados
     useEffect(() => {
@@ -633,114 +659,151 @@ const InspectionCalendar = () => {
         setNewInspection({ inspection_type: [], inspection_sub_type: '' });
     };
 
-    const fetchScheduleAndServices = async () => {
+
+    /* ────────────────────────────────────────────────────────────── */
+    /* 1. helper que construye el objeto evento EXACTAMENTE           */
+    /*    como lo hacías antes; solo lo saqué fuera para reutilizar   */
+    /* ────────────────────────────────────────────────────────────── */
+    async function buildEvent(schedule) {
+        /*  🟢  Fetch del servicio asociado */
+        const serviceRes = await fetch(
+            `${process.env.REACT_APP_API_URL}/api/services/${schedule.service_id}`
+        );
+        if (!serviceRes.ok) throw new Error('Service not found');
+        const service = await serviceRes.json();
+
+        /*  🟢  Cliente (opcional) */
+        let client = null;
+        if (service.client_id) {
+            const r = await fetch(
+                `${process.env.REACT_APP_API_URL}/api/clients/${service.client_id}`
+            );
+            client = r.ok ? await r.json() : null;
+        }
+
+        /*  🟢  Responsable (opcional) */
+        let responsible = null;
+        if (service.responsible) {
+            const r = await fetch(
+                `${process.env.REACT_APP_API_URL}/api/users/${service.responsible}`
+            );
+            responsible = r.ok ? await r.json() : null;
+        }
+
+        /*  🟢  Formateos */
+        const start = moment(
+            `${schedule.date.split('T')[0]}T${schedule.start_time}`
+        ).toISOString();
+        const end = schedule.end_time
+            ? moment(`${schedule.date.split('T')[0]}T${schedule.end_time}`).toISOString()
+            : null;
+
+        return {
+            id: schedule.id,
+            service_id: schedule.service_id,
+            title: service.id,
+            serviceType: service.service_type || 'Sin tipo',
+            description: service.description || 'Sin descripción',
+            category: service.category || 'Sin categoría',
+            quantyPerMonth: service.quantity_per_month || null,
+            clientName: client?.name ?? 'Sin empresa',
+            clientId: service.client_id,
+            responsibleId: [
+                service.responsible,
+                ...(service.companion
+                    ? service.companion.replace(/[\{\}"]/g, '').split(',')
+                    : []),
+            ],
+            responsibleName: responsible
+                ? `${responsible.name} ${responsible.lastname ?? ''}`.trim()
+                : 'Sin responsable',
+            address: client?.address ?? 'Sin dirección',
+            phone: client?.phone ?? 'Sin teléfono',
+            color: responsible?.color ?? '#fdd835',
+            backgroundColor: responsible?.color,
+            interventionAreas: service.intervention_areas,
+            value: service.value,
+            companion: service.companion,
+            start,
+            end,
+            allDay: false,
+        };
+    }
+
+    /* ────────────────────────────────────────────────────────────── */
+    /* 2. función principal: lee caché, pinta progresivo, refresca    */
+    /*    Parámetros:                                                */
+    /*      - refresh  → fuerza ir a servidor aunque sí exista caché */
+    /*      - abortFn  → callback que devuelve true cuando abortar   */
+    /* ────────────────────────────────────────────────────────────── */
+    const fetchScheduleAndServices = async ({
+        refresh = true,
+        abortFn = () => false,
+    } = {}) => {
         try {
-            setIsLoading(true); // Activar el spinner antes de la carga
-            console.log(`Fetching schedule and services for: ${mesComp}`);
+            setIsLoading(true);
 
-            const scheduleResponse = await fetch(`${process.env.REACT_APP_API_URL}/api/service-schedule?month=${mesComp}`);
-            if (!scheduleResponse.ok) throw new Error('Failed to fetch schedule');
-            const scheduleData = await scheduleResponse.json();
+            /* 1️⃣ intentamos leer de IndexedDB */
+            const cached = await getCachedMonth(mesComp);
+            if (cached && !abortFn()) {
+                setAllEvents(cached);
+                setEvents(cached);          // seguirá filtrándose por usuarios
+                setIsLoading(false);        // UI lista inmediatamente
+            }
 
-            console.log('Schedule data received:', scheduleData);
+            /* 2️⃣ si no hay caché o queremos refrescar, pegamos al backend  */
+            if (!cached || refresh) {
+                const resp = await fetch(
+                    `${process.env.REACT_APP_API_URL}/api/service-schedule?month=${mesComp}`
+                );
+                if (!resp.ok) throw new Error('Failed to fetch schedule');
+                const scheduleList = await resp.json();
 
-            const formattedEvents = await Promise.all(
-                scheduleData.map(async (schedule) => {
+                /* limpia eventos del mes antes de empezar la carga progresiva */
+                if (!abortFn()) {
+                    setAllEvents([]);
+                    setEvents([]);
+                }
+
+                const monthEvents = [];
+
+                /* procesamos uno a uno: permite repintar progresivamente */
+                for (const sched of scheduleList) {
+                    if (abortFn()) return;          // si cambió el mes, salimos
+
                     try {
-                        // 🟢 Buscar información del servicio asociado al evento
-                        const serviceResponse = await fetch(`${process.env.REACT_APP_API_URL}/api/services/${schedule.service_id}`);
-                        if (!serviceResponse.ok) throw new Error(`Failed to fetch service for ID: ${schedule.service_id}`);
-                        const serviceData = await serviceResponse.json();
+                        const ev = await buildEvent(sched);
+                        if (!ev) continue;
 
-                        // 🟢 Obtener datos del cliente
-                        let clientName = 'Sin empresa';
-                        let clientData = null;
-                        if (serviceData.client_id) {
-                            try {
-                                const clientResponse = await fetch(`${process.env.REACT_APP_API_URL}/api/clients/${serviceData.client_id}`);
-                                if (clientResponse.ok) {
-                                    clientData = await clientResponse.json();
-                                    clientName = clientData.name || 'Sin nombre';
-                                }
-                            } catch (error) {
-                                console.error(`Error fetching client for ID: ${serviceData.client_id}`, error);
-                            }
-                        }
+                        /* evita duplicados rápidos */
+                        const dup = monthEvents.some(
+                            (e) =>
+                                e.service_id === ev.service_id &&
+                                e.start === ev.start &&
+                                e.end === ev.end
+                        );
+                        if (dup) continue;
 
-                        // 🟢 Obtener datos del responsable
-                        let responsibleName = 'Sin responsable';
-                        let responsibleData = null;
-                        if (serviceData.responsible) {
-                            try {
-                                const responsibleResponse = await fetch(`${process.env.REACT_APP_API_URL}/api/users/${serviceData.responsible}`);
-                                if (responsibleResponse.ok) {
-                                    responsibleData = await responsibleResponse.json();
-                                    responsibleName = `${responsibleData.name || 'Sin nombre'} ${responsibleData.lastname || ''}`.trim();
-                                }
-                            } catch (error) {
-                                console.error(`Error fetching responsible for ID: ${serviceData.responsible}`, error);
-                            }
-                        }
+                        monthEvents.push(ev);
 
-                        // 🟢 Formatear fechas y datos del evento
-                        const start = moment(`${schedule.date.split('T')[0]}T${schedule.start_time}`).toISOString();
-                        const end = schedule.end_time
-                            ? moment(`${schedule.date.split('T')[0]}T${schedule.end_time}`).toISOString()
-                            : null;
-
-                        const formattedEvent = {
-                            id: schedule.id,
-                            service_id: schedule.service_id,
-                            title: `${serviceData.id}`,
-                            serviceType: serviceData.service_type || 'Sin tipo',
-                            description: serviceData.description || 'Sin descripción',
-                            category: serviceData.category || 'Sin categoría',
-                            quantyPerMonth: serviceData.quantity_per_month || null,
-                            clientName,
-                            clientId: serviceData.client_id,
-                            responsibleId: [serviceData.responsible, ...(serviceData.companion ? serviceData.companion.replace(/[\{\}"]/g, '').split(',') : [])],
-                            responsibleName,
-                            address: clientData?.address || 'Sin dirección',
-                            phone: clientData?.phone || 'Sin teléfono',
-                            color: responsibleData?.color || '#fdd835',
-                            backgroundColor: responsibleData?.color,
-                            interventionAreas: serviceData.intervention_areas,
-                            value: serviceData.value,
-                            companion: serviceData.companion,
-                            start,
-                            end,
-                            allDay: false,
-                        };
-
-                        return formattedEvent;
-                    } catch (error) {
-                        console.error(`Error processing schedule with service_id: ${schedule.service_id}`, error);
-                        return null;
+                        /* añade al estado inmediatamente → se dibuja de golpe */
+                        setAllEvents((prev) => [...prev, ev]);
+                        setEvents((prev) => [...prev, ev]);
+                    } catch (err) {
+                        console.error(
+                            `Error procesando schedule id ${sched.id}`,
+                            err.message
+                        );
                     }
-                })
-            );
+                }
 
-            // 🔥 Filtrar eventos nulos
-            const validEvents = formattedEvents.filter(event => event !== null);
-
-            // 🚀 Evitar duplicados antes de actualizar el estado
-            const uniqueEvents = validEvents.filter((event, index, self) =>
-                index === self.findIndex((e) =>
-                    e.service_id === event.service_id &&
-                    e.start === event.start &&
-                    e.end === event.end
-                )
-            );
-
-            setAllEvents(uniqueEvents);
-            setEvents(uniqueEvents);
-
-            console.log("Eventos final procesados sin duplicados:", uniqueEvents);
-            setIsLoading(false); // Desactivar el spinner después de cargar los datos
-        } catch (error) {
-            console.error('Error loading schedule and services:', error);
+                /* 3️⃣ guardamos el lote en cache */
+                if (!abortFn()) await setCachedMonth(mesComp, monthEvents);
+            }
+        } catch (err) {
+            console.error('Error loading schedule and services:', err);
         } finally {
-            setIsLoading(false); // Desactivar el spinner incluso si hay un error
+            if (!abortFn()) setIsLoading(false);
         }
     };
 
@@ -1124,7 +1187,7 @@ const InspectionCalendar = () => {
 
     return (
         <div className="d-flex">
-            {isLoading && (
+            {isLoading && allEvents.length === 0 && (
                 <div
                     style={{
                         position: "fixed",

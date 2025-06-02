@@ -1,7 +1,7 @@
 {
   "files": {
     "main.css": "https://services.impecol.com/static/css/main.6b8621b0.css",
-    "main.js": "https://services.impecol.com/static/js/main.666d8e96.js",
+    "main.js": "https://services.impecol.com/static/js/main.223a9976.js",
     "static/js/453.f75ac2fb.chunk.js": "https://services.impecol.com/static/js/453.f75ac2fb.chunk.js",
     "static/media/fa-solid-900.ttf": "https://services.impecol.com/static/media/fa-solid-900.2582b0e4bcf85eceead0.ttf",
     "static/media/fa-brands-400.ttf": "https://services.impecol.com/static/media/fa-brands-400.1815e00441357e01619e.ttf",
@@ -13,11 +13,11 @@
     "static/media/fa-v4compatibility.woff2": "https://services.impecol.com/static/media/fa-v4compatibility.ea8f94e1d22e0d35ccd4.woff2",
     "index.html": "https://services.impecol.com/index.html",
     "main.6b8621b0.css.map": "https://services.impecol.com/static/css/main.6b8621b0.css.map",
-    "main.666d8e96.js.map": "https://services.impecol.com/static/js/main.666d8e96.js.map",
+    "main.223a9976.js.map": "https://services.impecol.com/static/js/main.223a9976.js.map",
     "453.f75ac2fb.chunk.js.map": "https://services.impecol.com/static/js/453.f75ac2fb.chunk.js.map"
   },
   "entrypoints": [
     "static/css/main.6b8621b0.css",
-    "static/js/main.666d8e96.js"
+    "static/js/main.223a9976.js"
   ]
 }

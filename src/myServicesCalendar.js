@@ -7,6 +7,7 @@ import interactionPlugin from '@fullcalendar/interaction';
 import ClientInfoModal from './ClientInfoModal';
 import esLocale from '@fullcalendar/core/locales/es';
 import { Button, Modal, Form, Table } from 'react-bootstrap';
+import { getCachedMonth, setCachedMonth } from './indexedDBHandler';
 import { ChevronLeft, ChevronRight, Plus, GearFill, InfoCircle, Bug, GeoAlt, FileText, Clipboard, PlusCircle, PencilSquare, Trash, Building, ViewList, EyeFill } from 'react-bootstrap-icons';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import './InspectionCalendar.css';
@@ -15,6 +16,77 @@ import Tooltip from 'react-bootstrap/Tooltip';
 import OverlayTrigger from 'react-bootstrap/OverlayTrigger';
 import { useNavigate } from 'react-router-dom';
 import { useSocket } from './SocketContext';
+
+async function buildMyEvent(schedule, userId) {
+    /* 1. servicio */
+    const sRes = await fetch(
+        `${process.env.REACT_APP_API_URL}/api/services/${schedule.service_id}`
+    );
+    if (!sRes.ok) throw new Error('service not found');
+    const service = await sRes.json();
+
+    /* 2. ¿soy responsable o acompañante? */
+    let companions = [];
+    try {
+        companions = JSON.parse(
+            (service.companion ?? '').replace(/{/g, '[').replace(/}/g, ']')
+        );
+    } catch (_) { }                              // si falla, se queda []
+    if (service.responsible !== userId && !companions.includes(userId)) {
+        return null;                              // evento que NO me pertenece
+    }
+
+    /* 3. cliente (puede no existir) */
+    let client = null;
+    if (service.client_id) {
+        const c = await fetch(
+            `${process.env.REACT_APP_API_URL}/api/clients/${service.client_id}`
+        );
+        client = c.ok ? await c.json() : null;
+    }
+
+    /* 4. responsable → nombre + color  */
+    let responsible = null;
+    if (service.responsible) {
+        const r = await fetch(
+            `${process.env.REACT_APP_API_URL}/api/users/${service.responsible}`
+        );
+        responsible = r.ok ? await r.json() : null;
+    }
+
+    /* 5. fechas */
+    const start = moment(
+        `${schedule.date.split('T')[0]}T${schedule.start_time}`
+    ).toISOString();
+    const end = schedule.end_time
+        ? moment(`${schedule.date.split('T')[0]}T${schedule.end_time}`).toISOString()
+        : null;
+
+    return {
+        id: schedule.id,
+        title: service.id,
+        serviceType: service.service_type || 'Sin tipo',
+        description: service.description || 'Sin descripción',
+        category: service.category,
+        quantyPerMonth: service.quantity_per_month,
+        clientName: client?.name ?? 'Sin empresa',
+        clientId: service.client_id,
+        responsibleId: service.responsible,
+        responsibleName: responsible
+            ? `${responsible.name} ${responsible.lastname ?? ''}`.trim()
+            : 'Sin responsable',
+        address: client?.address ?? 'Sin dirección',
+        phone: client?.phone ?? 'Sin teléfono',
+        color: responsible?.color ?? '#fdd835',
+        pestToControl: service.pest_to_control,
+        interventionAreas: service.intervention_areas,
+        value: service.value,
+        companion: service.companion,
+        start,
+        end,
+        allDay: false,
+    };
+}
 
 const MyServicesCalendar = () => {
     const [events, setEvents] = useState([]);
@@ -91,147 +163,77 @@ const MyServicesCalendar = () => {
         }
     };
 
-    useEffect(() => {
-        const fetchData = async () => {
-            await fetchScheduleAndServices();
-        };
-        fetchData();
-    }, [mesComp]);  // 🔥 Se ejecuta cada vez que `mesComp` cambie       
+    useEffect(() => { fetchUsers(); }, []);
 
-    const fetchScheduleAndServices = async () => {
+    useEffect(() => {
+        let aborted = false;
+
+        fetchScheduleAndServices({
+            refresh: true,            // refresca también en segundo plano
+            abortFn: () => aborted,
+        });
+
+        return () => { aborted = true; };      // cancela si el mes cambia
+    }, [mesComp]);                           // sólo depende del mes    
+
+    // dentro del componente, justo donde estaba tu antigua función
+    const fetchScheduleAndServices = async ({ refresh = true, abortFn = () => false } = {}) => {
         try {
-            console.log('Fetching schedule and services...');
             setIsLoading(true);
 
-            // Paso 1: Obtén los eventos de la agenda de servicios
-            const scheduleResponse = await fetch(`${process.env.REACT_APP_API_URL}/api/service-schedule?month=${mesComp}`);
-            if (!scheduleResponse.ok) throw new Error('Failed to fetch schedule');
-            const scheduleData = await scheduleResponse.json();
+            /* 1️⃣ lee caché */
+            const cached = await getCachedMonth(mesComp);
+            if (cached && !abortFn()) {
+                setAllEvents(cached);
+                setEvents(cached);
+                setIsLoading(false);               // UI lista de inmediato
+            }
 
-            console.log('Schedule data received:', scheduleData);
+            /* 2️⃣ refresco si no hay caché o se pide refresh */
+            if (!cached || refresh) {
+                const resp = await fetch(
+                    `${process.env.REACT_APP_API_URL}/api/service-schedule?month=${mesComp}`
+                );
+                if (!resp.ok) throw new Error('schedule fetch error');
+                const scheduleList = await resp.json();
 
-            // Paso 2: Crea un array para almacenar los eventos formateados
-            const formattedEvents = await Promise.all(
-                scheduleData.map(async (schedule) => {
+                /* si no había caché, vaciamos antes de comenzar la carga progresiva */
+                if (!cached && !abortFn()) {
+                    setAllEvents([]);
+                    setEvents([]);
+                }
+
+                const monthEvents = [];
+
+                for (const sched of scheduleList) {
+                    if (abortFn()) return;           // el usuario cambió de mes → aborta
+
                     try {
-                        // Paso 3: Consulta la información del servicio
-                        const serviceResponse = await fetch(`${process.env.REACT_APP_API_URL}/api/services/${schedule.service_id}`);
-                        if (!serviceResponse.ok) throw new Error(`Failed to fetch service for ID: ${schedule.service_id}`);
-                        const serviceData = await serviceResponse.json();
+                        const ev = await buildMyEvent(sched, userId);
+                        if (!ev) continue;             // no me pertenece
 
-                        console.log(`Service data for ID ${schedule.service_id}:`, serviceData);
+                        /* evita duplicados rápidos */
+                        const dup = monthEvents.some(
+                            (e) => e.service_id === ev.service_id && e.start === ev.start
+                        );
+                        if (dup) continue;
 
-                        // Logs para depuración
-                        console.log(`Usuario conectado: ${userId}`);
-                        console.log(`Responsable del servicio: ${serviceData.responsible}`);
-                        console.log(`Compañeros en el servicio (raw): ${serviceData.companion}`);
+                        monthEvents.push(ev);
 
-                        // Convertir el campo companion de texto a un array
-                        let companionsArray = [];
-                        try {
-                            companionsArray = JSON.parse(serviceData.companion.replace(/{/g, '[').replace(/}/g, ']').replace(/"/g, '"'));
-                            console.log(`Compañeros en el servicio (parsed):`, companionsArray);
-                        } catch (error) {
-                            console.error(`Error al procesar el campo companion: ${serviceData.companion}`, error);
-                        }
-
-                        // Verificar si el usuario conectado es responsable o está en la lista de acompañantes
-                        const isCompanion = companionsArray.includes(userId);
-                        console.log(`El usuario ${userId} está como acompañante: ${isCompanion}`);
-
-                        // Filtrar servicios donde el usuario conectado es responsable o acompañante
-                        if (serviceData.responsible !== userId && !isCompanion) {
-                            console.log(`El usuario ${userId} no es responsable ni acompañante del servicio con ID ${schedule.service_id}.`);
-                            return null;
-                        }
-
-                        console.log(`El usuario ${userId} tiene acceso al servicio con ID ${schedule.service_id}.`);
-
-
-                        // Paso 4: Consulta el nombre de la empresa usando el client_id
-                        let clientName = 'Sin empresa';
-                        let clientData;
-                        if (serviceData.client_id) {
-                            try {
-                                const clientResponse = await fetch(`${process.env.REACT_APP_API_URL}/api/clients/${serviceData.client_id}`);
-                                if (clientResponse.ok) {
-                                    clientData = await clientResponse.json();
-                                    clientName = clientData.name || 'Sin nombre';
-                                    console.log(`Client data for ID ${serviceData.client_id}:`, clientData);
-                                } else {
-                                    console.warn(`Failed to fetch client for ID: ${serviceData.client_id}`);
-                                }
-                            } catch (error) {
-                                console.error(`Error fetching client for ID: ${serviceData.client_id}`, error);
-                            }
-                        }
-
-                        // Paso 5: Consulta la información del responsable usando el responsible_id
-                        let responsibleName = 'Sin responsable';
-                        let responsibleData;
-                        if (serviceData.responsible) {
-                            try {
-                                const responsibleResponse = await fetch(`${process.env.REACT_APP_API_URL}/api/users/${serviceData.responsible}`);
-                                if (responsibleResponse.ok) {
-                                    responsibleData = await responsibleResponse.json();
-                                    responsibleName = `${responsibleData.name || 'Sin nombre'} ${responsibleData.lastname || ''}`.trim();
-                                    console.log(`Responsible data for ID ${serviceData.responsible}:`, responsibleData);
-                                } else {
-                                    console.warn(`Failed to fetch responsible for ID: ${serviceData.responsible}`);
-                                }
-                            } catch (error) {
-                                console.error(`Error fetching responsible for ID: ${serviceData.responsible}`, error);
-                            }
-                        }
-
-                        // Paso 6: Crea el evento formateado
-                        const start = moment(`${schedule.date.split('T')[0]}T${schedule.start_time}`).toISOString();
-                        const end = schedule.end_time
-                            ? moment(`${schedule.date.split('T')[0]}T${schedule.end_time}`).toISOString()
-                            : null;
-
-                        const formattedEvent = {
-                            id: schedule.id,
-                            title: `${serviceData.id}`,
-                            serviceType: serviceData.service_type || 'Sin tipo',
-                            description: serviceData.description || 'Sin descripción',
-                            category: serviceData.category || 'Sin categoría', // Nueva propiedad
-                            quantyPerMonth: serviceData.quantity_per_month || null, // Nueva propiedad
-                            clientName,
-                            clientId: serviceData.client_id,
-                            responsibleId: serviceData.responsible,
-                            responsibleName,
-                            address: clientData?.address || 'Sin dirección',
-                            phone: clientData?.phone || 'Sin teléfono',
-                            color: responsibleData?.color || '#fdd835',
-                            pestToControl: serviceData.pest_to_control,
-                            interventionAreas: serviceData.intervention_areas,
-                            value: serviceData.value,
-                            companion: serviceData.companion,
-                            start,
-                            end,
-                            allDay: false,
-                        };
-
-                        console.log(`Color del responsable: `, responsibleData.color)
-
-                        console.log('Formatted event:', formattedEvent);
-                        return formattedEvent;
-
-                    } catch (error) {
-                        console.error(`Error processing schedule with service_id: ${schedule.service_id}`, error);
-                        return null; // Retorna nulo si falla algo
+                        /* pinta inmediatamente → carga progresiva */
+                        setAllEvents((prev) => [...prev, ev]);
+                        setEvents((prev) => [...prev, ev]);
+                    } catch (err) {
+                        console.error('buildMyEvent error', err);
                     }
-                })
-            );
+                }
 
-            const validEvents = formattedEvents.filter((event) => event !== null);
-            setAllEvents(validEvents);
-            setEvents(validEvents);
-        } catch (error) {
-            console.error('Error loading schedule and services:', error);
+                if (!abortFn()) await setCachedMonth(mesComp, monthEvents);
+            }
+        } catch (err) {
+            console.error('Error loading schedule and services:', err);
         } finally {
-            setIsLoading(false);
+            if (!abortFn()) setIsLoading(false);
         }
     };
 
@@ -444,7 +446,7 @@ const MyServicesCalendar = () => {
     return (
         <div className="d-flex">
 
-            {isLoading && (
+            {isLoading && allEvents.length === 0 && (
                 <div
                     style={{
                         position: "fixed",

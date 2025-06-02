@@ -1,5 +1,62 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { Button, Form, Row, Col, Card, Table } from "react-bootstrap";
+import { useParams, useSearchParams } from "react-router-dom";
+import { isEqual } from "lodash";
+
+/* ─── Descriptores y utilidades ───────────────────────────── */
+
+const PERIODS = new Set([
+  "all", "this_year", "last_3_months", "last_month", "this_week"
+]);
+const SERVICE_TYPES = new Set([
+  "all", "Desinsectación", "Desratización", "Desinfección", "Roceria",
+  "Limpieza y aseo de archivos", "Lavado shut basura", "Encarpado",
+  "Lavado de tanque", "Inspección", "Diagnostico"
+]);
+
+/*  IA-<modelo>-<prompt>(-S|-N) */
+const RE_IA = /^IA-(?<model>[^-]+)-(?<prompt>[^-]+?)(?:-(?<ns>[SN]))?$/iu;
+
+/**
+ * Devuelve un objeto normalizado a partir de un valor guardado
+ *  kind   : "IA" | "FUENTE" | "CUSTOM"
+ *  source : "Cliente" | "Inspección" | …
+ *  period : this_year | all | …
+ *  stype  : Desinsectación | …
+ *  field  : campo final
+ *  model / prompt / ns   (sólo para IA)
+ */
+function parseValue(str = "") {
+  // 1) ¿Es IA?
+  const ia = RE_IA.exec(str);
+  if (ia) return { kind: "IA", raw: str, ...ia.groups };
+
+  // 2)  FUENTE  genérica
+  const parts = str.split("-");
+  if (parts.length < 2) return { kind: "CUSTOM", raw: str, value: str };
+
+  const source = parts[0];
+  const field = parts.pop();              // último token
+  const mid = parts.slice(1);           // tokens intermedios
+
+  let period = null, stype = null;
+  if (mid.length === 2) {                  // source-period-stype-field
+    [period, stype] = mid;
+  } else if (mid.length === 1) {           // source-period|stype-field
+    const t = mid[0];
+    (PERIODS.has(t) ? (period = t) : (stype = t));
+  }
+
+  return { kind: "FUENTE", raw: str, source, period, stype, field };
+}
+
+/* {{placeholder}} extractor para prompts IA */
+function getPromptVars(prompt = "") {
+  const vars = [];
+  const re = /{{\s*([^}]+?)\s*}}/g;
+  let m; while ((m = re.exec(prompt))) vars.push(m[1]);
+  return vars;
+}
 
 const DocumentConfigurator = ({ selectedTemplateId, selectedEntity }) => {
   const [templateData, setTemplateData] = useState(null);
@@ -35,6 +92,13 @@ const DocumentConfigurator = ({ selectedTemplateId, selectedEntity }) => {
   const [documentName, setDocumentName] = useState("");
   const [documentType, setDocumentType] = useState("");
   const [nsSelections, setNsSelections] = useState({});
+  const [search] = useSearchParams();
+  const configId = search.get("configId");      // <-- id que viene en la URL
+  const [configData, setConfigData] = useState(null);   // JSON completo de la configuración
+  const [configReady, setConfigReady] = useState(false); // bandera para hidratar
+
+  // ——————————————— 1) ¿llegó el parámetro?  ———————————————
+  console.log("[DEBUG] configId from URL ⇒", configId);
 
   // Mapear las columnas de "clients" a nombres en español
   const clientFields = [
@@ -71,7 +135,7 @@ const DocumentConfigurator = ({ selectedTemplateId, selectedEntity }) => {
     { label: "ID del Cliente", value: "client_id" },
     { label: "Código QR", value: "qr_code" },
   ];
-  
+
   // Mapeo de columnas para "Mapas"
   const mapFields = [
     { label: "Descripción", value: "description" },
@@ -92,7 +156,7 @@ const DocumentConfigurator = ({ selectedTemplateId, selectedEntity }) => {
     { label: "Compañero", value: "companion" },
     { label: "Creado Por", value: "created_by" },
     { label: "Fecha de Creación", value: "created_at" },
-  ];  
+  ];
 
   const rulesClient = [
     { label: "Norma", value: "rule" },
@@ -148,7 +212,7 @@ const DocumentConfigurator = ({ selectedTemplateId, selectedEntity }) => {
       { label: "Descripción Hallazgo Después", value: "findings_findingsByType_descriptionDe" },
       { label: "Foto Hallazgo Después", value: "findings_findingsByType_photoDe" },
     ];
-  
+
     const stationDesratizacion = [
       { label: "Finalidad Estación", value: "findings_stationsFindings_Roedores_purpose" },
       { label: "Cantidad Consumo Estación", value: "findings_stationsFindings_Roedores_consumptionAmount" },
@@ -161,7 +225,7 @@ const DocumentConfigurator = ({ selectedTemplateId, selectedEntity }) => {
       { label: "Descripción Hallazgo Estación", value: "findings_stationsFindings_Roedores_description" },
       { label: "Fotografía Hallazgo Estación", value: "findings_stationsFindings_Roedores_photo" },
     ];
-  
+
     const stationDesinsectacion = [
       { label: "Cantidad de Capturas Estación", value: "findings_stationsFindings_Aéreas_captureQuantity" },
       { label: "Estado Físico Estación", value: "findings_stationsFindings_Aéreas_physicalState" },
@@ -184,14 +248,14 @@ const DocumentConfigurator = ({ selectedTemplateId, selectedEntity }) => {
       { label: "Descripción Hallazgo Estación", value: "findings_stationsFindings_all_description" },
       { label: "Fotografía Hallazgo Estación", value: "findings_stationsFindings_all_photo" },
     ];
-  
+
     // Condicional para agregar campos de estaciones
     if (serviceType === "Desratización") {
       return [...commonFields, ...stationDesratizacion];
     } else if (serviceType === "Desinsectación") {
       return [...commonFields, ...stationDesinsectacion];
     } else if (serviceType === "all") {
-      return [...commonFields,...allStation];
+      return [...commonFields, ...allStation];
     } else {
       return commonFields; // Sin estaciones
     }
@@ -200,7 +264,7 @@ const DocumentConfigurator = ({ selectedTemplateId, selectedEntity }) => {
   const addAiModel = () => {
     setAiModels((prevModels) => [...prevModels, { model: "", name: "", personality: "" }]);
   };
-  
+
   const handleAiModelChange = (index, field, value) => {
     setAiModels((prevModels) => {
       const updatedModels = [...prevModels];
@@ -208,11 +272,11 @@ const DocumentConfigurator = ({ selectedTemplateId, selectedEntity }) => {
       return updatedModels;
     });
   };
-  
+
   const removeAiModel = (index) => {
     setAiModels((prevModels) => prevModels.filter((_, i) => i !== index));
-  };  
-  
+  };
+
   useEffect(() => {
     const fetchTemplateDetails = async () => {
       if (!selectedTemplateId) return;
@@ -237,6 +301,282 @@ const DocumentConfigurator = ({ selectedTemplateId, selectedEntity }) => {
     fetchTemplateDetails();
   }, [selectedTemplateId]);
 
+
+
+  /* --------------------------------------------------------------
+ *  Hidratación completa a partir del JSON guardado
+ * -------------------------------------------------------------- */
+  const hydrateFromConfig = useCallback((conf) => {
+    /* ─── 0) bulk states que rellenaremos y volcamos al final ─── */
+    /* ===== VARIABLES ===== */
+    const vShowSrc = {}, vSrcOpt = {}, vSelSrc = {}, vFieldOp = {},
+      vSelFld = {}, vInter = {}, vSType = {};
+
+    const vShowIA = {}, vIaCfg = {}, vIaDyn = {};
+    const vCustom = {};
+    const vIaFieldOptions = {}, vIaSelectedField = {},
+      vIaInter = {}, vIaSType = {};
+
+    /* ===== TABLAS ===== */
+    const tShowSrc = {}, tSrcOpt = {}, tSelSrc = {}, tFieldOp = {},
+      tSelFld = {}, tInter = {}, tSType = {};
+
+    const tShowIA = {}, tIaCfg = {}, tIaDyn = {};
+    const tCustom = {};
+    /*  Estos se mezclarán luego con los de variable-IA:            */
+    const tIaFieldOptions = {}, tIaSelectedField = {},
+      tIaInter = {}, tIaSType = {};
+
+    /* ─── 1) datos generales ──────────────────────────────────── */
+    setDocumentName(conf.document_name || "");
+    setDocumentType(conf.document_type || "");
+    setAiModels(conf.aiModels || []);
+
+    /* ─── 2) VARIABLES ────────────────────────────────────────── */
+    const mappings = { ...conf.variables };
+    setVariableMappings(mappings);
+
+    Object.entries(mappings).forEach(([vName, raw]) => {
+      const info = parseValue(raw);
+
+      /* —— FUENTE —— */
+      if (info.kind === "FUENTE") {
+        vShowSrc[vName] = true;
+        vSelSrc[vName] = info.source;
+        if (info.period) vInter[vName] = info.period;
+        if (info.stype) vSType[vName] = info.stype;
+        vSelFld[vName] = info.field;
+
+        vSrcOpt[vName] = getSourceOptions(selectedEntity);
+        vFieldOp[vName] = getFieldList(info.source, info.stype);
+        return;
+      }
+
+      /* —— IA —— */
+      if (info.kind === "IA") {
+        const found = (conf.aiModels || [])
+          .find(m => m.name === info.model || m.model === info.model);
+        const modelId = found ? found.model : info.model;
+
+        vShowIA[vName] = true;
+        vIaCfg[vName] = {
+          model: modelId,
+          prompt: info.prompt.replace(/\\n/g, "\n"),
+          ns: info.ns ?? ""
+        };
+
+        const phVars = getPromptVars(info.prompt);
+        if (!phVars.length) return;
+
+        vIaDyn[vName] = phVars.map((ph, i) => {
+          const linkedRaw = conf.variables?.[ph] ?? "";
+          const linked = parseValue(linkedRaw);
+          const dynId = Date.now() + i;
+
+          if (linked.kind === "FUENTE") {
+            vSrcOpt[vName] = getSourceOptions(selectedEntity);
+
+            vIaFieldOptions[`${vName}-${dynId}`] = getFieldList(linked.source, linked.stype);
+            vIaSelectedField[`${vName}-${dynId}`] = linked.field;
+            if (linked.period) vIaInter[`${vName}-${dynId}`] = linked.period;
+            if (linked.stype) vIaSType[`${vName}-${dynId}`] = linked.stype;
+          }
+
+          return {
+            id: dynId,
+            name: ph,
+            source: linked.kind === "FUENTE" ? linked.source : "",
+            field: linked.field ?? "",
+            value: linked.raw
+          };
+        });
+        return;
+      }
+
+      /* —— CUSTOM —— */
+      vCustom[vName] = info.value;
+    });
+
+    /* ─── 3) TABLAS ───────────────────────────────────────────── */
+    const tablesState = {};
+    (conf.tablas || []).forEach(t => {
+      tablesState[t.nombre] = {
+        tipo: t.tipo, orientacion: t.orientacion,
+        encabezado: t.encabezado, cuerpo: t.cuerpo
+      };
+
+      t.cuerpo.forEach((row, rIdx) =>
+        row.forEach((cell, cIdx) => {
+          const key = `${t.nombre}_${rIdx}_${cIdx}`;
+          const info = parseValue(cell);
+
+          /* FUENTE */
+          if (info.kind === "FUENTE") {
+            tShowSrc[key] = true;
+            tSelSrc[key] = info.source;
+            if (info.period) tInter[key] = info.period;
+            if (info.stype) tSType[key] = info.stype;
+            tSelFld[key] = info.field;
+
+            tSrcOpt[key] = getSourceOptions(selectedEntity);
+            tFieldOp[key] = getFieldList(info.source, info.stype);
+            return;
+          }
+
+          /* IA */
+          if (info.kind === "IA") {
+            const found = (conf.aiModels || [])
+              .find(m => m.name === info.model || m.model === info.model);
+            const modelId = found ? found.model : info.model;
+
+            tShowIA[key] = true;
+            tIaCfg[key] = {
+              model: modelId,
+              prompt: info.prompt.replace(/\\n/g, "\n"),
+              ns: info.ns ?? ""
+            };
+
+            const phVars = getPromptVars(info.prompt);
+            if (!phVars.length) return;
+
+            tIaDyn[key] = phVars.map((ph, i) => {
+              const linkedRaw = conf.variables?.[ph] ?? "";
+              const linked = parseValue(linkedRaw);
+              const dynId = Date.now() + i;
+
+              if (linked.kind === "FUENTE") {
+                tSrcOpt[key] = getSourceOptions(selectedEntity);
+
+                tIaFieldOptions[`${key}-${dynId}`] = getFieldList(linked.source, linked.stype);
+                tIaSelectedField[`${key}-${dynId}`] = linked.field;
+
+                /* pre-seleccionar combos de la celda */
+                if (linked.period) { tInter[key] = linked.period; tIaInter[`${key}-${dynId}`] = linked.period; }
+                if (linked.stype) { tSType[key] = linked.stype; tIaSType[`${key}-${dynId}`] = linked.stype; }
+              }
+
+              return {
+                id: dynId,
+                name: ph,
+                source: linked.kind === "FUENTE" ? linked.source : "",
+                field: linked.field ?? "",
+                value: linked.raw
+              };
+            });
+            return;
+          }
+
+          /* CUSTOM */
+          tCustom[key] = info.value;
+        })
+      );
+    });
+
+    /* ─── 4) Volcar estados ──────────────────────────────────── */
+    /* —— VARIABLES —— */
+    setShowSourceDropdown(vShowSrc);
+    setSourceOptions(vSrcOpt);
+    setSelectedSource(vSelSrc);
+    setFieldOptions(vFieldOp);
+    setSelectedField(vSelFld);
+    setIntermediateSelection(vInter);
+    setServiceTypeSelection(vSType);
+
+    setShowIaConfiguration(vShowIA);
+    setIaConfigurations(vIaCfg);
+    setIaDynamicInputs(vIaDyn);
+
+    setIaFieldOptions(vIaFieldOptions);
+    setIaSelectedField(vIaSelectedField);
+    setIaIntermediateSelection(vIaInter);
+    setIaServiceTypeSelection(vIaSType);
+
+    setCustomizedValues(vCustom);
+
+    /* —— TABLAS —— */
+    setTableShowSourceDropdown(tShowSrc);
+    setTableSourceOptions(tSrcOpt);
+    setTableSelectedSource(tSelSrc);
+
+    /* opciones / campos de la celda (incluye IA) */
+    setTableFieldOptions({ ...tFieldOp, ...tIaFieldOptions });
+    setTableSelectedField({ ...tSelFld, ...tIaSelectedField });
+    setTableIntermediateSelection({ ...tInter, ...tIaInter });
+    setTableServiceTypeSelection({ ...tSType, ...tIaSType });
+
+    setTableShowIaConfiguration(tShowIA);
+    setTableIaConfigurations(tIaCfg);
+    setTableIaDynamicInputs(tIaDyn);
+
+    setTableCustomizedValues(tCustom);
+
+    /* cuerpo completo de tablas */
+    setTableData(tablesState);
+  }, [selectedEntity]);
+
+
+
+  function getSourceOptions(entity) {
+    if (entity === "servicio")
+      return ["Servicio", "Inspecciones", "Responsable", "Acompañante",
+        "Cliente", "Normativa Cliente", "Procedimiento"];
+    if (entity === "inspeccion")
+      return ["Inspección", "Servicio", "Responsable", "Acompañante",
+        "Cliente", "Normativa Cliente", "Procedimiento"];
+    return ["Cliente", "Estaciones Aéreas", "Estaciones Roedores",
+      "Mapas", "Servicios", "Inspecciones"];
+  }
+
+  function getFieldList(source, serviceType = "") {
+    switch (source) {
+      case "Cliente": return clientFields;
+      case "Servicio": return serviceFields;
+      case "Servicios": return serviceFields;
+      case "Inspecciones": return getInspectionFields(serviceType || "all");
+      case "Inspección": return getInspectionFields(serviceType || "all");
+      case "Responsable":
+      case "Acompañante": return responsibleFields;
+      case "Estaciones Aéreas":
+      case "Estaciones Roedores": return stationFields;
+      case "Mapas": return mapFields;
+      case "Normativa Cliente": return rulesClient;
+      case "Procedimiento": return procedures;
+      default: return [];
+    }
+  }
+
+
+  /* 1) Descarga la configuración CUANDO exista configId */
+  useEffect(() => {
+    if (!configId) return;                        // nada que hacer
+    console.log("[DEBUG] fetching configuration id", configId);
+
+    const fetchConfiguration = async () => {
+      try {
+        const res = await fetch(
+          `${process.env.REACT_APP_API_URL}/api/get-configuration/${configId}`
+        );
+        if (!res.ok) throw new Error("No se pudo obtener la configuración");
+
+        const conf = await res.json();           // ← tu backend debe devolver { … }
+        console.log("[DEBUG] conf JSON", conf);
+        setConfigData(conf);
+        setConfigReady(true);                    // activa la hidratación
+      } catch (err) {
+        console.error("Error al cargar configuración:", err);
+      }
+    };
+    fetchConfiguration();
+  }, [configId]);
+
+  /* 2) Hidrata los estados una vez que templateData y configData existan */
+  useEffect(() => {
+    if (!configReady || !templateData) return;
+
+    hydrateFromConfig(configData);
+    setConfigReady(false);             // evita re-hidrataciones accidentales
+  }, [configReady, templateData, hydrateFromConfig]);
+
   // Inicializa variables
   const initializeMappings = (variables) => {
     const mappings = {};
@@ -260,7 +600,7 @@ const DocumentConfigurator = ({ selectedTemplateId, selectedEntity }) => {
           return []; // Default si no es ninguno
         }
       }) || [[]];
-  
+
       tablesState[table.nombre] = {
         encabezado: normalizedHeaders,
         cuerpo: table.cuerpo?.detalles || [[]], // Garantiza que cuerpo siempre sea un array válido
@@ -268,7 +608,7 @@ const DocumentConfigurator = ({ selectedTemplateId, selectedEntity }) => {
     });
     setTableData(tablesState);
   };
-  
+
 
   const handleFuenteClick = (variable) => {
     setShowIaConfiguration((prev) => ({ ...prev, [variable]: false }));
@@ -286,18 +626,18 @@ const DocumentConfigurator = ({ selectedTemplateId, selectedEntity }) => {
       "Servicios",
       "Inspecciones",
     ];
-  
+
     if (selectedEntity === "servicio") {
       options = ["Servicio", "Inspecciones", "Responsable", "Acompañante", "Cliente", "Normativa Cliente", "Procedimiento"];
     } else if (selectedEntity === "inspeccion") {
       options = ["Inspección", "Servicio", "Responsable", "Acompañante", "Cliente", "Normativa Cliente", "Procedimiento"];
     }
-  
+
     setSourceOptions((prev) => ({ ...prev, [variable]: options }));
     setShowSourceDropdown((prev) => ({ ...prev, [variable]: true }));
   };
-  
-  
+
+
   const handleIaClick = (variable) => {
     // Reiniciar configuraciones relacionadas con Fuente
     setShowSourceDropdown((prev) => ({ ...prev, [variable]: false }));
@@ -308,7 +648,7 @@ const DocumentConfigurator = ({ selectedTemplateId, selectedEntity }) => {
       delete updated[variable]; // Eliminar campo personalizado
       return updated;
     });
-  
+
     // Activar configuraciones de IA
     setShowIaConfiguration((prev) => ({ ...prev, [variable]: true }));
     setIaConfigurations((prev) => ({
@@ -322,7 +662,7 @@ const DocumentConfigurator = ({ selectedTemplateId, selectedEntity }) => {
       ...prev,
       [variable]: "IA-ModeloIA-Prompt", // Asignar el nombre directamente
     }));
-  };  
+  };
 
   const handleIaModelChange = (variable, value) => {
     setIaConfigurations((prev) => {
@@ -333,25 +673,25 @@ const DocumentConfigurator = ({ selectedTemplateId, selectedEntity }) => {
           model: value,
         },
       };
-  
+
       // Buscar el nombre del modelo en la lista de modelos
       const modelName = aiModels.find((model) => model.model === value)?.name || "ModeloIA";
-  
+
       // Obtener el prompt actual y procesarlo para incluir \n correctamente
       const currentPrompt = updatedConfig[variable]?.prompt || "Prompt";
       const processedPrompt = currentPrompt.replace(/\n/g, "\\n");
-  
+
       // Actualizar el nombre de la variable con el modelo y el prompt procesado
       setVariableMappings((prevMappings) => ({
         ...prevMappings,
         [variable]: `IA-${modelName}-${processedPrompt}`,
       }));
-  
+
       return updatedConfig;
     });
   };
-   
-  
+
+
   const handleIaPromptChange = (variable, value) => {
     setIaConfigurations((prev) => {
       const updatedConfig = {
@@ -361,24 +701,24 @@ const DocumentConfigurator = ({ selectedTemplateId, selectedEntity }) => {
           prompt: value,
         },
       };
-  
+
       // Obtener el modelo actual y su nombre
       const modelValue = updatedConfig[variable]?.model || "";
       const modelName = aiModels.find((model) => model.model === modelValue)?.name || "ModeloIA";
-  
+
       // Actualizar el nombre de la variable con el nombre del modelo y el prompt (procesado para incluir \n)
       setVariableMappings((prevMappings) => ({
         ...prevMappings,
         [variable]: `IA-${modelName}-${value.replace(/\n/g, "\\n")}`,
       }));
-  
+
       return updatedConfig;
     });
-  };   
-  
+  };
+
   const handleTableIaClick = (tableName, rowIndex, colIndex) => {
     const key = `${tableName}_${rowIndex}_${colIndex}`;
-  
+
     // Reiniciar configuraciones relacionadas con Fuente
     setTableShowSourceDropdown((prev) => ({ ...prev, [key]: false }));
     setTableSelectedSource((prev) => ({ ...prev, [key]: "" }));
@@ -389,7 +729,7 @@ const DocumentConfigurator = ({ selectedTemplateId, selectedEntity }) => {
       delete updated[key];
       return updated;
     });
-  
+
     // Activar configuraciones de IA
     setTableShowIaConfiguration((prev) => ({ ...prev, [key]: true }));
     setTableIaConfigurations((prev) => ({
@@ -399,13 +739,13 @@ const DocumentConfigurator = ({ selectedTemplateId, selectedEntity }) => {
         prompt: "",
       },
     }));
-  
+
     // Inicializar inputs dinámicos
     setTableIaDynamicInputs((prev) => ({
       ...prev,
       [key]: [],
     }));
-  
+
     // Inicializar opciones de fuente
     let options = [
       "Cliente",
@@ -415,18 +755,18 @@ const DocumentConfigurator = ({ selectedTemplateId, selectedEntity }) => {
       "Servicios",
       "Inspecciones",
     ];
-  
+
     if (selectedEntity === "servicio") {
       options = ["Servicio", "Inspecciones", "Responsable", "Acompañante", "Cliente", "Normativa Cliente", "Procedimiento"];
     } else if (selectedEntity === "inspeccion") {
       options = ["Inspección", "Servicio", "Responsable", "Acompañante", "Cliente", "Normativa Cliente", "Procedimiento"];
     }
-  
+
     setSourceOptions((prev) => ({
       ...prev,
       [key]: options,
     }));
-  
+
     // Actualizar el valor de la celda al estado inicial "IA-ModeloIA-Prompt"
     setTableData((prevTables) => {
       const updatedTable = { ...prevTables[tableName] };
@@ -435,11 +775,11 @@ const DocumentConfigurator = ({ selectedTemplateId, selectedEntity }) => {
       }
       return { ...prevTables, [tableName]: updatedTable };
     });
-  };  
-  
+  };
+
   const handleAddTableIaInput = (tableName, rowIndex, colIndex) => {
     const key = `${tableName}_${rowIndex}_${colIndex}`;
-  
+
     setTableIaDynamicInputs((prev) => ({
       ...prev,
       [key]: [
@@ -447,14 +787,14 @@ const DocumentConfigurator = ({ selectedTemplateId, selectedEntity }) => {
         { id: Date.now(), source: "", name: `Input ${Date.now()}` },
       ],
     }));
-  
+
     // Inicializar opciones de fuente
     initializeTableSourceOptions(tableName, rowIndex, colIndex);
-  };    
+  };
 
   const handleTableIaSourceSelect = (tableName, rowIndex, colIndex, inputId, source) => {
     const key = `${tableName}_${rowIndex}_${colIndex}`;
-    
+
     // Actualizar la fuente seleccionada en los inputs dinámicos de la tabla
     setTableIaDynamicInputs((prev) => ({
       ...prev,
@@ -462,7 +802,7 @@ const DocumentConfigurator = ({ selectedTemplateId, selectedEntity }) => {
         input.id === inputId ? { ...input, source } : input
       ),
     }));
-  
+
     if (source === "Inspecciones") {
       setTableFieldOptions((prev) => ({
         ...prev,
@@ -551,7 +891,7 @@ const DocumentConfigurator = ({ selectedTemplateId, selectedEntity }) => {
         [`${key}-${inputId}`]: [], // Reset si no hay campos específicos
       }));
     }
-  };  
+  };
 
   const handleCustomClick = (variable) => {
     // Desactivar configuraciones de Fuente e IA
@@ -559,38 +899,38 @@ const DocumentConfigurator = ({ selectedTemplateId, selectedEntity }) => {
     setShowIaConfiguration((prev) => ({ ...prev, [variable]: false }));
     setSelectedSource((prev) => ({ ...prev, [variable]: "" }));
     setFieldOptions((prev) => ({ ...prev, [variable]: [] }));
-  
+
     // Activar campo personalizado
     setCustomizedValues((prev) => ({ ...prev, [variable]: "" }));
-  };  
-  
+  };
+
   const handleCustomValueChange = (variable, value) => {
     setCustomizedValues((prev) => ({ ...prev, [variable]: value }));
     setVariableMappings((prevMappings) => ({
       ...prevMappings,
       [variable]: `${value}`,
     }));
-  };  
+  };
 
   const handleTableCustomClick = (tableName, rowIndex, colIndex) => {
     const key = `${tableName}_${rowIndex}_${colIndex}`;
-    
+
     // Desactivar Fuente e IA
     setTableShowSourceDropdown((prev) => ({ ...prev, [key]: false }));
     setTableShowIaConfiguration((prev) => ({ ...prev, [key]: false }));
     setTableSelectedSource((prev) => ({ ...prev, [key]: "" }));
     setTableFieldOptions((prev) => ({ ...prev, [key]: [] }));
-  
+
     // Activar Personalizado
     setTableCustomizedValues((prev) => ({ ...prev, [key]: "" }));
-  
+
     // Resetear valores de IA en la tabla
     setTableIaConfigurations((prev) => {
       const updated = { ...prev };
       delete updated[key];
       return updated;
     });
-  
+
     // Eliminar inputs dinámicos
     setTableIaDynamicInputs((prev) => {
       const updated = { ...prev };
@@ -598,12 +938,12 @@ const DocumentConfigurator = ({ selectedTemplateId, selectedEntity }) => {
       return updated;
     });
   };
-  
+
   const handleTableCustomValueChange = (tableName, rowIndex, colIndex, value) => {
     const key = `${tableName}_${rowIndex}_${colIndex}`;
-    
+
     setTableCustomizedValues((prev) => ({ ...prev, [key]: value }));
-  
+
     // Actualizar el valor en la tabla con el formato "Personalized-Valor"
     setTableData((prevTables) => {
       const updatedTable = { ...prevTables[tableName] };
@@ -611,16 +951,16 @@ const DocumentConfigurator = ({ selectedTemplateId, selectedEntity }) => {
       return { ...prevTables, [tableName]: updatedTable };
     });
   };
-  
+
   const handleTableIaFieldSelect = (tableName, rowIndex, colIndex, inputId, field) => {
     const key = `${tableName}_${rowIndex}_${colIndex}`;
     const input = tableIaDynamicInputs[key]?.find((input) => input.id === inputId);
     const source = input?.source || "";
     const period = tableIntermediateSelection[key] || "all";
     const serviceType = tableServiceTypeSelection[key] || "all";
-  
+
     let combinedValue = `${source}-${field}`;
-  
+
     // Si la fuente es "Inspecciones" o "Servicios", incluir período y tipo
     if (source === "Inspecciones" || source === "Inspección" || source === "Servicios") {
       combinedValue = `${source}-${period}-${serviceType}-${field}`;
@@ -628,8 +968,8 @@ const DocumentConfigurator = ({ selectedTemplateId, selectedEntity }) => {
     if (source === "Procedimiento") {
       combinedValue = `${source}-${serviceType}-${field}`;
     }
-    
-  
+
+
     // Actualizar el valor combinado del input
     setTableIaDynamicInputs((prev) => ({
       ...prev,
@@ -639,7 +979,7 @@ const DocumentConfigurator = ({ selectedTemplateId, selectedEntity }) => {
           : input
       ),
     }));
-  
+
     // Actualizar el prompt para incluir el nombre personalizado
     const customName = tableIaDynamicInputs[key]?.find((input) => input.id === inputId)?.name || combinedValue;
     setTableIaConfigurations((prev) => {
@@ -653,20 +993,20 @@ const DocumentConfigurator = ({ selectedTemplateId, selectedEntity }) => {
         },
       };
     });
-  
+
     // Actualizar el estado de campos seleccionados
     setTableSelectedField((prev) => ({
       ...prev,
       [`${key}-${inputId}`]: field,
     }));
-  };  
+  };
 
   const handleTableIaModelChange = (tableName, rowIndex, colIndex, value) => {
     const key = `${tableName}_${rowIndex}_${colIndex}`;
-  
+
     // Buscar el nombre del modelo seleccionado
     const modelName = aiModels.find((model) => model.model === value)?.name || "ModeloIA";
-  
+
     setTableIaConfigurations((prev) => ({
       ...prev,
       [key]: {
@@ -674,7 +1014,7 @@ const DocumentConfigurator = ({ selectedTemplateId, selectedEntity }) => {
         model: value,
       },
     }));
-  
+
     // Actualizar el valor en la tabla con el formato "IA-NombreModelo-Prompt"
     setTableData((prevTables) => {
       const updatedTable = { ...prevTables[tableName] };
@@ -683,20 +1023,20 @@ const DocumentConfigurator = ({ selectedTemplateId, selectedEntity }) => {
       updatedTable.cuerpo[rowIndex][colIndex] = `IA-${modelName}-${processedPrompt}`;
       return { ...prevTables, [tableName]: updatedTable };
     });
-  };    
+  };
 
   const handleTableIaPromptChange = (tableName, rowIndex, colIndex, value) => {
     const key = `${tableName}_${rowIndex}_${colIndex}`;
-  
+
     // 1. Obtener modelo, prompt y ns actuales
     const currentConfig = tableIaConfigurations[key] || {};
     const currentModel = currentConfig.model || "";
     const processedPrompt = value.replace(/\n/g, "\\n");
     const ns = nsSelections?.[key] || "${ns}"; // <-- clave: usa el valor de ns seleccionado o el placeholder
-  
+
     // 2. Construir valor final
     const finalValue = `IA-${currentModel}-${processedPrompt}-${ns}`;
-  
+
     // 3. Actualizar configuraciones de IA
     setTableIaConfigurations((prev) => ({
       ...prev,
@@ -705,13 +1045,13 @@ const DocumentConfigurator = ({ selectedTemplateId, selectedEntity }) => {
         prompt: value,
       },
     }));
-  
+
     // 4. Actualizar valor en la tabla
     setTableData((prevTables) => {
       const updatedTable = { ...prevTables[tableName] };
       const updatedBody = [...updatedTable.cuerpo];
       updatedBody[rowIndex][colIndex] = finalValue;
-  
+
       return {
         ...prevTables,
         [tableName]: {
@@ -720,7 +1060,7 @@ const DocumentConfigurator = ({ selectedTemplateId, selectedEntity }) => {
         },
       };
     });
-  };   
+  };
 
   const initializeIaSourceOptions = (variable) => {
     let options = [
@@ -731,16 +1071,16 @@ const DocumentConfigurator = ({ selectedTemplateId, selectedEntity }) => {
       "Servicios",
       "Inspecciones"
     ];
-  
+
     if (selectedEntity === "servicio") {
       options = ["Servicio", "Inspecciones", "Responsable", "Acompañante", "Cliente", "Normativa Cliente", "Procedimiento"];
     } else if (selectedEntity === "inspeccion") {
       options = ["Inspección", "Servicio", "Responsable", "Acompañante", "Cliente", "Normativa Cliente", "Procedimiento"];
     }
-  
+
     setSourceOptions((prev) => ({ ...prev, [variable]: options }));
-  };  
-  
+  };
+
   const handleAddIaInput = (variable) => {
     initializeIaSourceOptions(variable); // Asegurar que las opciones estén configuradas
     setIaDynamicInputs((prev) => ({
@@ -750,7 +1090,7 @@ const DocumentConfigurator = ({ selectedTemplateId, selectedEntity }) => {
         { id: Date.now(), source: "", name: `Input ${Date.now()}` },
       ],
     }));
-  };    
+  };
 
   const handleIaSourceSelect = (variable, id, source) => {
     setIaDynamicInputs((prev) => ({
@@ -759,7 +1099,7 @@ const DocumentConfigurator = ({ selectedTemplateId, selectedEntity }) => {
         input.id === id ? { ...input, source } : input
       ),
     }));
-  
+
     if (source === "Inspecciones") {
       setIaFieldOptions((prev) => ({
         ...prev,
@@ -781,7 +1121,7 @@ const DocumentConfigurator = ({ selectedTemplateId, selectedEntity }) => {
       setIaIntermediateSelection((prev) => ({
         ...prev,
         [`${variable}-${id}`]: "all", // Periodo por defecto es "all"
-      })); 
+      }));
       setIaServiceTypeSelection((prev) => ({
         ...prev,
         [`${variable}-${id}`]: "",
@@ -848,14 +1188,14 @@ const DocumentConfigurator = ({ selectedTemplateId, selectedEntity }) => {
         [`${variable}-${id}`]: [],
       })); // Reset si no hay campos específicos
     }
-  };  
+  };
 
   const handleDeleteIaInput = (variable, id) => {
     setIaDynamicInputs((prev) => ({
       ...prev,
       [variable]: prev[variable].filter((input) => input.id !== id),
     }));
-  };  
+  };
 
   const handleIaIntermediateSelect = (variable, id, selection) => {
     setIaIntermediateSelection((prev) => ({
@@ -863,15 +1203,15 @@ const DocumentConfigurator = ({ selectedTemplateId, selectedEntity }) => {
       [`${variable}-${id}`]: selection,
     }));
   };
-  
+
   const handleIaServiceTypeSelect = (variable, id, serviceType) => {
     setIaServiceTypeSelection((prev) => ({
       ...prev,
       [`${variable}-${id}`]: serviceType,
     }));
-  
+
     const source = iaDynamicInputs[variable].find((input) => input.id === id)?.source;
-  
+
     if (source === "Inspecciones") {
       const updatedFields = getInspectionFields(serviceType);
       setIaFieldOptions((prev) => ({
@@ -879,16 +1219,16 @@ const DocumentConfigurator = ({ selectedTemplateId, selectedEntity }) => {
         [`${variable}-${id}`]: updatedFields,
       }));
     }
-  };  
+  };
 
   const handleIaFieldSelect = (variable, id, field) => {
     const input = iaDynamicInputs[variable]?.find((input) => input.id === id);
     const source = input?.source || "";
     const period = iaIntermediateSelection[`${variable}-${id}`] || "all";
     const serviceType = iaServiceTypeSelection[`${variable}-${id}`] || "all";
-  
+
     let combinedValue = `${source}-${field}`;
-  
+
     // Si la fuente es "Inspecciones" o "Servicios", incluir período y tipo
     if (source === "Inspecciones" || source === "Inspección" || source === "Servicios") {
       combinedValue = `${source}-${period}-${serviceType}-${field}`;
@@ -897,7 +1237,7 @@ const DocumentConfigurator = ({ selectedTemplateId, selectedEntity }) => {
     if (source === "Procedimiento") {
       combinedValue = `${source}-${serviceType}-${field}`;
     }
-  
+
     // Actualizar el valor combinado del input
     setIaDynamicInputs((prev) => ({
       ...prev,
@@ -905,7 +1245,7 @@ const DocumentConfigurator = ({ selectedTemplateId, selectedEntity }) => {
         input.id === id ? { ...input, value: combinedValue } : input
       ),
     }));
-  
+
     // Actualizar el prompt para incluir el nombre personalizado
     const customName = iaDynamicInputs[variable]?.find((input) => input.id === id)?.name || combinedValue;
     setIaConfigurations((prev) => {
@@ -919,14 +1259,14 @@ const DocumentConfigurator = ({ selectedTemplateId, selectedEntity }) => {
         },
       };
     });
-  
+
     // Actualizar el estado de campos seleccionados
     setIaSelectedField((prev) => ({
       ...prev,
       [`${variable}-${id}`]: field,
     }));
   };
-  
+
   const handleIaInputNameChange = (variable, id, name) => {
     setIaDynamicInputs((prev) => ({
       ...prev,
@@ -942,7 +1282,7 @@ const DocumentConfigurator = ({ selectedTemplateId, selectedEntity }) => {
         console.error(`La clave ${key} no existe en tableIaDynamicInputs`);
         return prev; // Retorna el estado actual si la clave no existe
       }
-  
+
       return {
         ...prev,
         [key]: prev[key].map((input) =>
@@ -950,7 +1290,7 @@ const DocumentConfigurator = ({ selectedTemplateId, selectedEntity }) => {
         ),
       };
     });
-  };  
+  };
 
   const initializeTableSourceOptions = (tableName, rowIndex, colIndex) => {
     const key = `${tableName}_${rowIndex}_${colIndex}`;
@@ -962,27 +1302,27 @@ const DocumentConfigurator = ({ selectedTemplateId, selectedEntity }) => {
       "Servicios",
       "Inspecciones",
     ];
-  
+
     // Personalizar opciones según la entidad seleccionada
     if (selectedEntity === "servicio") {
       options = ["Servicio", "Inspecciones", "Responsable", "Acompañante", "Cliente", "Normativa Cliente", "Procedimiento"];
     } else if (selectedEntity === "inspeccion") {
       options = ["Inspección", "Servicio", "Responsable", "Acompañante", "Cliente", "Normativa Cliente", "Procedimiento"];
     }
-  
+
     // Actualizar las opciones en el estado `tableSourceOptions`
     setTableSourceOptions((prev) => ({ ...prev, [key]: options }));
-  };     
+  };
 
   const handleTableFuenteClick = (tableName, rowIndex, colIndex) => {
     const key = `${tableName}_${rowIndex}_${colIndex}`;
-  
+
     // Llama a la función para inicializar las opciones de fuente
     initializeTableSourceOptions(tableName, rowIndex, colIndex);
-  
+
     // Activa el desplegable de fuente
     setTableShowSourceDropdown((prev) => ({ ...prev, [key]: true }));
-  
+
     // Reinicia configuraciones de IA si estaban activas
     setTableShowIaConfiguration((prev) => ({ ...prev, [key]: false }));
     setTableIaConfigurations((prev) => ({ ...prev, [key]: undefined }));
@@ -993,10 +1333,10 @@ const DocumentConfigurator = ({ selectedTemplateId, selectedEntity }) => {
       return updated;
     });
   };
-  
+
   const handleSourceSelect = (variable, source) => {
     setSelectedSource((prev) => ({ ...prev, [variable]: source }));
-  
+
     if (source === "Inspecciones") {
       setFieldOptions((prev) => ({ ...prev, [variable]: getInspectionFields("") })); // Por defecto sin filtro
       setIntermediateSelection((prev) => ({ ...prev, [variable]: "" })); // Reset período
@@ -1042,7 +1382,7 @@ const DocumentConfigurator = ({ selectedTemplateId, selectedEntity }) => {
   const handleTableSourceSelect = (tableName, rowIndex, colIndex, source) => {
     const key = `${tableName}_${rowIndex}_${colIndex}`;
     setTableSelectedSource((prev) => ({ ...prev, [key]: source }));
-  
+
     if (source === "Inspecciones") {
       setTableFieldOptions((prev) => ({ ...prev, [key]: getInspectionFields("all") })); // Inicializa con "all"
       setTableIntermediateSelection((prev) => ({ ...prev, [key]: "all" })); // Período predeterminado
@@ -1068,12 +1408,12 @@ const DocumentConfigurator = ({ selectedTemplateId, selectedEntity }) => {
     } else {
       setTableFieldOptions((prev) => ({ ...prev, [key]: [] })); // Fuente sin campos específicos
     }
-  };  
+  };
 
   const handleTableIntermediateSelect = (tableName, rowIndex, colIndex, selection) => {
     const key = `${tableName}_${rowIndex}_${colIndex}`;
     setTableIntermediateSelection((prev) => ({ ...prev, [key]: selection }));
-  
+
     // Actualizar campos si la fuente es "Inspecciones" o "Servicios"
     if (tableSelectedSource[key] === "Inspecciones" || tableSelectedSource[key] === "Servicios") {
       const serviceType = tableServiceTypeSelection[key] || "all";
@@ -1081,21 +1421,21 @@ const DocumentConfigurator = ({ selectedTemplateId, selectedEntity }) => {
       setTableFieldOptions((prev) => ({ ...prev, [key]: updatedFields }));
     }
   };
-  
+
   const handleTableServiceTypeSelect = (tableName, rowIndex, colIndex, serviceType) => {
     const key = `${tableName}_${rowIndex}_${colIndex}`;
     setTableServiceTypeSelection((prev) => ({ ...prev, [key]: serviceType }));
-  
+
     // Actualizar campos dinámicamente según tipo seleccionado
     if (tableSelectedSource[key] === "Inspecciones" || tableSelectedSource[key] === "Servicios") {
       const updatedFields = getInspectionFields(serviceType);
       setTableFieldOptions((prev) => ({ ...prev, [key]: updatedFields }));
     }
-  };  
-  
+  };
+
   const handleServiceTypeSelect = (variable, serviceType) => {
     setServiceTypeSelection((prev) => ({ ...prev, [variable]: serviceType }));
-  
+
     // Actualizar dinámicamente los campos según el tipo de inspección seleccionado
     if (selectedSource[variable] === "Inspecciones") {
       const updatedFields = getInspectionFields(serviceType);
@@ -1111,9 +1451,9 @@ const DocumentConfigurator = ({ selectedTemplateId, selectedEntity }) => {
     const source = tableSelectedSource[key] || "";
     const period = tableIntermediateSelection[key] || "all";
     const serviceType = tableServiceTypeSelection[key] || "all";
-  
+
     let combinedValue = `${source}-${field}`;
-  
+
     // Agregar período y tipo de servicio si la fuente es "Inspecciones" o "Servicios"
     if (source === "Inspecciones" || source === "Inspección" || source === "Servicios") {
       combinedValue = `${source}-${period}-${serviceType}-${field}`;
@@ -1122,27 +1462,27 @@ const DocumentConfigurator = ({ selectedTemplateId, selectedEntity }) => {
     if (source === "Procedimiento") {
       combinedValue = `${source}-${serviceType}-${field}`;
     }
-  
+
     setTableData((prevTables) => {
       const updatedTable = { ...prevTables[tableName] };
       updatedTable.cuerpo[rowIndex][colIndex] = combinedValue;
-  
+
       return { ...prevTables, [tableName]: updatedTable };
     });
-  
+
     setTableSelectedField((prev) => ({ ...prev, [key]: field }));
-  };   
-  
+  };
+
   const handleIntermediateSelect = (variable, selection) => {
     setIntermediateSelection((prev) => ({ ...prev, [variable]: selection }));
-  };  
+  };
 
   const handleFieldSelect = (variable, field) => {
     const source = selectedSource[variable];
     const period = intermediateSelection[variable] || "all";
     const serviceType = serviceTypeSelection[variable] || "all";
     let combinedValue = `${source}-${field}`;
-  
+
     // Incluir el período y tipo si la fuente es "Inspecciones" o "Servicios"
     if (source === "Inspecciones" || source === "Inspección" || source === "Servicios") {
       combinedValue = `${source}-${period}-${serviceType}-${field}`;
@@ -1151,14 +1491,14 @@ const DocumentConfigurator = ({ selectedTemplateId, selectedEntity }) => {
     if (source === "Procedimiento") {
       combinedValue = `${source}-${serviceType}-${field}`;
     }
-  
+
     setVariableMappings((prevMappings) => ({
       ...prevMappings,
       [variable]: combinedValue,
     }));
-  
+
     setSelectedField((prev) => ({ ...prev, [variable]: field }));
-  };  
+  };
 
   // Manejar cambios en la tabla
   const handleTableCellChange = (tableName, rowIndex, colIndex, value) => {
@@ -1176,13 +1516,13 @@ const DocumentConfigurator = ({ selectedTemplateId, selectedEntity }) => {
       ...prev,
       [key]: prev[key].filter((input) => input.id !== inputId),
     }));
-  };  
+  };
 
   // Guardar configuración
   const handleSaveConfiguration = async () => {
     // Clonar el mapeo actual
     const updatedMappings = { ...variableMappings };
-  
+
     // Verificar si hay inputs dinámicos antes de procesarlos
     if (iaDynamicInputs && Object.keys(iaDynamicInputs).length > 0) {
       Object.entries(iaDynamicInputs).forEach(([variable, inputs]) => {
@@ -1204,7 +1544,7 @@ const DocumentConfigurator = ({ selectedTemplateId, selectedEntity }) => {
         });
       });
     }
-  
+
     // Preparar las tablas con el tipo incluido
     const preparedTables = Object.entries(tableData).map(([tableName, tableInfo]) => ({
       nombre: tableName,
@@ -1213,7 +1553,7 @@ const DocumentConfigurator = ({ selectedTemplateId, selectedEntity }) => {
       encabezado: tableInfo.encabezado,
       cuerpo: tableInfo.cuerpo,
     }));
-  
+
     // Validar que los modelos de IA sean válidos
     const preparedAiModels = aiModels
       .filter((model) => model.model && model.name && model.personality) // Filtrar modelos completos
@@ -1222,7 +1562,7 @@ const DocumentConfigurator = ({ selectedTemplateId, selectedEntity }) => {
         name: model.name,
         personality: model.personality,
       }));
-  
+
     const configuration = {
       templateId: selectedTemplateId,
       entity: selectedEntity,
@@ -1231,8 +1571,9 @@ const DocumentConfigurator = ({ selectedTemplateId, selectedEntity }) => {
       aiModels: preparedAiModels,
       document_name: documentName,
       document_type: documentType,
+      ...(configId ? { configId } : {})
     };
-  
+
     try {
       const response = await fetch(`${process.env.REACT_APP_API_URL}/api/save-configuration`, {
         method: "POST",
@@ -1241,34 +1582,34 @@ const DocumentConfigurator = ({ selectedTemplateId, selectedEntity }) => {
         },
         body: JSON.stringify(configuration),
       });
-  
+
       if (!response.ok) {
         throw new Error(`Error al guardar configuración: ${response.statusText}`);
       }
-  
+
       const data = await response.json();
-  
+
       console.log("Configuración guardada en el servidor:", data);
       alert("Configuración guardada correctamente");
     } catch (error) {
       console.error("Error al enviar la configuración:", error);
       alert("Ocurrió un error al guardar la configuración. Por favor, intenta nuevamente.");
     }
-  };  
+  };
 
   if (!templateData) {
     return <p className="text-center mt-4">Selecciona una plantilla para comenzar la configuración.</p>;
   }
 
   return (
-    
+
     <div className="document-configurator mt-4">
       <Card className="mt-4">
         <Card.Header>
           <h4 className="text-center">Información del Documento</h4>
         </Card.Header>
         <Card.Body>
-          <Row className="align-items-center mb-3"  style={{height: 'auto'}}>
+          <Row className="align-items-center mb-3" style={{ height: 'auto' }}>
             <Col sm={6}>
               <Form.Label>Nombre del Documento</Form.Label>
               <Form.Control
@@ -1298,7 +1639,7 @@ const DocumentConfigurator = ({ selectedTemplateId, selectedEntity }) => {
         </Card.Header>
         <Card.Body>
           {aiModels.map((model, index) => (
-            <Row key={index} className="align-items-center mb-3" style={{height: 'auto'}}>
+            <Row key={index} className="align-items-center mb-3" style={{ height: 'auto' }}>
               <Col sm={2}>
                 <Form.Select
                   value={model.model}
@@ -1351,20 +1692,20 @@ const DocumentConfigurator = ({ selectedTemplateId, selectedEntity }) => {
         </Card.Header>
         <Card.Body>
           {templateData.datos.variables.map((variable) => (
-            <Row key={variable.nombre} className="align-items-center mb-3" style={{height:'auto'}}>
+            <Row key={variable.nombre} className="align-items-center mb-3" style={{ height: 'auto' }}>
               <Col sm={4}>
                 <Form.Label>
                   <strong>{variable.nombre}</strong>
                 </Form.Label>
               </Col>
               <Col sm={4}>
-              <Form.Control
-                type="text"
-                placeholder={`Dato para ${variable.nombre}`}
-                value={variableMappings[variable.nombre] || ""}
-                readOnly
-                disabled
-              />
+                <Form.Control
+                  type="text"
+                  placeholder={`Dato para ${variable.nombre}`}
+                  value={variableMappings[variable.nombre] || ""}
+                  readOnly
+                  disabled
+                />
               </Col>
               <Col sm={4} className="text-center">
                 <Button
@@ -1398,108 +1739,108 @@ const DocumentConfigurator = ({ selectedTemplateId, selectedEntity }) => {
                   <Form.Select
                     onChange={(e) => handleSourceSelect(variable.nombre, e.target.value)}
                     value={selectedSource[variable.nombre] || ""} // Mostrar la fuente seleccionada
-                    >
+                  >
                     <option value="">-- Selecciona una fuente --</option>
                     {sourceOptions[variable.nombre]?.map((option, index) => (
-                        <option key={index} value={option}>
+                      <option key={index} value={option}>
                         {option}
-                        </option>
+                      </option>
                     ))}
                   </Form.Select>
                 </Col>
               )}
 
-            {/* Selector intermedio si la fuente es "Servicios" o "Inspecciones" */}
-            {(showSourceDropdown[variable.nombre] && selectedSource[variable.nombre] === "Servicios" || selectedSource[variable.nombre] === "Inspecciones") && (
-            <>
-                <Col sm={12} className="mt-2">
-                <Form.Select
-                    onChange={(e) =>
-                    handleIntermediateSelect(variable.nombre, e.target.value)
-                    }
-                    value={intermediateSelection[variable.nombre] || ""}
-                >
-                    <option value="">-- Selecciona un período --</option>
-                    <option value="all">Todos</option>
-                    <option value="this_year">Este año</option>
-                    <option value="last_3_months">Últimos 3 meses</option>
-                    <option value="last_month">Último mes</option>
-                    <option value="this_week">Esta semana</option>
-                </Form.Select>
-                </Col>
-                <Col sm={12} className="mt-2">
-                <Form.Select
-                    onChange={(e) =>
-                    handleServiceTypeSelect(variable.nombre, e.target.value)
-                    }
-                    value={serviceTypeSelection[variable.nombre] || ""}
-                >
-                    <option value="">-- Selecciona un tipo de servicio --</option>
-                    <option value="all">Todos</option>
-                    <option value="Desinsectación">Desinsectación</option>
-                    <option value="Desratización">Desratización</option>
-                    <option value="Desinfección">Desinfección</option>
-                    <option value="Roceria">Roceria</option>
-                    <option value="Limpieza y aseo de archivos">
-                    Limpieza y aseo de archivos
-                    </option>
-                    <option value="Lavado shut basura">Lavado shut basura</option>
-                    <option value="Encarpado">Encarpado</option>
-                    <option value="Lavado de tanque">Lavado de tanque</option>
-                    <option value="Inspección">Inspección</option>
-                    <option value="Diagnostico">Diagnostico</option>
-                </Form.Select>
-                </Col>
-            </>
-            )}
+              {/* Selector intermedio si la fuente es "Servicios" o "Inspecciones" */}
+              {(showSourceDropdown[variable.nombre] && selectedSource[variable.nombre] === "Servicios" || selectedSource[variable.nombre] === "Inspecciones") && (
+                <>
+                  <Col sm={12} className="mt-2">
+                    <Form.Select
+                      onChange={(e) =>
+                        handleIntermediateSelect(variable.nombre, e.target.value)
+                      }
+                      value={intermediateSelection[variable.nombre] || ""}
+                    >
+                      <option value="">-- Selecciona un período --</option>
+                      <option value="all">Todos</option>
+                      <option value="this_year">Este año</option>
+                      <option value="last_3_months">Últimos 3 meses</option>
+                      <option value="last_month">Último mes</option>
+                      <option value="this_week">Esta semana</option>
+                    </Form.Select>
+                  </Col>
+                  <Col sm={12} className="mt-2">
+                    <Form.Select
+                      onChange={(e) =>
+                        handleServiceTypeSelect(variable.nombre, e.target.value)
+                      }
+                      value={serviceTypeSelection[variable.nombre] || ""}
+                    >
+                      <option value="">-- Selecciona un tipo de servicio --</option>
+                      <option value="all">Todos</option>
+                      <option value="Desinsectación">Desinsectación</option>
+                      <option value="Desratización">Desratización</option>
+                      <option value="Desinfección">Desinfección</option>
+                      <option value="Roceria">Roceria</option>
+                      <option value="Limpieza y aseo de archivos">
+                        Limpieza y aseo de archivos
+                      </option>
+                      <option value="Lavado shut basura">Lavado shut basura</option>
+                      <option value="Encarpado">Encarpado</option>
+                      <option value="Lavado de tanque">Lavado de tanque</option>
+                      <option value="Inspección">Inspección</option>
+                      <option value="Diagnostico">Diagnostico</option>
+                    </Form.Select>
+                  </Col>
+                </>
+              )}
 
-            {(showSourceDropdown[variable.nombre] && selectedSource[variable.nombre] === "Inspección" || showSourceDropdown[variable.nombre] && selectedSource[variable.nombre] === "Procedimiento") && (
-            <>
-                <Col sm={12} className="mt-2">
-                <Form.Select
-                    onChange={(e) =>
-                    handleServiceTypeSelect(variable.nombre, e.target.value)
-                    }
-                    value={serviceTypeSelection[variable.nombre] || ""}
-                >
-                    <option value="">-- Selecciona un tipo de servicio --</option>
-                    <option value="all">Todos</option>
-                    <option value="Desinsectación">Desinsectación</option>
-                    <option value="Desratización">Desratización</option>
-                    <option value="Desinfección">Desinfección</option>
-                    <option value="Roceria">Roceria</option>
-                    <option value="Limpieza y aseo de archivos">
-                    Limpieza y aseo de archivos
-                    </option>
-                    <option value="Lavado shut basura">Lavado shut basura</option>
-                    <option value="Encarpado">Encarpado</option>
-                    <option value="Lavado de tanque">Lavado de tanque</option>
-                    <option value="Inspección">Inspección</option>
-                    <option value="Diagnostico">Diagnostico</option>
-                </Form.Select>
-                </Col>
-            </>
-            )}
+              {(showSourceDropdown[variable.nombre] && selectedSource[variable.nombre] === "Inspección" || showSourceDropdown[variable.nombre] && selectedSource[variable.nombre] === "Procedimiento") && (
+                <>
+                  <Col sm={12} className="mt-2">
+                    <Form.Select
+                      onChange={(e) =>
+                        handleServiceTypeSelect(variable.nombre, e.target.value)
+                      }
+                      value={serviceTypeSelection[variable.nombre] || ""}
+                    >
+                      <option value="">-- Selecciona un tipo de servicio --</option>
+                      <option value="all">Todos</option>
+                      <option value="Desinsectación">Desinsectación</option>
+                      <option value="Desratización">Desratización</option>
+                      <option value="Desinfección">Desinfección</option>
+                      <option value="Roceria">Roceria</option>
+                      <option value="Limpieza y aseo de archivos">
+                        Limpieza y aseo de archivos
+                      </option>
+                      <option value="Lavado shut basura">Lavado shut basura</option>
+                      <option value="Encarpado">Encarpado</option>
+                      <option value="Lavado de tanque">Lavado de tanque</option>
+                      <option value="Inspección">Inspección</option>
+                      <option value="Diagnostico">Diagnostico</option>
+                    </Form.Select>
+                  </Col>
+                </>
+              )}
 
               {/* Desplegable de campos específicos si selecciona "Cliente" */}
               {showSourceDropdown[variable.nombre] && fieldOptions[variable.nombre] && (
                 <Col sm={12} className="mt-2">
-                    <Form.Select
+                  <Form.Select
                     onChange={(e) => handleFieldSelect(variable.nombre, e.target.value)}
                     value={selectedField[variable.nombre] || ""}
-                    >
+                  >
                     <option value="">-- Selecciona un campo --</option>
                     {fieldOptions[variable.nombre]?.map((field) => (
-                        <option key={field.value} value={field.value}>
+                      <option key={field.value} value={field.value}>
                         {field.label}
-                        </option>
+                      </option>
                     ))}
-                    </Form.Select>
+                  </Form.Select>
                 </Col>
-                )}
+              )}
 
-                {/* Mostrar configuración de IA */}
-                {showIaConfiguration[variable.nombre] && (
+              {/* Mostrar configuración de IA */}
+              {showIaConfiguration[variable.nombre] && (
                 <>
                   {/* Selector de modelo */}
                   <Col sm={12} className="mt-2">
@@ -1519,23 +1860,23 @@ const DocumentConfigurator = ({ selectedTemplateId, selectedEntity }) => {
                   </Col>
                   {/* Textarea para el prompt */}
                   <Col sm={12} className="mt-2">
-                  <Form.Control
-                    as="textarea"
-                    placeholder="Escribe aquí el prompt"
-                    rows={3}
-                    value={iaConfigurations[variable.nombre]?.prompt || ""}
-                    onChange={(e) => handleIaPromptChange(variable.nombre, e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        e.preventDefault(); // Evitar el comportamiento predeterminado
-                        const currentPrompt = iaConfigurations[variable.nombre]?.prompt || "";
-                        const updatedPrompt = `${currentPrompt}\n`;
+                    <Form.Control
+                      as="textarea"
+                      placeholder="Escribe aquí el prompt"
+                      rows={3}
+                      value={iaConfigurations[variable.nombre]?.prompt || ""}
+                      onChange={(e) => handleIaPromptChange(variable.nombre, e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault(); // Evitar el comportamiento predeterminado
+                          const currentPrompt = iaConfigurations[variable.nombre]?.prompt || "";
+                          const updatedPrompt = `${currentPrompt}\n`;
 
-                        // Actualizar el estado del prompt directamente
-                        handleIaPromptChange(variable.nombre, updatedPrompt);
-                      }
-                    }}
-                  />
+                          // Actualizar el estado del prompt directamente
+                          handleIaPromptChange(variable.nombre, updatedPrompt);
+                        }
+                      }}
+                    />
                   </Col>
                   {/* Botón para agregar inputs */}
                   <Col sm={12} className="text-center mt-3">
@@ -1549,158 +1890,158 @@ const DocumentConfigurator = ({ selectedTemplateId, selectedEntity }) => {
                   </Col>
                   {/* Inputs dinámicos */}
                   {iaDynamicInputs[variable.nombre]?.map((input) => (
-                  <Row className="mt-4 align-items-center" key={input.id} style={{ height: 'auto' }}>
-                    <hr></hr>
-                    {/* Nombre del input */}
-                    <Col sm={6}>
-                      <Form.Control
-                        type="text"
-                        placeholder="Nombre personalizado"
-                        value={input.name}
-                        onChange={(e) =>
-                          handleIaInputNameChange(variable.nombre, input.id, e.target.value)
-                        }
-                      />
-                    </Col>
-
-                    {/* Valor generado automáticamente */}
-                    <Col sm={6}>
-                      <Form.Control
-                        type="text"
-                        placeholder="Valor generado automáticamente"
-                        value={input.value || ""}
-                        readOnly
-                      />
-                    </Col>
-
-                    {/* Selector de fuente */}
-                    <Col sm={6}>
-                      <Form.Select
-                        value={input.source}
-                        onChange={(e) =>
-                          handleIaSourceSelect(variable.nombre, input.id, e.target.value)
-                        }
-                      >
-                        <option value="">-- Selecciona una fuente --</option>
-                        {sourceOptions[variable.nombre]?.map((option, index) => (
-                          <option key={index} value={option}>
-                            {option}
-                          </option>
-                        ))}
-                      </Form.Select>
-                    </Col>
-
-                    {/* Selectores adicionales */}
-                    {(input.source === "Servicios" || input.source === "Inspecciones") && (
-                      <>
-                        <Col sm={6} className="mt-2">
-                          <Form.Select
-                            value={iaIntermediateSelection[`${variable.nombre}-${input.id}`] || ""}
-                            onChange={(e) =>
-                              handleIaIntermediateSelect(variable.nombre, input.id, e.target.value)
-                            }
-                          >
-                            <option value="">-- Selecciona un período --</option>
-                            <option value="all">Todos</option>
-                            <option value="this_year">Este año</option>
-                            <option value="last_3_months">Últimos 3 meses</option>
-                            <option value="last_month">Último mes</option>
-                            <option value="this_week">Esta semana</option>
-                          </Form.Select>
-                        </Col>
-                        <Col sm={6} className="mt-2">
-                          <Form.Select
-                            value={iaServiceTypeSelection[`${variable.nombre}-${input.id}`] || ""}
-                            onChange={(e) =>
-                              handleIaServiceTypeSelect(variable.nombre, input.id, e.target.value)
-                            }
-                          >
-                            <option value="">-- Selecciona un tipo de servicio --</option>
-                            <option value="all">Todos</option>
-                            <option value="Desinsectación">Desinsectación</option>
-                            <option value="Desratización">Desratización</option>
-                            <option value="Desinfección">Desinfección</option>
-                            <option value="Roceria">Roceria</option>
-                          </Form.Select>
-                        </Col>
-                      </>
-                    )}
-
-                    {/* Selectores adicionales */}
-                    {(input.source === "Inspección" || input.source === "Procedimiento") && (
-                      <>
-                        <Col sm={6} className="mt-2">
-                          <Form.Select
-                            value={iaServiceTypeSelection[`${variable.nombre}-${input.id}`] || ""}
-                            onChange={(e) =>
-                              handleIaServiceTypeSelect(variable.nombre, input.id, e.target.value)
-                            }
-                          >
-                            <option value="">-- Selecciona un tipo de servicio --</option>
-                            <option value="all">Todos</option>
-                            <option value="Desinsectación">Desinsectación</option>
-                            <option value="Desratización">Desratización</option>
-                            <option value="Desinfección">Desinfección</option>
-                            <option value="Roceria">Roceria</option>
-                          </Form.Select>
-                        </Col>
-                      </>
-                    )}
-
-                    {/* Selector de campos */}
-                    {iaFieldOptions[`${variable.nombre}-${input.id}`] && (
-                      <Col sm={6} className="mt-2">
-                        <Form.Select
-                          value={iaSelectedField[`${variable.nombre}-${input.id}`] || ""}
+                    <Row className="mt-4 align-items-center" key={input.id} style={{ height: 'auto' }}>
+                      <hr></hr>
+                      {/* Nombre del input */}
+                      <Col sm={6}>
+                        <Form.Control
+                          type="text"
+                          placeholder="Nombre personalizado"
+                          value={input.name}
                           onChange={(e) =>
-                            handleIaFieldSelect(variable.nombre, input.id, e.target.value)
+                            handleIaInputNameChange(variable.nombre, input.id, e.target.value)
+                          }
+                        />
+                      </Col>
+
+                      {/* Valor generado automáticamente */}
+                      <Col sm={6}>
+                        <Form.Control
+                          type="text"
+                          placeholder="Valor generado automáticamente"
+                          value={input.value || ""}
+                          readOnly
+                        />
+                      </Col>
+
+                      {/* Selector de fuente */}
+                      <Col sm={6}>
+                        <Form.Select
+                          value={input.source}
+                          onChange={(e) =>
+                            handleIaSourceSelect(variable.nombre, input.id, e.target.value)
                           }
                         >
-                          <option value="">-- Selecciona un campo --</option>
-                          {/* Agregar la opción "Todo" */}
-                          <option value="all">Todo</option>
-                          
-                          {/* Generar opciones dinámicas */}
-                          {iaFieldOptions[`${variable.nombre}-${input.id}`]?.map((field) => (
-                            <option key={field.value} value={field.value}>
-                              {field.label}
+                          <option value="">-- Selecciona una fuente --</option>
+                          {sourceOptions[variable.nombre]?.map((option, index) => (
+                            <option key={index} value={option}>
+                              {option}
                             </option>
                           ))}
                         </Form.Select>
                       </Col>
-                    )}
 
-                    {/* Botón de eliminar */}
-                    <Col sm={12} className="text-center mt-2">
-                      <Button
-                        className="w-100"
-                        variant="danger"
-                        size="sm"
-                        onClick={() => handleDeleteIaInput(variable.nombre, input.id)}
-                      >
-                        Eliminar
-                      </Button>
-                    </Col>
+                      {/* Selectores adicionales */}
+                      {(input.source === "Servicios" || input.source === "Inspecciones") && (
+                        <>
+                          <Col sm={6} className="mt-2">
+                            <Form.Select
+                              value={iaIntermediateSelection[`${variable.nombre}-${input.id}`] || ""}
+                              onChange={(e) =>
+                                handleIaIntermediateSelect(variable.nombre, input.id, e.target.value)
+                              }
+                            >
+                              <option value="">-- Selecciona un período --</option>
+                              <option value="all">Todos</option>
+                              <option value="this_year">Este año</option>
+                              <option value="last_3_months">Últimos 3 meses</option>
+                              <option value="last_month">Último mes</option>
+                              <option value="this_week">Esta semana</option>
+                            </Form.Select>
+                          </Col>
+                          <Col sm={6} className="mt-2">
+                            <Form.Select
+                              value={iaServiceTypeSelection[`${variable.nombre}-${input.id}`] || ""}
+                              onChange={(e) =>
+                                handleIaServiceTypeSelect(variable.nombre, input.id, e.target.value)
+                              }
+                            >
+                              <option value="">-- Selecciona un tipo de servicio --</option>
+                              <option value="all">Todos</option>
+                              <option value="Desinsectación">Desinsectación</option>
+                              <option value="Desratización">Desratización</option>
+                              <option value="Desinfección">Desinfección</option>
+                              <option value="Roceria">Roceria</option>
+                            </Form.Select>
+                          </Col>
+                        </>
+                      )}
 
-                    
-                  </Row>
-                  
-                ))}
+                      {/* Selectores adicionales */}
+                      {(input.source === "Inspección" || input.source === "Procedimiento") && (
+                        <>
+                          <Col sm={6} className="mt-2">
+                            <Form.Select
+                              value={iaServiceTypeSelection[`${variable.nombre}-${input.id}`] || ""}
+                              onChange={(e) =>
+                                handleIaServiceTypeSelect(variable.nombre, input.id, e.target.value)
+                              }
+                            >
+                              <option value="">-- Selecciona un tipo de servicio --</option>
+                              <option value="all">Todos</option>
+                              <option value="Desinsectación">Desinsectación</option>
+                              <option value="Desratización">Desratización</option>
+                              <option value="Desinfección">Desinfección</option>
+                              <option value="Roceria">Roceria</option>
+                            </Form.Select>
+                          </Col>
+                        </>
+                      )}
+
+                      {/* Selector de campos */}
+                      {iaFieldOptions[`${variable.nombre}-${input.id}`] && (
+                        <Col sm={6} className="mt-2">
+                          <Form.Select
+                            value={iaSelectedField[`${variable.nombre}-${input.id}`] || ""}
+                            onChange={(e) =>
+                              handleIaFieldSelect(variable.nombre, input.id, e.target.value)
+                            }
+                          >
+                            <option value="">-- Selecciona un campo --</option>
+                            {/* Agregar la opción "Todo" */}
+                            <option value="all">Todo</option>
+
+                            {/* Generar opciones dinámicas */}
+                            {iaFieldOptions[`${variable.nombre}-${input.id}`]?.map((field) => (
+                              <option key={field.value} value={field.value}>
+                                {field.label}
+                              </option>
+                            ))}
+                          </Form.Select>
+                        </Col>
+                      )}
+
+                      {/* Botón de eliminar */}
+                      <Col sm={12} className="text-center mt-2">
+                        <Button
+                          className="w-100"
+                          variant="danger"
+                          size="sm"
+                          onClick={() => handleDeleteIaInput(variable.nombre, input.id)}
+                        >
+                          Eliminar
+                        </Button>
+                      </Col>
+
+
+                    </Row>
+
+                  ))}
                 </>
               )}
-              
+
               {customizedValues[variable.nombre] !== undefined && (
-                  <Col sm={12} className="mt-2">
-                    <Form.Control
-                      type="text"
-                      placeholder="Ingresa un valor personalizado"
-                      value={customizedValues[variable.nombre] || ""}
-                      onChange={(e) =>
-                        handleCustomValueChange(variable.nombre, e.target.value)
-                      }
-                    />
-                  </Col>
-                )}
+                <Col sm={12} className="mt-2">
+                  <Form.Control
+                    type="text"
+                    placeholder="Ingresa un valor personalizado"
+                    value={customizedValues[variable.nombre] || ""}
+                    onChange={(e) =>
+                      handleCustomValueChange(variable.nombre, e.target.value)
+                    }
+                  />
+                </Col>
+              )}
             </Row>
           ))}
         </Card.Body>
@@ -1716,59 +2057,59 @@ const DocumentConfigurator = ({ selectedTemplateId, selectedEntity }) => {
             {templateData.datos.tablas.map((table) => (
               <div key={table.nombre} className="mb-4">
                 <Form.Group as={Row} className="mb-3" style={{ height: "auto" }}>
-                <Col sm={2}>
+                  <Col sm={2}>
                     <Form.Label>Tipo de Tabla</Form.Label>
-                </Col>
-                <Col sm={4}>
+                  </Col>
+                  <Col sm={4}>
                     <Form.Select
-                    onChange={(e) =>
+                      onChange={(e) =>
                         setTableData((prevTables) => ({
-                        ...prevTables,
-                        [table.nombre]: {
+                          ...prevTables,
+                          [table.nombre]: {
                             ...prevTables[table.nombre],
                             tipo: e.target.value,
                             orientacion: e.target.value === "Dinámica" ? "Horizontal" : "", // Valor predeterminado
-                        },
+                          },
                         }))
-                    }
-                    value={tableData[table.nombre]?.tipo || "Estática"}
+                      }
+                      value={tableData[table.nombre]?.tipo || "Estática"}
                     >
-                    <option value="Estática">Estática</option>
-                    <option value="Dinámica">Dinámica</option>
+                      <option value="Estática">Estática</option>
+                      <option value="Dinámica">Dinámica</option>
                     </Form.Select>
-                </Col>
+                  </Col>
 
-                {/* Selector de Orientación si es Dinámica */}
-                {tableData[table.nombre]?.tipo === "Dinámica" && (
+                  {/* Selector de Orientación si es Dinámica */}
+                  {tableData[table.nombre]?.tipo === "Dinámica" && (
                     <>
-                    <Col sm={2}>
+                      <Col sm={2}>
                         <Form.Label>Orientación</Form.Label>
-                    </Col>
-                    <Col sm={4}>
+                      </Col>
+                      <Col sm={4}>
                         <Form.Select
-                        onChange={(e) =>
+                          onChange={(e) =>
                             setTableData((prevTables) => ({
-                            ...prevTables,
-                            [table.nombre]: {
+                              ...prevTables,
+                              [table.nombre]: {
                                 ...prevTables[table.nombre],
                                 orientacion: e.target.value, // Guardar la orientación seleccionada
-                            },
+                              },
                             }))
-                        }
-                        value={tableData[table.nombre]?.orientacion || "Horizontal"}
+                          }
+                          value={tableData[table.nombre]?.orientacion || "Horizontal"}
                         >
-                        <option value="Horizontal">Horizontal</option>
-                        <option value="Vertical">Vertical</option>
+                          <option value="Horizontal">Horizontal</option>
+                          <option value="Vertical">Vertical</option>
                         </Form.Select>
-                    </Col>
+                      </Col>
                     </>
-                )}
+                  )}
                 </Form.Group>
                 <h5>{table.nombre}</h5>
                 <Table bordered>
                   <thead>
                     <tr>
-                     {tableData[table.nombre]?.encabezado[0]?.map((header, index) => (
+                      {tableData[table.nombre]?.encabezado[0]?.map((header, index) => (
                         <th key={index}>{header}</th>
                       ))}
                     </tr>
@@ -1778,238 +2119,238 @@ const DocumentConfigurator = ({ selectedTemplateId, selectedEntity }) => {
                       <tr key={rowIndex}>
                         {row.map((cell, colIndex) => (
                           <td key={colIndex} style={{ width: `${100 / row.length}%`, verticalAlign: "top" }}>
-                          <div className="d-flex flex-column">
-                            <div className="d-flex align-items-center">
-                              <Form.Control
-                                type="text"
-                                value={tableData[table.nombre]?.cuerpo[rowIndex][colIndex] || ""}
-                                readOnly
-                              />
-                              <Button
-                                variant="info"
-                                size="sm"
-                                className="ms-2"
-                                onClick={() =>
-                                  handleTableFuenteClick(table.nombre, rowIndex, colIndex)
-                                }
-                              >
-                                Fuente
-                              </Button>
-                              <Button
-                                variant="warning"
-                                size="sm"
-                                className="ms-2"
-                                onClick={() => handleTableIaClick(table.nombre, rowIndex, colIndex)}
-                              >
-                                IA
-                              </Button>
-                              <Button
-                                variant="primary"
-                                size="sm"
-                                className="ms-2"
-                                onClick={() => handleTableCustomClick(table.nombre, rowIndex, colIndex)}
-                              >
-                                Personalizado
-                              </Button>
-                            </div>
-                        
-                            {/* Selector de fuente */}
-                            {tableShowSourceDropdown[`${table.nombre}_${rowIndex}_${colIndex}`] && (
-                              <Form.Select
-                                className="mt-2"
-                                onChange={(e) =>
-                                  handleTableSourceSelect(
-                                    table.nombre,
-                                    rowIndex,
-                                    colIndex,
-                                    e.target.value
-                                  )
-                                }
-                                value={
-                                  tableSelectedSource[`${table.nombre}_${rowIndex}_${colIndex}`] || ""
-                                }
-                              >
-                                <option value="">-- Selecciona una fuente --</option>
-                                {tableSourceOptions[`${table.nombre}_${rowIndex}_${colIndex}`]?.map(
-                                  (option, index) => (
-                                    <option key={index} value={option}>
-                                      {option}
-                                    </option>
-                                  )
+                            <div className="d-flex flex-column">
+                              <div className="d-flex align-items-center">
+                                <Form.Control
+                                  type="text"
+                                  value={tableData[table.nombre]?.cuerpo[rowIndex][colIndex] || ""}
+                                  readOnly
+                                />
+                                <Button
+                                  variant="info"
+                                  size="sm"
+                                  className="ms-2"
+                                  onClick={() =>
+                                    handleTableFuenteClick(table.nombre, rowIndex, colIndex)
+                                  }
+                                >
+                                  Fuente
+                                </Button>
+                                <Button
+                                  variant="warning"
+                                  size="sm"
+                                  className="ms-2"
+                                  onClick={() => handleTableIaClick(table.nombre, rowIndex, colIndex)}
+                                >
+                                  IA
+                                </Button>
+                                <Button
+                                  variant="primary"
+                                  size="sm"
+                                  className="ms-2"
+                                  onClick={() => handleTableCustomClick(table.nombre, rowIndex, colIndex)}
+                                >
+                                  Personalizado
+                                </Button>
+                              </div>
+
+                              {/* Selector de fuente */}
+                              {tableShowSourceDropdown[`${table.nombre}_${rowIndex}_${colIndex}`] && (
+                                <Form.Select
+                                  className="mt-2"
+                                  onChange={(e) =>
+                                    handleTableSourceSelect(
+                                      table.nombre,
+                                      rowIndex,
+                                      colIndex,
+                                      e.target.value
+                                    )
+                                  }
+                                  value={
+                                    tableSelectedSource[`${table.nombre}_${rowIndex}_${colIndex}`] || ""
+                                  }
+                                >
+                                  <option value="">-- Selecciona una fuente --</option>
+                                  {tableSourceOptions[`${table.nombre}_${rowIndex}_${colIndex}`]?.map(
+                                    (option, index) => (
+                                      <option key={index} value={option}>
+                                        {option}
+                                      </option>
+                                    )
+                                  )}
+                                </Form.Select>
+                              )}
+
+                              {/* Selector intermedio para "Servicios" y "Inspecciones" */}
+                              {(tableSelectedSource[`${table.nombre}_${rowIndex}_${colIndex}`] === "Servicios" ||
+                                tableSelectedSource[`${table.nombre}_${rowIndex}_${colIndex}`] === "Inspecciones") && (
+                                  <>
+                                    {/* Selector de Período */}
+                                    <Form.Select
+                                      className="mt-2"
+                                      onChange={(e) =>
+                                        handleTableIntermediateSelect(
+                                          table.nombre,
+                                          rowIndex,
+                                          colIndex,
+                                          e.target.value
+                                        )
+                                      }
+                                      value={
+                                        tableIntermediateSelection[`${table.nombre}_${rowIndex}_${colIndex}`] || ""
+                                      }
+                                    >
+                                      <option value="">-- Selecciona un período --</option>
+                                      <option value="all">Todos</option>
+                                      <option value="this_year">Este año</option>
+                                      <option value="last_3_months">Últimos 3 meses</option>
+                                      <option value="last_month">Último mes</option>
+                                      <option value="this_week">Esta semana</option>
+                                    </Form.Select>
+
+                                    {/* Selector de Tipo de Servicio */}
+                                    <Form.Select
+                                      className="mt-2"
+                                      onChange={(e) =>
+                                        handleTableServiceTypeSelect(
+                                          table.nombre,
+                                          rowIndex,
+                                          colIndex,
+                                          e.target.value
+                                        )
+                                      }
+                                      value={
+                                        tableServiceTypeSelection[`${table.nombre}_${rowIndex}_${colIndex}`] || ""
+                                      }
+                                    >
+                                      <option value="">-- Selecciona un tipo de servicio --</option>
+                                      <option value="all">Todos</option>
+                                      <option value="Desinsectación">Desinsectación</option>
+                                      <option value="Desratización">Desratización</option>
+                                      <option value="Desinfección">Desinfección</option>
+                                      <option value="Roceria">Roceria</option>
+                                    </Form.Select>
+                                  </>
                                 )}
-                              </Form.Select>
-                            )}
-                        
-                            {/* Selector intermedio para "Servicios" y "Inspecciones" */}
-                            {(tableSelectedSource[`${table.nombre}_${rowIndex}_${colIndex}`] === "Servicios" ||
-                              tableSelectedSource[`${table.nombre}_${rowIndex}_${colIndex}`] === "Inspecciones") && (
-                              <>
-                                {/* Selector de Período */}
-                                <Form.Select
-                                  className="mt-2"
-                                  onChange={(e) =>
-                                    handleTableIntermediateSelect(
-                                      table.nombre,
-                                      rowIndex,
-                                      colIndex,
-                                      e.target.value
-                                    )
-                                  }
-                                  value={
-                                    tableIntermediateSelection[`${table.nombre}_${rowIndex}_${colIndex}`] || ""
-                                  }
-                                >
-                                  <option value="">-- Selecciona un período --</option>
-                                  <option value="all">Todos</option>
-                                  <option value="this_year">Este año</option>
-                                  <option value="last_3_months">Últimos 3 meses</option>
-                                  <option value="last_month">Último mes</option>
-                                  <option value="this_week">Esta semana</option>
-                                </Form.Select>
-                        
-                                {/* Selector de Tipo de Servicio */}
-                                <Form.Select
-                                  className="mt-2"
-                                  onChange={(e) =>
-                                    handleTableServiceTypeSelect(
-                                      table.nombre,
-                                      rowIndex,
-                                      colIndex,
-                                      e.target.value
-                                    )
-                                  }
-                                  value={
-                                    tableServiceTypeSelection[`${table.nombre}_${rowIndex}_${colIndex}`] || ""
-                                  }
-                                >
-                                  <option value="">-- Selecciona un tipo de servicio --</option>
-                                  <option value="all">Todos</option>
-                                  <option value="Desinsectación">Desinsectación</option>
-                                  <option value="Desratización">Desratización</option>
-                                  <option value="Desinfección">Desinfección</option>
-                                  <option value="Roceria">Roceria</option>
-                                </Form.Select>
-                              </>
-                            )}
 
-                            {/* Selector intermedio para "Inspección" */}
-                            {(tableSelectedSource[`${table.nombre}_${rowIndex}_${colIndex}`] === "Inspección" || tableSelectedSource[`${table.nombre}_${rowIndex}_${colIndex}`] === "Procedimiento") && (
-                              <>
-                        
-                                {/* Selector de Tipo de Servicio */}
-                                <Form.Select
-                                  className="mt-2"
-                                  onChange={(e) =>
-                                    handleTableServiceTypeSelect(
-                                      table.nombre,
-                                      rowIndex,
-                                      colIndex,
-                                      e.target.value
-                                    )
-                                  }
-                                  value={
-                                    tableServiceTypeSelection[`${table.nombre}_${rowIndex}_${colIndex}`] || ""
-                                  }
-                                >
-                                  <option value="">-- Selecciona un tipo de servicio --</option>
-                                  <option value="all">Todos</option>
-                                  <option value="Desinsectación">Desinsectación</option>
-                                  <option value="Desratización">Desratización</option>
-                                  <option value="Desinfección">Desinfección</option>
-                                  <option value="Roceria">Roceria</option>
-                                </Form.Select>
-                              </>
-                            )}
-                        
-                            {/* Selector de campos */}
-                            {tableShowSourceDropdown[`${table.nombre}_${rowIndex}_${colIndex}`] && tableFieldOptions[`${table.nombre}_${rowIndex}_${colIndex}`] && (
-                              <Form.Select
-                                className="mt-2"
-                                onChange={(e) =>
-                                  handleTableFieldSelect(
-                                    table.nombre,
-                                    rowIndex,
-                                    colIndex,
-                                    e.target.value
-                                  )
-                                }
-                                value={
-                                  tableSelectedField[`${table.nombre}_${rowIndex}_${colIndex}`] || ""
-                                }
-                              >
-                                <option value="">-- Selecciona un campo --</option>
-                                {tableFieldOptions[`${table.nombre}_${rowIndex}_${colIndex}`]?.map(
-                                  (field) => (
-                                    <option key={field.value} value={field.value}>
-                                      {field.label}
-                                    </option>
-                                  )
-                                )}
-                              </Form.Select>
-                            )}
+                              {/* Selector intermedio para "Inspección" */}
+                              {(tableSelectedSource[`${table.nombre}_${rowIndex}_${colIndex}`] === "Inspección" || tableSelectedSource[`${table.nombre}_${rowIndex}_${colIndex}`] === "Procedimiento") && (
+                                <>
 
-                            {tableShowIaConfiguration[`${table.nombre}_${rowIndex}_${colIndex}`] && (
-                              <>
-                              {/* Selector de modelo */}
-                              <Form.Select
-                                className="mt-2"
-                                value={tableIaConfigurations[`${table.nombre}_${rowIndex}_${colIndex}`]?.model || ""}
-                                onChange={(e) =>
-                                  handleTableIaModelChange(table.nombre, rowIndex, colIndex, e.target.value)
-                                }
-                              >
-                                <option value="">-- Selecciona un modelo --</option>
-                                {aiModels.map((model, index) => (
-                                  <option key={index} value={model.model}>
-                                    {model.name || model.model}
-                                  </option>
-                                ))}
-                              </Form.Select>
-
-                                {/* NUEVO: Selector Sí/No para incluir ${ns} */}
-                                <Form.Select
-                                  className="mt-2"
-                                  value={tableIaConfigurations[`${table.nombre}_${rowIndex}_${colIndex}`]?.ns || ""}
-                                  onChange={(e) => {
-                                    const selectedNS = e.target.value.toUpperCase(); // Convertimos a mayúsculas
-                                    const key = `${table.nombre}_${rowIndex}_${colIndex}`;
-                                    const prevConfig = tableIaConfigurations[key] || {};
-                                    const model = prevConfig.model || "";
-                                    const prompt = (prevConfig.prompt || "").replace(/\n/g, "\\n");
-
-                                    const modelName = aiModels.find((m) => m.model === model)?.name || "ModeloIA";
-                                    const finalValue = `IA-${modelName}-${prompt}-${selectedNS}`;
-
-                                    // Guardamos la configuración del campo ns
-                                    setTableIaConfigurations((prev) => ({
-                                      ...prev,
-                                      [key]: {
-                                        ...prev[key],
-                                        ns: selectedNS,
-                                      },
-                                    }));
-
-                                    // Actualizamos el valor visible en la celda de la tabla
-                                    setTableData((prevTables) => {
-                                      const updated = { ...prevTables };
-                                      updated[table.nombre].cuerpo[rowIndex][colIndex] = finalValue;
-                                      return updated;
-                                    });
-
-                                    // Acción personalizada
-                                    if (selectedNS === "S") {
-                                      console.log(`⚡ Acción para SÍ: ${key}`);
-                                      // Aquí puedes agregar más lógica
-                                    } else if (selectedNS === "N") {
-                                      console.log(`🚫 Acción para NO: ${key}`);
-                                      // Aquí puedes agregar más lógica
+                                  {/* Selector de Tipo de Servicio */}
+                                  <Form.Select
+                                    className="mt-2"
+                                    onChange={(e) =>
+                                      handleTableServiceTypeSelect(
+                                        table.nombre,
+                                        rowIndex,
+                                        colIndex,
+                                        e.target.value
+                                      )
                                     }
-                                  }}
+                                    value={
+                                      tableServiceTypeSelection[`${table.nombre}_${rowIndex}_${colIndex}`] || ""
+                                    }
+                                  >
+                                    <option value="">-- Selecciona un tipo de servicio --</option>
+                                    <option value="all">Todos</option>
+                                    <option value="Desinsectación">Desinsectación</option>
+                                    <option value="Desratización">Desratización</option>
+                                    <option value="Desinfección">Desinfección</option>
+                                    <option value="Roceria">Roceria</option>
+                                  </Form.Select>
+                                </>
+                              )}
+
+                              {/* Selector de campos */}
+                              {tableShowSourceDropdown[`${table.nombre}_${rowIndex}_${colIndex}`] && tableFieldOptions[`${table.nombre}_${rowIndex}_${colIndex}`] && (
+                                <Form.Select
+                                  className="mt-2"
+                                  onChange={(e) =>
+                                    handleTableFieldSelect(
+                                      table.nombre,
+                                      rowIndex,
+                                      colIndex,
+                                      e.target.value
+                                    )
+                                  }
+                                  value={
+                                    tableSelectedField[`${table.nombre}_${rowIndex}_${colIndex}`] || ""
+                                  }
                                 >
-                                  <option value="">-- ¿Incluir NS? --</option>
-                                  <option value="S">Sí</option>
-                                  <option value="N">No</option>
+                                  <option value="">-- Selecciona un campo --</option>
+                                  {tableFieldOptions[`${table.nombre}_${rowIndex}_${colIndex}`]?.map(
+                                    (field) => (
+                                      <option key={field.value} value={field.value}>
+                                        {field.label}
+                                      </option>
+                                    )
+                                  )}
                                 </Form.Select>
+                              )}
+
+                              {tableShowIaConfiguration[`${table.nombre}_${rowIndex}_${colIndex}`] && (
+                                <>
+                                  {/* Selector de modelo */}
+                                  <Form.Select
+                                    className="mt-2"
+                                    value={tableIaConfigurations[`${table.nombre}_${rowIndex}_${colIndex}`]?.model || ""}
+                                    onChange={(e) =>
+                                      handleTableIaModelChange(table.nombre, rowIndex, colIndex, e.target.value)
+                                    }
+                                  >
+                                    <option value="">-- Selecciona un modelo --</option>
+                                    {aiModels.map((model, index) => (
+                                      <option key={index} value={model.model}>
+                                        {model.name || model.model}
+                                      </option>
+                                    ))}
+                                  </Form.Select>
+
+                                  {/* NUEVO: Selector Sí/No para incluir ${ns} */}
+                                  <Form.Select
+                                    className="mt-2"
+                                    value={tableIaConfigurations[`${table.nombre}_${rowIndex}_${colIndex}`]?.ns || ""}
+                                    onChange={(e) => {
+                                      const selectedNS = e.target.value.toUpperCase(); // Convertimos a mayúsculas
+                                      const key = `${table.nombre}_${rowIndex}_${colIndex}`;
+                                      const prevConfig = tableIaConfigurations[key] || {};
+                                      const model = prevConfig.model || "";
+                                      const prompt = (prevConfig.prompt || "").replace(/\n/g, "\\n");
+
+                                      const modelName = aiModels.find((m) => m.model === model)?.name || "ModeloIA";
+                                      const finalValue = `IA-${modelName}-${prompt}-${selectedNS}`;
+
+                                      // Guardamos la configuración del campo ns
+                                      setTableIaConfigurations((prev) => ({
+                                        ...prev,
+                                        [key]: {
+                                          ...prev[key],
+                                          ns: selectedNS,
+                                        },
+                                      }));
+
+                                      // Actualizamos el valor visible en la celda de la tabla
+                                      setTableData((prevTables) => {
+                                        const updated = { ...prevTables };
+                                        updated[table.nombre].cuerpo[rowIndex][colIndex] = finalValue;
+                                        return updated;
+                                      });
+
+                                      // Acción personalizada
+                                      if (selectedNS === "S") {
+                                        console.log(`⚡ Acción para SÍ: ${key}`);
+                                        // Aquí puedes agregar más lógica
+                                      } else if (selectedNS === "N") {
+                                        console.log(`🚫 Acción para NO: ${key}`);
+                                        // Aquí puedes agregar más lógica
+                                      }
+                                    }}
+                                  >
+                                    <option value="">-- ¿Incluir NS? --</option>
+                                    <option value="S">Sí</option>
+                                    <option value="N">No</option>
+                                  </Form.Select>
 
                                   {/* Textarea para el prompt */}
                                   <Form.Control
@@ -2045,170 +2386,170 @@ const DocumentConfigurator = ({ selectedTemplateId, selectedEntity }) => {
                                     }}
                                   />
 
-                                {/* Botón para agregar inputs */}
-                                <Col sm={12} className="text-center mt-3">
-                                  <Button
-                                    variant="success"
-                                    size="sm"
-                                    onClick={() => handleAddTableIaInput(table.nombre, rowIndex, colIndex)}
-                                  >
-                                    Agregar Inputs
-                                  </Button>
-                                </Col>
-                              </>
-                            )}
+                                  {/* Botón para agregar inputs */}
+                                  <Col sm={12} className="text-center mt-3">
+                                    <Button
+                                      variant="success"
+                                      size="sm"
+                                      onClick={() => handleAddTableIaInput(table.nombre, rowIndex, colIndex)}
+                                    >
+                                      Agregar Inputs
+                                    </Button>
+                                  </Col>
+                                </>
+                              )}
 
-                            {/* Inputs dinámicos */}
-                            {tableIaDynamicInputs[`${table.nombre}_${rowIndex}_${colIndex}`]?.map((input) => (
-                              <Row key={input.id} className="align-items-center mt-2" style={{ height: 'auto' }}>
-                                <hr></hr>
+                              {/* Inputs dinámicos */}
+                              {tableIaDynamicInputs[`${table.nombre}_${rowIndex}_${colIndex}`]?.map((input) => (
+                                <Row key={input.id} className="align-items-center mt-2" style={{ height: 'auto' }}>
+                                  <hr></hr>
 
-                                {/* Nombre del input */}
-                                <Col sm={12} className="mt-2">
-                                  <Form.Control
-                                    type="text"
-                                    placeholder="Nombre personalizado"
-                                    value={input.name}
-                                    onChange={(e) =>
-                                      handleTableIaInputNameChange(`${table.nombre}_${rowIndex}_${colIndex}`, input.id, e.target.value)
-                                    }
-                                  />
-                                </Col>
+                                  {/* Nombre del input */}
+                                  <Col sm={12} className="mt-2">
+                                    <Form.Control
+                                      type="text"
+                                      placeholder="Nombre personalizado"
+                                      value={input.name}
+                                      onChange={(e) =>
+                                        handleTableIaInputNameChange(`${table.nombre}_${rowIndex}_${colIndex}`, input.id, e.target.value)
+                                      }
+                                    />
+                                  </Col>
 
-                                {/* Valor generado automáticamente */}
-                                <Col sm={12} className="mt-2">
-                                  <Form.Control
-                                    type="text"
-                                    placeholder="Valor generado automáticamente"
-                                    value={input.value || ""}
-                                    readOnly
-                                  />
-                                </Col>
+                                  {/* Valor generado automáticamente */}
+                                  <Col sm={12} className="mt-2">
+                                    <Form.Control
+                                      type="text"
+                                      placeholder="Valor generado automáticamente"
+                                      value={input.value || ""}
+                                      readOnly
+                                    />
+                                  </Col>
 
-                                {/* Selector de fuente */}
-                                <Col sm={12} className="mt-2">
-                                <Form.Select
-                              value={input.source}
-                              onChange={(e) =>
-                                handleTableIaSourceSelect(table.nombre, rowIndex, colIndex, input.id, e.target.value)
-                              }
-                            >
-                              <option value="">-- Selecciona una fuente --</option>
-                              {tableSourceOptions[`${table.nombre}_${rowIndex}_${colIndex}`]?.map((option, index) => (
-                                <option key={index} value={option}>
-                                  {option}
-                                </option>
-                              ))}
-                            </Form.Select>
-                                </Col>
-
-                                {/* Selectores adicionales */}
-                                {(input.source === "Servicios" || input.source === "Inspecciones") && (
-                                  <>
-                                    <Col sm={12} className="mt-2">
-                                      <Form.Select
-                                        value={tableIntermediateSelection[`${table.nombre}_${rowIndex}_${colIndex}`] || ""}
-                                        onChange={(e) =>
-                                          handleTableIntermediateSelect(table.nombre, rowIndex, colIndex, e.target.value)
-                                        }
-                                      >
-                                        <option value="">-- Selecciona un período --</option>
-                                        <option value="all">Todos</option>
-                                        <option value="this_year">Este año</option>
-                                        <option value="last_3_months">Últimos 3 meses</option>
-                                        <option value="last_month">Último mes</option>
-                                        <option value="this_week">Esta semana</option>
-                                      </Form.Select>
-                                    </Col>
-                                    <Col sm={12} className="mt-2">
-                                      <Form.Select
-                                        value={tableServiceTypeSelection[`${table.nombre}_${rowIndex}_${colIndex}`] || ""}
-                                        onChange={(e) =>
-                                          handleTableServiceTypeSelect(table.nombre, rowIndex, colIndex, e.target.value)
-                                        }
-                                      >
-                                        <option value="">-- Selecciona un tipo de servicio --</option>
-                                        <option value="all">Todos</option>
-                                        <option value="Desinsectación">Desinsectación</option>
-                                        <option value="Desratización">Desratización</option>
-                                        <option value="Desinfección">Desinfección</option>
-                                        <option value="Roceria">Roceria</option>
-                                      </Form.Select>
-                                    </Col>
-                                  </>
-                                )}
-
-                                 {/* Selectores adicionales */}
-                                 {(input.source === "Inspección") && (
-                                  <>
-                                    <Col sm={12} className="mt-2">
-                                      <Form.Select
-                                        value={tableServiceTypeSelection[`${table.nombre}_${rowIndex}_${colIndex}`] || ""}
-                                        onChange={(e) =>
-                                          handleTableServiceTypeSelect(table.nombre, rowIndex, colIndex, e.target.value)
-                                        }
-                                      >
-                                        <option value="">-- Selecciona un tipo de servicio --</option>
-                                        <option value="all">Todos</option>
-                                        <option value="Desinsectación">Desinsectación</option>
-                                        <option value="Desratización">Desratización</option>
-                                        <option value="Desinfección">Desinfección</option>
-                                        <option value="Roceria">Roceria</option>
-                                      </Form.Select>
-                                    </Col>
-                                  </>
-                                )}
-
-                                {/* Selector de campos */}
-                                {tableFieldOptions[`${table.nombre}_${rowIndex}_${colIndex}-${input.id}`] && (
+                                  {/* Selector de fuente */}
                                   <Col sm={12} className="mt-2">
                                     <Form.Select
-                                      value={input.field || ""} // Usar directamente el valor de `input.field`
+                                      value={input.source}
                                       onChange={(e) =>
-                                        handleTableIaFieldSelect(table.nombre, rowIndex, colIndex, input.id, e.target.value)
+                                        handleTableIaSourceSelect(table.nombre, rowIndex, colIndex, input.id, e.target.value)
                                       }
                                     >
-                                      <option value="">-- Selecciona un campo --</option>
-                                      {tableFieldOptions[`${table.nombre}_${rowIndex}_${colIndex}-${input.id}`]?.map((field) => (
-                                        <option key={field.value} value={field.value}>
-                                          {field.label}
+                                      <option value="">-- Selecciona una fuente --</option>
+                                      {tableSourceOptions[`${table.nombre}_${rowIndex}_${colIndex}`]?.map((option, index) => (
+                                        <option key={index} value={option}>
+                                          {option}
                                         </option>
                                       ))}
                                     </Form.Select>
                                   </Col>
-                                )}
 
-                                {/* Botón de eliminar */}
-                                <Col sm={12} className="text-center mt-2">
-                                  <Button
-                                    variant="danger"
-                                    size="sm"
-                                    className="w-100"
-                                    onClick={() =>
-                                      handleDeleteTableIaInput(table.nombre, rowIndex, colIndex, input.id)
-                                    }
-                                  >
-                                    Eliminar
-                                  </Button>
-                                </Col>
-                              </Row>
-                            ))}
+                                  {/* Selectores adicionales */}
+                                  {(input.source === "Servicios" || input.source === "Inspecciones") && (
+                                    <>
+                                      <Col sm={12} className="mt-2">
+                                        <Form.Select
+                                          value={tableIntermediateSelection[`${table.nombre}_${rowIndex}_${colIndex}`] || ""}
+                                          onChange={(e) =>
+                                            handleTableIntermediateSelect(table.nombre, rowIndex, colIndex, e.target.value)
+                                          }
+                                        >
+                                          <option value="">-- Selecciona un período --</option>
+                                          <option value="all">Todos</option>
+                                          <option value="this_year">Este año</option>
+                                          <option value="last_3_months">Últimos 3 meses</option>
+                                          <option value="last_month">Último mes</option>
+                                          <option value="this_week">Esta semana</option>
+                                        </Form.Select>
+                                      </Col>
+                                      <Col sm={12} className="mt-2">
+                                        <Form.Select
+                                          value={tableServiceTypeSelection[`${table.nombre}_${rowIndex}_${colIndex}`] || ""}
+                                          onChange={(e) =>
+                                            handleTableServiceTypeSelect(table.nombre, rowIndex, colIndex, e.target.value)
+                                          }
+                                        >
+                                          <option value="">-- Selecciona un tipo de servicio --</option>
+                                          <option value="all">Todos</option>
+                                          <option value="Desinsectación">Desinsectación</option>
+                                          <option value="Desratización">Desratización</option>
+                                          <option value="Desinfección">Desinfección</option>
+                                          <option value="Roceria">Roceria</option>
+                                        </Form.Select>
+                                      </Col>
+                                    </>
+                                  )}
 
-                            {/* Campo personalizado */}
-                            {tableCustomizedValues[`${table.nombre}_${rowIndex}_${colIndex}`] !== undefined && (
-                              <Form.Control
-                                className="mt-2"
-                                type="text"
-                                placeholder="Ingresa un valor personalizado"
-                                value={tableCustomizedValues[`${table.nombre}_${rowIndex}_${colIndex}`] || ""}
-                                onChange={(e) =>
-                                  handleTableCustomValueChange(table.nombre, rowIndex, colIndex, e.target.value)
-                                }
-                              />
-                            )}
+                                  {/* Selectores adicionales */}
+                                  {(input.source === "Inspección") && (
+                                    <>
+                                      <Col sm={12} className="mt-2">
+                                        <Form.Select
+                                          value={tableServiceTypeSelection[`${table.nombre}_${rowIndex}_${colIndex}`] || ""}
+                                          onChange={(e) =>
+                                            handleTableServiceTypeSelect(table.nombre, rowIndex, colIndex, e.target.value)
+                                          }
+                                        >
+                                          <option value="">-- Selecciona un tipo de servicio --</option>
+                                          <option value="all">Todos</option>
+                                          <option value="Desinsectación">Desinsectación</option>
+                                          <option value="Desratización">Desratización</option>
+                                          <option value="Desinfección">Desinfección</option>
+                                          <option value="Roceria">Roceria</option>
+                                        </Form.Select>
+                                      </Col>
+                                    </>
+                                  )}
 
-                          </div>
-                        </td>                                                                       
+                                  {/* Selector de campos */}
+                                  {tableFieldOptions[`${table.nombre}_${rowIndex}_${colIndex}-${input.id}`] && (
+                                    <Col sm={12} className="mt-2">
+                                      <Form.Select
+                                        value={input.field || ""} // Usar directamente el valor de `input.field`
+                                        onChange={(e) =>
+                                          handleTableIaFieldSelect(table.nombre, rowIndex, colIndex, input.id, e.target.value)
+                                        }
+                                      >
+                                        <option value="">-- Selecciona un campo --</option>
+                                        {tableFieldOptions[`${table.nombre}_${rowIndex}_${colIndex}-${input.id}`]?.map((field) => (
+                                          <option key={field.value} value={field.value}>
+                                            {field.label}
+                                          </option>
+                                        ))}
+                                      </Form.Select>
+                                    </Col>
+                                  )}
+
+                                  {/* Botón de eliminar */}
+                                  <Col sm={12} className="text-center mt-2">
+                                    <Button
+                                      variant="danger"
+                                      size="sm"
+                                      className="w-100"
+                                      onClick={() =>
+                                        handleDeleteTableIaInput(table.nombre, rowIndex, colIndex, input.id)
+                                      }
+                                    >
+                                      Eliminar
+                                    </Button>
+                                  </Col>
+                                </Row>
+                              ))}
+
+                              {/* Campo personalizado */}
+                              {tableCustomizedValues[`${table.nombre}_${rowIndex}_${colIndex}`] !== undefined && (
+                                <Form.Control
+                                  className="mt-2"
+                                  type="text"
+                                  placeholder="Ingresa un valor personalizado"
+                                  value={tableCustomizedValues[`${table.nombre}_${rowIndex}_${colIndex}`] || ""}
+                                  onChange={(e) =>
+                                    handleTableCustomValueChange(table.nombre, rowIndex, colIndex, e.target.value)
+                                  }
+                                />
+                              )}
+
+                            </div>
+                          </td>
                         ))}
                       </tr>
                     ))}

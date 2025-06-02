@@ -1,7 +1,8 @@
 import React, { useEffect, useState, useRef } from 'react';
 import axios from 'axios';
 import moment, { duration } from 'moment-timezone';
-import { useNavigate, useLocation } from 'react-router-dom'; // Asegúrate de tener configurado react-router
+import { useNavigate, useLocation } from 'react-router-dom';
+import { getCachedServices, setCachedServices, } from './indexedDBHandler';
 import { Calendar, Person, Bag, Building, PencilSquare, Trash, Bug, Diagram3, GearFill, Clipboard, PlusCircle, InfoCircle, FileText, GeoAlt, Stopwatch, Bullseye, ArrowRepeat, Calendar2Check, FileEarmarkWord, FileEarmarkExcel, FileEarmarkPdf, FileEarmarkImage, FileEarmarkArrowDown, EnvelopePaper, Whatsapp, Radioactive } from 'react-bootstrap-icons';
 import { Card, Col, Row, Collapse, Button, Table, Modal, Form, CardFooter, ModalTitle } from 'react-bootstrap';
 import ClientInfoModal from './ClientInfoModal';
@@ -472,29 +473,62 @@ function ServiceList() {
   };
 
   useEffect(() => {
-    const fetchData = async () => {
+    let aborted = false;            // por si desmonta el componente
+
+    const loadServices = async () => {
+      /* 1️⃣  Cache first */
+      const cached = await getCachedServices();
+      if (cached && !aborted) {
+        setServices(cached);
+        setFilteredServices(cached);
+        setLoading(false);          // ya mostramos algo
+      }
+
+      /* 2️⃣  Petición a backend + pinta progresiva */
       try {
-        const servicesResponse = await axios.get(`${process.env.REACT_APP_API_URL}/api/services`);
-        const clientsResponse = await axios.get(`${process.env.REACT_APP_API_URL}/api/clients`);
-        const techniciansResponse = await axios.get(`${process.env.REACT_APP_API_URL}/api/users?rol=Operario,Operario Hogar`);
+        const [srvRes, cliRes, techRes] = await Promise.all([
+          axios.get(`${process.env.REACT_APP_API_URL}/api/services`),
+          axios.get(`${process.env.REACT_APP_API_URL}/api/clients`),
+          axios.get(
+            `${process.env.REACT_APP_API_URL}/api/users?rol=Operario,Operario Hogar`
+          ),
+        ]);
 
-        // Ordenar los servicios de forma descendente por created_at
-        const sortedServices = servicesResponse.data.sort((a, b) =>
-          new Date(b.created_at) - new Date(a.created_at)
-        );
+        if (aborted) return;        // cancelado
 
-        setServices(sortedServices);
-        setClients(clientsResponse.data);
-        setTechnicians(techniciansResponse.data);
-        setFilteredServices(sortedServices);
-        setLoading(false);
-      } catch (error) {
-        console.error("Error fetching data:", error);
-        setLoading(false);
+        const clientsMap = {};
+        cliRes.data.forEach((c) => (clientsMap[c.id] = c.name));
+        setClients(cliRes.data);
+        setTechnicians(techRes.data);
+        setClientNames(clientsMap);
+
+        /* ⁂  mostramos uno a uno */
+        const freshServices = [];
+        for (const srv of srvRes.data.sort(
+          (a, b) => new Date(b.created_at) - new Date(a.created_at)
+        )) {
+          if (aborted) return;
+          freshServices.push(srv);
+          setServices((prev) => [...prev, srv]);
+          setFilteredServices((prev) => [...prev, srv]);
+          await new Promise((r) => setTimeout(r)); // micro-yield para repintar
+        }
+
+        /* 3️⃣  Actualiza caché */
+        await setCachedServices(freshServices);
+      } catch (err) {
+        console.error('fetch services error', err);
+      } finally {
+        if (!aborted) setLoading(false);
       }
     };
-    fetchData();
+
+    loadServices();
+    return () => {
+      aborted = true;
+    };
   }, []);
+
 
   useEffect(() => {
     const fetchServicesAndClients = async () => {
@@ -590,8 +624,6 @@ function ServiceList() {
 
     setFilteredServices(filtered);
   }, [searchServiceText, selectedClient, selectedUser, services, clients, technicians]);
-
-  if (loading) return <div>Cargando servicios...</div>;
 
 
   const handleServiceSearchChange = (e) => {
@@ -994,9 +1026,6 @@ function ServiceList() {
     setDocumentModalOpen(false);
   };
 
-
-  if (loading) return <div>Cargando servicios...</div>;
-
   const handleCompanionChange = (e) => {
     const { value, checked } = e.target;
     setNewService((prevService) => ({
@@ -1027,6 +1056,27 @@ function ServiceList() {
 
   return (
     <div className="container mt-4">
+      {loading && services.length === 0 && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            zIndex: 2050,
+            width: "100vw",
+            height: "100vh",
+            backgroundColor: "rgba(255, 255, 255, 0.7)",
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+          }}
+        >
+          <div className="spinner-border text-secondary" role="status" style={{ width: "5rem", height: "5rem" }}>
+            <span className="visually-hidden">Cargando...</span>
+          </div>
+        </div>
+      )}
+
       <Row className="align-items-center mb-4" style={{ minHeight: 0, height: 'auto' }}>
         {/* Campo de búsqueda */}
         <Col xs={12} md={6}>

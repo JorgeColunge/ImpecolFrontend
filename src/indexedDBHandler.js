@@ -12,8 +12,8 @@ const requestPersistentStorage = async () => {
     if (!isPersisted) {
       try {
         const granted = await navigator.storage.persist();
-        console.log(granted 
-          ? "✅ Almacenamiento persistente concedido con éxito." 
+        console.log(granted
+          ? "✅ Almacenamiento persistente concedido con éxito."
           : "❌ No se pudo establecer almacenamiento persistente.");
 
         if (!granted) {
@@ -49,220 +49,220 @@ const requestPersistentStorage = async () => {
 
 // Inicializar IndexedDB para los usuarios
 export const initUsersDB = async () => {
-    await requestPersistentStorage();
-    return openDB('offline-ddbb', 3, { // Incrementa la versión a 3
-      upgrade(db, oldVersion) {
-        if (oldVersion < 1) {
-          // Crear otros object stores si los necesitas
-        }
-        if (oldVersion < 2) {
-          // Crear el object store para usuarios si no existe
-          if (!db.objectStoreNames.contains('users')) {
-            db.createObjectStore('users', { keyPath: 'id' });
-          }
-        }
-      },
-    });
-  };
-
-  
-
-  const getImageUrl = (image) => {
-    if (!image) return null;
-    return image.startsWith('http') ? image : `${process.env.REACT_APP_API_URL}${image}`;
-  };
-  
-
-    // Guardar usuarios en IndexedDB
-    export const saveUsers = async (users, initialSync) => {
-    // Procesar previamente las imágenes
-    const processedUsers = await Promise.all(
-      users.map(async (user) => {
-        if (user.image) {
-          try {
-              // Primero, solicita la URL prefirmada desde el backend
-              const preSignedResponse = await api.post('/PrefirmarArchivos', { url: user.image });
-
-              if (preSignedResponse.data?.signedUrl) {
-                  const imageUrl = preSignedResponse.data.signedUrl;
-
-                  // Descarga la imagen desde la URL prefirmada
-                  const response = await fetch(imageUrl);
-                  if (response.ok) {
-                      const blob = await response.blob();
-                      user.imageBlob = blob;
-                      console.log(`Imagen descargada correctamente para el usuario ${user.id}`);
-                  } else {
-                      console.warn(`No se pudo obtener la imagen para el usuario ${user.id}`);
-                      user.imageBlob = null;
-                  }
-              } else {
-                  console.warn(`No se obtuvo una URL prefirmada para el usuario ${user.id}`);
-                  user.imageBlob = null;
-              }
-          } catch (error) {
-              console.error(`Error al procesar la imagen del usuario ${user.id}:`, error);
-              user.imageBlob = null;
-          }
+  await requestPersistentStorage();
+  return openDB('offline-ddbb', 3, { // Incrementa la versión a 3
+    upgrade(db, oldVersion) {
+      if (oldVersion < 1) {
+        // Crear otros object stores si los necesitas
       }
-        return user;
-      })
-    );
-
-    // Ahora guarda los usuarios en IndexedDB
-    const db = await initUsersDB();
-    const tx = db.transaction('users', 'readwrite', { durability: 'strict' });
-    const store = tx.objectStore('users');
-  
-    // Las operaciones de IndexedDB son rápidas y síncronas
-    processedUsers.forEach((user) => {
-      user.synced = initialSync;
-      console.log(`Guardando usuario en IndexedDB: ${user.id}`, user);
-      store.put(user); // Guarda cada usuario
-    });
-  
-    await tx.done; // Finaliza la transacción
-    console.log('Usuarios guardados en IndexedDB con imágenes.');
-  };
-  
-
-  export const getUsers = async () => {
-    const db = await initUsersDB();
-    const users = await db.getAll('users');
-
-    console.log('Usuarios recuperados de IndexedDB:', users);
-
-    // Convierte los blobs en URLs locales
-    users.forEach((user) => {
-        if (user.imageBlob) {
-            user.imageUrl = URL.createObjectURL(user.imageBlob); // Genera una URL temporal desde el blob
-            console.log(`URL de imagen creada para usuario ${user.id}:`, user.imageUrl);
-        } else {
-            console.warn(`Usuario ${user.id} no tiene una imagen almacenada en IndexedDB.`);
+      if (oldVersion < 2) {
+        // Crear el object store para usuarios si no existe
+        if (!db.objectStoreNames.contains('users')) {
+          db.createObjectStore('users', { keyPath: 'id' });
         }
-    });
+      }
+    },
+  });
+};
 
-    return users;
-  };   
-  
-  export const syncUsers = async () => {
-    const db = await initUsersDB();
-  
-    const allUsers = await db.getAll('users'); // Obtén todos los usuarios
-    const unsyncedUsers = allUsers.filter((user) => !user.synced); // Filtra los no sincronizados
-  
-    console.log('Usuarios no sincronizados:', unsyncedUsers);
-  
-    if (unsyncedUsers.length === 0) {
-      console.log('No hay usuarios para sincronizar.');
-      return;
-    }
-  
-    try {
-      for (const user of unsyncedUsers) {
-        console.log(`Sincronizando usuario: ${user.id}`, user);
-  
-        const formData = new FormData();
-        formData.append('id', user.id);
-        formData.append('name', user.name);
-        formData.append('lastname', user.lastname);
-        formData.append('phone', user.phone);
-        formData.append('rol', user.rol);
-        formData.append('password', user.password);
-        formData.append('email', user.email);
-  
-        if (user.imageBlob) {
-          formData.append('image', user.imageBlob, `${user.id}.jpg`);
-        }
-  
-        // Sincroniza el usuario con el servidor
+
+
+const getImageUrl = (image) => {
+  if (!image) return null;
+  return image.startsWith('http') ? image : `${process.env.REACT_APP_API_URL}${image}`;
+};
+
+
+// Guardar usuarios en IndexedDB
+export const saveUsers = async (users, initialSync) => {
+  // Procesar previamente las imágenes
+  const processedUsers = await Promise.all(
+    users.map(async (user) => {
+      if (user.image) {
         try {
-          await api.post('/register', formData, {
-            headers: {
-              'Content-Type': 'multipart/form-data',
-            },
-          });
-  
-          console.log(`Usuario sincronizado correctamente: ${user.id}`);
-  
-          // Actualiza el estado del usuario en IndexedDB
-          const tx = db.transaction('users', 'readwrite', { durability: 'strict' });
-          const store = tx.objectStore('users');
-          user.synced = true; // Marca como sincronizado
-          await store.put(user);
-          await tx.done; // Finaliza la transacción
-        } catch (syncError) {
-          console.error(`Error al sincronizar el usuario ${user.id}:`, syncError);
+          // Primero, solicita la URL prefirmada desde el backend
+          const preSignedResponse = await api.post('/PrefirmarArchivos', { url: user.image });
+
+          if (preSignedResponse.data?.signedUrl) {
+            const imageUrl = preSignedResponse.data.signedUrl;
+
+            // Descarga la imagen desde la URL prefirmada
+            const response = await fetch(imageUrl);
+            if (response.ok) {
+              const blob = await response.blob();
+              user.imageBlob = blob;
+              console.log(`Imagen descargada correctamente para el usuario ${user.id}`);
+            } else {
+              console.warn(`No se pudo obtener la imagen para el usuario ${user.id}`);
+              user.imageBlob = null;
+            }
+          } else {
+            console.warn(`No se obtuvo una URL prefirmada para el usuario ${user.id}`);
+            user.imageBlob = null;
+          }
+        } catch (error) {
+          console.error(`Error al procesar la imagen del usuario ${user.id}:`, error);
+          user.imageBlob = null;
         }
       }
-    } catch (globalError) {
-      console.error('Error global durante la sincronización de usuarios:', globalError);
-    } finally {
-      console.log('Sincronización completada.');
+      return user;
+    })
+  );
+
+  // Ahora guarda los usuarios en IndexedDB
+  const db = await initUsersDB();
+  const tx = db.transaction('users', 'readwrite', { durability: 'strict' });
+  const store = tx.objectStore('users');
+
+  // Las operaciones de IndexedDB son rápidas y síncronas
+  processedUsers.forEach((user) => {
+    user.synced = initialSync;
+    console.log(`Guardando usuario en IndexedDB: ${user.id}`, user);
+    store.put(user); // Guarda cada usuario
+  });
+
+  await tx.done; // Finaliza la transacción
+  console.log('Usuarios guardados en IndexedDB con imágenes.');
+};
+
+
+export const getUsers = async () => {
+  const db = await initUsersDB();
+  const users = await db.getAll('users');
+
+  console.log('Usuarios recuperados de IndexedDB:', users);
+
+  // Convierte los blobs en URLs locales
+  users.forEach((user) => {
+    if (user.imageBlob) {
+      user.imageUrl = URL.createObjectURL(user.imageBlob); // Genera una URL temporal desde el blob
+      console.log(`URL de imagen creada para usuario ${user.id}:`, user.imageUrl);
+    } else {
+      console.warn(`Usuario ${user.id} no tiene una imagen almacenada en IndexedDB.`);
     }
-  };
+  });
 
-  export const syncUsersOnStart = async () => {
-    try {
-        const db = await initUsersDB();
-        const usersInDB = await db.getAll('users');
-        
-        if (navigator.onLine) { // Verifica si hay conexión
-            const response = await api.get('/users');
-            const serverUsers = response.data; // Usuarios obtenidos del servidor
-            
-            // Crear un Set con los IDs de los usuarios del servidor
-            const serverUserIds = new Set(serverUsers.map(user => user.id));
+  return users;
+};
 
-            // Eliminar usuarios de IndexedDB que no están en el servidor
-            const tx = db.transaction('users', 'readwrite', { durability: 'strict' });
-            const store = tx.objectStore('users');
-            for (const user of usersInDB) {
-                if (!serverUserIds.has(user.id)) { // Si el ID no está en el servidor, eliminarlo
-                    console.log(`Eliminando usuario de IndexedDB: ${user.id}`);
-                    await store.delete(user.id);
-                }
-            }
-            await tx.done;
+export const syncUsers = async () => {
+  const db = await initUsersDB();
 
-            // Guardar los nuevos usuarios en IndexedDB
-            await saveUsers(serverUsers, true);
-            console.log('Usuarios sincronizados en IndexedDB.');
+  const allUsers = await db.getAll('users'); // Obtén todos los usuarios
+  const unsyncedUsers = allUsers.filter((user) => !user.synced); // Filtra los no sincronizados
 
-        } else {
-            console.log('No hay conexión a Internet. No se pueden sincronizar los usuarios.');
+  console.log('Usuarios no sincronizados:', unsyncedUsers);
+
+  if (unsyncedUsers.length === 0) {
+    console.log('No hay usuarios para sincronizar.');
+    return;
+  }
+
+  try {
+    for (const user of unsyncedUsers) {
+      console.log(`Sincronizando usuario: ${user.id}`, user);
+
+      const formData = new FormData();
+      formData.append('id', user.id);
+      formData.append('name', user.name);
+      formData.append('lastname', user.lastname);
+      formData.append('phone', user.phone);
+      formData.append('rol', user.rol);
+      formData.append('password', user.password);
+      formData.append('email', user.email);
+
+      if (user.imageBlob) {
+        formData.append('image', user.imageBlob, `${user.id}.jpg`);
+      }
+
+      // Sincroniza el usuario con el servidor
+      try {
+        await api.post('/register', formData, {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+        });
+
+        console.log(`Usuario sincronizado correctamente: ${user.id}`);
+
+        // Actualiza el estado del usuario en IndexedDB
+        const tx = db.transaction('users', 'readwrite', { durability: 'strict' });
+        const store = tx.objectStore('users');
+        user.synced = true; // Marca como sincronizado
+        await store.put(user);
+        await tx.done; // Finaliza la transacción
+      } catch (syncError) {
+        console.error(`Error al sincronizar el usuario ${user.id}:`, syncError);
+      }
+    }
+  } catch (globalError) {
+    console.error('Error global durante la sincronización de usuarios:', globalError);
+  } finally {
+    console.log('Sincronización completada.');
+  }
+};
+
+export const syncUsersOnStart = async () => {
+  try {
+    const db = await initUsersDB();
+    const usersInDB = await db.getAll('users');
+
+    if (navigator.onLine) { // Verifica si hay conexión
+      const response = await api.get('/users');
+      const serverUsers = response.data; // Usuarios obtenidos del servidor
+
+      // Crear un Set con los IDs de los usuarios del servidor
+      const serverUserIds = new Set(serverUsers.map(user => user.id));
+
+      // Eliminar usuarios de IndexedDB que no están en el servidor
+      const tx = db.transaction('users', 'readwrite', { durability: 'strict' });
+      const store = tx.objectStore('users');
+      for (const user of usersInDB) {
+        if (!serverUserIds.has(user.id)) { // Si el ID no está en el servidor, eliminarlo
+          console.log(`Eliminando usuario de IndexedDB: ${user.id}`);
+          await store.delete(user.id);
         }
-    } catch (error) {
-        console.error('Error al sincronizar usuarios en el inicio:', error);
+      }
+      await tx.done;
+
+      // Guardar los nuevos usuarios en IndexedDB
+      await saveUsers(serverUsers, true);
+      console.log('Usuarios sincronizados en IndexedDB.');
+
+    } else {
+      console.log('No hay conexión a Internet. No se pueden sincronizar los usuarios.');
     }
+  } catch (error) {
+    console.error('Error al sincronizar usuarios en el inicio:', error);
+  }
 };
 
 // Inicializa IndexedDB para perfiles
 export const initProfileDB = async () => {
-    await requestPersistentStorage();
-    return openDB('offline-profile', 3, {
-        upgrade(db) {
-            if (!db.objectStoreNames.contains('profile')) {
-                db.createObjectStore('profile', { keyPath: 'id' });
-            }
-        },
-    });
+  await requestPersistentStorage();
+  return openDB('offline-profile', 3, {
+    upgrade(db) {
+      if (!db.objectStoreNames.contains('profile')) {
+        db.createObjectStore('profile', { keyPath: 'id' });
+      }
+    },
+  });
 };
 
 // Guardar perfil en IndexedDB
 export const saveProfile = async (user) => {
-    const db = await initProfileDB();
-    const tx = db.transaction('profile', 'readwrite', { durability: 'strict' });
-    const store = tx.objectStore('profile');
-    await store.put(user);
-    await tx.done;
-    console.log(`Perfil de usuario ${user.id} guardado en IndexedDB.`);
+  const db = await initProfileDB();
+  const tx = db.transaction('profile', 'readwrite', { durability: 'strict' });
+  const store = tx.objectStore('profile');
+  await store.put(user);
+  await tx.done;
+  console.log(`Perfil de usuario ${user.id} guardado en IndexedDB.`);
 };
 
 // Obtener perfil desde IndexedDB
 export const getProfile = async (userId) => {
-    const db = await initProfileDB();
-    return await db.get('profile', userId);
+  const db = await initProfileDB();
+  return await db.get('profile', userId);
 };
 
 
@@ -270,137 +270,137 @@ export const getProfile = async (userId) => {
 export const initServicesDB = async () => {
   await requestPersistentStorage();
   return openDB('offline-services', 7, { // Asegura que la versión sea mayor a la anterior
-      upgrade(db, oldVersion) {
-          if (oldVersion < 7) {
-              if (!db.objectStoreNames.contains('services')) {
-                  db.createObjectStore('services', { keyPath: 'id' });
-              }
-              if (!db.objectStoreNames.contains('clients')) {
-                  db.createObjectStore('clients', { keyPath: 'id' });
-              }
-              if (!db.objectStoreNames.contains('events')) {
-                db.createObjectStore('events', { keyPath: 'id' });
-              }
-              if (!db.objectStoreNames.contains('technicians')) {
-                db.createObjectStore('technicians', { keyPath: 'id' });
-              }
-              if (!db.objectStoreNames.contains('inspections')) {
-                db.createObjectStore('inspections', { keyPath: 'id' });
-              }
-              if (!db.objectStoreNames.contains('pending_inspections')) {
-                db.createObjectStore('pending_inspections', { keyPath: 'id', autoIncrement: true });
-              }
-          }
-      },
+    upgrade(db, oldVersion) {
+      if (oldVersion < 7) {
+        if (!db.objectStoreNames.contains('services')) {
+          db.createObjectStore('services', { keyPath: 'id' });
+        }
+        if (!db.objectStoreNames.contains('clients')) {
+          db.createObjectStore('clients', { keyPath: 'id' });
+        }
+        if (!db.objectStoreNames.contains('events')) {
+          db.createObjectStore('events', { keyPath: 'id' });
+        }
+        if (!db.objectStoreNames.contains('technicians')) {
+          db.createObjectStore('technicians', { keyPath: 'id' });
+        }
+        if (!db.objectStoreNames.contains('inspections')) {
+          db.createObjectStore('inspections', { keyPath: 'id' });
+        }
+        if (!db.objectStoreNames.contains('pending_inspections')) {
+          db.createObjectStore('pending_inspections', { keyPath: 'id', autoIncrement: true });
+        }
+      }
+    },
   });
 };
 
 // Guardar servicios y clientes en IndexedDB
 export const saveServices = async (services, clients) => {
   try {
-      const db = await initServicesDB();
-      const tx = db.transaction(['services', 'clients'], 'readwrite', { durability: 'strict' });
-      const serviceStore = tx.objectStore('services');
-      const clientStore = tx.objectStore('clients');
+    const db = await initServicesDB();
+    const tx = db.transaction(['services', 'clients'], 'readwrite', { durability: 'strict' });
+    const serviceStore = tx.objectStore('services');
+    const clientStore = tx.objectStore('clients');
 
-      // Guardar cada servicio en IndexedDB
-      for (const service of services) {
-          await serviceStore.put(service);
+    // Guardar cada servicio en IndexedDB
+    for (const service of services) {
+      await serviceStore.put(service);
+    }
+
+    // Guardar cada cliente en IndexedDB correctamente
+    for (const clientId in clients) {
+      if (clients.hasOwnProperty(clientId)) {
+        const clientData = clients[clientId];
+        if (typeof clientData === 'string') {
+          // Si clientData es una cadena, guardarlo como objeto correctamente
+          await clientStore.put({ id: clientId, name: clientData });
+        } else if (typeof clientData === 'object' && clientData !== null) {
+          // Si ya es un objeto, guardarlo tal cual
+          await clientStore.put({ id: clientId, ...clientData });
+        }
       }
+    }
 
-      // Guardar cada cliente en IndexedDB correctamente
-      for (const clientId in clients) {
-          if (clients.hasOwnProperty(clientId)) {
-              const clientData = clients[clientId];
-              if (typeof clientData === 'string') {
-                  // Si clientData es una cadena, guardarlo como objeto correctamente
-                  await clientStore.put({ id: clientId, name: clientData });
-              } else if (typeof clientData === 'object' && clientData !== null) {
-                  // Si ya es un objeto, guardarlo tal cual
-                  await clientStore.put({ id: clientId, ...clientData });
-              }
-          }
-      }
-
-      await tx.done;
-      console.log("✅ Servicios y clientes guardados correctamente en IndexedDB.");
+    await tx.done;
+    console.log("✅ Servicios y clientes guardados correctamente en IndexedDB.");
   } catch (error) {
-      console.error("❌ Error al guardar servicios y clientes en IndexedDB:", error);
+    console.error("❌ Error al guardar servicios y clientes en IndexedDB:", error);
   }
 };
 
 // Obtener servicios y clientes desde IndexedDB
 export const getServices = async () => {
   try {
-      const db = await initServicesDB();
-      const tx = db.transaction(['services', 'clients'], 'readonly');
-      const services = await tx.objectStore('services').getAll();
-      const clients = await tx.objectStore('clients').getAll();
+    const db = await initServicesDB();
+    const tx = db.transaction(['services', 'clients'], 'readonly');
+    const services = await tx.objectStore('services').getAll();
+    const clients = await tx.objectStore('clients').getAll();
 
-      // Convertir la lista de clientes en un objeto { id: name }
-      const clientMap = clients.reduce((acc, client) => {
-          if (typeof client.name === 'string') {
-              acc[client.id] = client.name;
-          } else {
-              console.warn(`⚠️ Cliente mal almacenado en IndexedDB:`, client);
-          }
-          return acc;
-      }, {});
+    // Convertir la lista de clientes en un objeto { id: name }
+    const clientMap = clients.reduce((acc, client) => {
+      if (typeof client.name === 'string') {
+        acc[client.id] = client.name;
+      } else {
+        console.warn(`⚠️ Cliente mal almacenado en IndexedDB:`, client);
+      }
+      return acc;
+    }, {});
 
-      return { services, clients: clientMap };
+    return { services, clients: clientMap };
   } catch (error) {
-      console.error("❌ Error al obtener servicios y clientes desde IndexedDB:", error);
-      return { services: [], clients: {} };
+    console.error("❌ Error al obtener servicios y clientes desde IndexedDB:", error);
+    return { services: [], clients: {} };
   }
 };
 
 // Sincronizar servicios con el backend
 export const syncServicesOnStart = async () => {
   try {
-      const db = await initServicesDB();
-      const storedServices = await db.transaction('services', 'readonly').objectStore('services').getAll();
+    const db = await initServicesDB();
+    const storedServices = await db.transaction('services', 'readonly').objectStore('services').getAll();
 
-      if (navigator.onLine) {
-          console.log("🌐 Modo online: obteniendo servicios desde el servidor...");
-          const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/services`);
-          const serverServices = response.data;
+    if (navigator.onLine) {
+      console.log("🌐 Modo online: obteniendo servicios desde el servidor...");
+      const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/services`);
+      const serverServices = response.data;
 
-          // Obtener los clientes relacionados
-          const clientData = {};
-          for (const service of serverServices) {
-              if (service.client_id && !clientData[service.client_id]) {
-                  try {
-                      const clientResponse = await axios.get(`${process.env.REACT_APP_API_URL}/api/clients/${service.client_id}`);
-                      clientData[service.client_id] = clientResponse.data; // Guardar el objeto completo
-                  } catch (error) {
-                      console.error(`⚠️ Error obteniendo cliente ${service.client_id}:`, error);
-                  }
-              }
+      // Obtener los clientes relacionados
+      const clientData = {};
+      for (const service of serverServices) {
+        if (service.client_id && !clientData[service.client_id]) {
+          try {
+            const clientResponse = await axios.get(`${process.env.REACT_APP_API_URL}/api/clients/${service.client_id}`);
+            clientData[service.client_id] = clientResponse.data; // Guardar el objeto completo
+          } catch (error) {
+            console.error(`⚠️ Error obteniendo cliente ${service.client_id}:`, error);
           }
-
-          // Crear un Set con los IDs de los servicios del servidor
-          const serverServiceIds = new Set(serverServices.map(service => service.id));
-
-          // Eliminar servicios que ya no existen en el servidor
-          const tx = db.transaction('services', 'readwrite');
-          const store = tx.objectStore('services');
-
-          for (const service of storedServices) {
-              if (!serverServiceIds.has(service.id)) {
-                  console.log(`🗑 Eliminando servicio obsoleto de IndexedDB: ${service.id}`);
-                  await store.delete(service.id);
-              }
-          }
-          await tx.done;
-
-          // Guardar los servicios y clientes actualizados en IndexedDB
-          await saveServices(serverServices, clientData);
-          console.log("✅ Servicios y clientes sincronizados en IndexedDB.");
-      } else {
-          console.log("📴 Modo offline: usando datos desde IndexedDB.");
+        }
       }
+
+      // Crear un Set con los IDs de los servicios del servidor
+      const serverServiceIds = new Set(serverServices.map(service => service.id));
+
+      // Eliminar servicios que ya no existen en el servidor
+      const tx = db.transaction('services', 'readwrite');
+      const store = tx.objectStore('services');
+
+      for (const service of storedServices) {
+        if (!serverServiceIds.has(service.id)) {
+          console.log(`🗑 Eliminando servicio obsoleto de IndexedDB: ${service.id}`);
+          await store.delete(service.id);
+        }
+      }
+      await tx.done;
+
+      // Guardar los servicios y clientes actualizados en IndexedDB
+      await saveServices(serverServices, clientData);
+      console.log("✅ Servicios y clientes sincronizados en IndexedDB.");
+    } else {
+      console.log("📴 Modo offline: usando datos desde IndexedDB.");
+    }
   } catch (error) {
-      console.error("❌ Error al sincronizar servicios y clientes:", error);
+    console.error("❌ Error al sincronizar servicios y clientes:", error);
   }
 };
 
@@ -409,159 +409,159 @@ export const syncServicesOnStart = async () => {
 export const initClientsDB = async () => {
   await requestPersistentStorage();
   return openDB('offline-clients', 1, { // Asegurar nueva versión
-      upgrade(db, oldVersion) {
-          if (oldVersion < 6) {
-              if (!db.objectStoreNames.contains('clients')) {
-                  db.createObjectStore('clients', { keyPath: 'id' });
-              }
-          }
-      },
+    upgrade(db, oldVersion) {
+      if (oldVersion < 6) {
+        if (!db.objectStoreNames.contains('clients')) {
+          db.createObjectStore('clients', { keyPath: 'id' });
+        }
+      }
+    },
   });
 };
 
 // Guardar clientes en IndexedDB
 export const saveClients = async (clients) => {
   try {
-      const db = await initClientsDB();
-      const tx = db.transaction('clients', 'readwrite', { durability: 'strict' });
-      const store = tx.objectStore('clients');
+    const db = await initClientsDB();
+    const tx = db.transaction('clients', 'readwrite', { durability: 'strict' });
+    const store = tx.objectStore('clients');
 
-      for (const client of clients) {
-          await store.put(client);
-      }
+    for (const client of clients) {
+      await store.put(client);
+    }
 
-      await tx.done;
-      console.log("Clientes guardados en IndexedDB.");
+    await tx.done;
+    console.log("Clientes guardados en IndexedDB.");
   } catch (error) {
-      console.error("Error al guardar clientes en IndexedDB:", error);
+    console.error("Error al guardar clientes en IndexedDB:", error);
   }
 };
 
 // Obtener clientes desde IndexedDB
 export const getClients = async () => {
   try {
-      const db = await initClientsDB();
-      const tx = db.transaction('clients', 'readonly');
-      const store = tx.objectStore('clients');
-      return await store.getAll();
+    const db = await initClientsDB();
+    const tx = db.transaction('clients', 'readonly');
+    const store = tx.objectStore('clients');
+    return await store.getAll();
   } catch (error) {
-      console.error("Error al obtener clientes desde IndexedDB:", error);
-      return [];
+    console.error("Error al obtener clientes desde IndexedDB:", error);
+    return [];
   }
 };
 
 export const saveEvents = async (events) => {
   try {
-      const db = await initServicesDB();
-      const tx = db.transaction('events', 'readwrite', { durability: 'strict' });
-      const eventStore = tx.objectStore('events');
+    const db = await initServicesDB();
+    const tx = db.transaction('events', 'readwrite', { durability: 'strict' });
+    const eventStore = tx.objectStore('events');
 
-      // Guardar cada evento en IndexedDB
-      for (const event of events) {
-          await eventStore.put(event);
-      }
+    // Guardar cada evento en IndexedDB
+    for (const event of events) {
+      await eventStore.put(event);
+    }
 
-      await tx.done;
-      console.log("✅ Eventos guardados correctamente en IndexedDB.");
+    await tx.done;
+    console.log("✅ Eventos guardados correctamente en IndexedDB.");
   } catch (error) {
-      console.error("❌ Error al guardar eventos en IndexedDB:", error);
+    console.error("❌ Error al guardar eventos en IndexedDB:", error);
   }
 };
 
 export const getEvents = async () => {
   try {
-      const db = await initServicesDB();
-      const tx = db.transaction('events', 'readonly');
-      const events = await tx.objectStore('events').getAll();
+    const db = await initServicesDB();
+    const tx = db.transaction('events', 'readonly');
+    const events = await tx.objectStore('events').getAll();
 
-      console.log("📂 Eventos obtenidos desde IndexedDB:", events);
-      return events;
+    console.log("📂 Eventos obtenidos desde IndexedDB:", events);
+    return events;
   } catch (error) {
-      console.error("❌ Error al obtener eventos desde IndexedDB:", error);
-      return [];
+    console.error("❌ Error al obtener eventos desde IndexedDB:", error);
+    return [];
   }
 };
 
 export const saveTechnicians = async (technicians) => {
   try {
-      const db = await initServicesDB();
-      const tx = db.transaction('technicians', 'readwrite', { durability: 'strict' });
-      const techStore = tx.objectStore('technicians');
+    const db = await initServicesDB();
+    const tx = db.transaction('technicians', 'readwrite', { durability: 'strict' });
+    const techStore = tx.objectStore('technicians');
 
-      // Guardar cada técnico en IndexedDB
-      for (const technician of technicians) {
-          await techStore.put(technician);
-      }
+    // Guardar cada técnico en IndexedDB
+    for (const technician of technicians) {
+      await techStore.put(technician);
+    }
 
-      await tx.done;
-      console.log("✅ Técnicos guardados correctamente en IndexedDB.");
+    await tx.done;
+    console.log("✅ Técnicos guardados correctamente en IndexedDB.");
   } catch (error) {
-      console.error("❌ Error al guardar técnicos en IndexedDB:", error);
+    console.error("❌ Error al guardar técnicos en IndexedDB:", error);
   }
 };
 
 export const getTechnicians = async () => {
   try {
-      const db = await initServicesDB();
-      const tx = db.transaction('technicians', 'readonly');
-      const technicians = await tx.objectStore('technicians').getAll();
+    const db = await initServicesDB();
+    const tx = db.transaction('technicians', 'readonly');
+    const technicians = await tx.objectStore('technicians').getAll();
 
-      console.log("📂 Técnicos obtenidos desde IndexedDB:", technicians);
-      return technicians;
+    console.log("📂 Técnicos obtenidos desde IndexedDB:", technicians);
+    return technicians;
   } catch (error) {
-      console.error("❌ Error al obtener técnicos desde IndexedDB:", error);
-      return [];
+    console.error("❌ Error al obtener técnicos desde IndexedDB:", error);
+    return [];
   }
 };
 
 
 export const saveInspections = async (inspections) => {
   try {
-      const db = await initServicesDB();
-      const tx = db.transaction('inspections', 'readwrite', { durability: 'strict' });
-      const inspectionStore = tx.objectStore('inspections');
+    const db = await initServicesDB();
+    const tx = db.transaction('inspections', 'readwrite', { durability: 'strict' });
+    const inspectionStore = tx.objectStore('inspections');
 
-      console.log("🔄 Guardando inspecciones en IndexedDB...", inspections);
+    console.log("🔄 Guardando inspecciones en IndexedDB...", inspections);
 
-      // 🔥 Convertir el objeto de inspecciones en un array plano
-      for (const serviceId in inspections) { 
-          if (Array.isArray(inspections[serviceId])) { // Verifica que sea un array
-              for (const inspection of inspections[serviceId]) {
-                  console.log("➡️ Guardando inspección con service_id:", inspection.service_id, " - ID:", inspection.id);
-                  await inspectionStore.put(inspection);
-              }
-          }
+    // 🔥 Convertir el objeto de inspecciones en un array plano
+    for (const serviceId in inspections) {
+      if (Array.isArray(inspections[serviceId])) { // Verifica que sea un array
+        for (const inspection of inspections[serviceId]) {
+          console.log("➡️ Guardando inspección con service_id:", inspection.service_id, " - ID:", inspection.id);
+          await inspectionStore.put(inspection);
+        }
       }
+    }
 
-      await tx.done;
-      console.log("✅ Inspecciones guardadas correctamente en IndexedDB.");
+    await tx.done;
+    console.log("✅ Inspecciones guardadas correctamente en IndexedDB.");
   } catch (error) {
-      console.error("❌ Error al guardar inspecciones en IndexedDB:", error);
+    console.error("❌ Error al guardar inspecciones en IndexedDB:", error);
   }
 };
 
 export const getInspections = async () => {
   try {
-      const db = await initServicesDB();
-      const tx = db.transaction('inspections', 'readonly');
-      const allInspections = await tx.objectStore('inspections').getAll();
+    const db = await initServicesDB();
+    const tx = db.transaction('inspections', 'readonly');
+    const allInspections = await tx.objectStore('inspections').getAll();
 
-      console.log("📂 Todas las inspecciones en IndexedDB:", allInspections);
+    console.log("📂 Todas las inspecciones en IndexedDB:", allInspections);
 
-      // 🔥 Agrupar inspecciones por `service_id`
-      const inspectionsByService = {};
-      for (const inspection of allInspections) {
-          if (!inspectionsByService[inspection.service_id]) {
-              inspectionsByService[inspection.service_id] = [];
-          }
-          inspectionsByService[inspection.service_id].push(inspection);
+    // 🔥 Agrupar inspecciones por `service_id`
+    const inspectionsByService = {};
+    for (const inspection of allInspections) {
+      if (!inspectionsByService[inspection.service_id]) {
+        inspectionsByService[inspection.service_id] = [];
       }
+      inspectionsByService[inspection.service_id].push(inspection);
+    }
 
-      console.log("📂 Inspecciones organizadas por servicio:", inspectionsByService);
-      return inspectionsByService;
+    console.log("📂 Inspecciones organizadas por servicio:", inspectionsByService);
+    return inspectionsByService;
   } catch (error) {
-      console.error("❌ Error al obtener inspecciones desde IndexedDB:", error);
-      return {};
+    console.error("❌ Error al obtener inspecciones desde IndexedDB:", error);
+    return {};
   }
 };
 
@@ -698,13 +698,13 @@ export const updateInspection = async (inspectionId, newObservations, exitTime, 
     const db = await initServicesDB();
     const tx = db.transaction('inspections', 'readwrite');
     const store = tx.objectStore('inspections');
-    
+
     const inspection = await store.get(inspectionId);
     if (!inspection) {
       console.warn(`⚠️ No se encontró la inspección con ID ${inspectionId}`);
       return;
     }
-    
+
     // Actualizar solo los campos que reciban datos
     if (newObservations !== undefined) {
       inspection.observations = newObservations;
@@ -715,12 +715,123 @@ export const updateInspection = async (inspectionId, newObservations, exitTime, 
     if (findings !== undefined) {
       inspection.findings = findings;
     }
-    
+
     await store.put(inspection);
     await tx.done;
-    
+
     console.log(`✅ Inspección con ID ${inspectionId} actualizada.`, { observations: newObservations, exit_time: exitTime, findings: findings });
   } catch (error) {
     console.error(`❌ Error al actualizar la inspección con ID ${inspectionId}:`, error);
   }
+};
+
+
+export const initProductsDB = async () => {
+  await requestPersistentStorage();          // ya lo tienes arriba
+  return openDB('offline-products', 1, {     // nueva BBDD
+    upgrade(db) {
+      if (!db.objectStoreNames.contains('products')) {
+        db.createObjectStore('products', { keyPath: 'id' }); // clave = id del producto
+      }
+      if (!db.objectStoreNames.contains('pending_products')) {
+        db.createObjectStore('pending_products', { keyPath: 'tmpId', autoIncrement: true });
+      }
+    },
+  });
+};
+
+export const saveProducts = async (products) => {
+  try {
+    const db = await initProductsDB();
+    const tx = db.transaction('products', 'readwrite', { durability: 'strict' });
+    const sto = tx.objectStore('products');
+
+    for (const product of products) {
+      await sto.put(product);               // sobrescribe o inserta
+    }
+    await tx.done;
+    console.log('✅ Productos guardados en IndexedDB:', products.length);
+  } catch (err) {
+    console.error('❌ Error al guardar productos:', err);
+  }
+};
+
+export const getProducts = async () => {
+  try {
+    const db = await initProductsDB();
+    const tx = db.transaction('products', 'readonly');
+    const all = await tx.objectStore('products').getAll();
+    console.log('📂 Productos recuperados de IndexedDB:', all.length);
+    return all;
+  } catch (err) {
+    console.error('❌ Error al leer productos:', err);
+    return [];
+  }
+};
+
+export const syncProductsOnStart = async () => {
+  if (!navigator.onLine) {
+    console.log('📴 Offline: no se sincronizan productos.');
+    return;
+  }
+  try {
+    const { data: serverProducts } = await axios.get(`${process.env.REACT_APP_API_URL}/api/products`);
+    await saveProducts(serverProducts);
+    console.log('✅ Productos sincronizados al iniciar.');
+  } catch (err) {
+    console.error('❌ Error al sincronizar productos:', err);
+  }
+};
+
+
+// 🔄 Manejo de caché mensual
+let monthDBPromise = null;
+
+const getMonthDB = async () => {
+  if (!monthDBPromise) {
+    monthDBPromise = openDB('inspectionCalendar', 1, {
+      upgrade(db) {
+        if (!db.objectStoreNames.contains('months')) {
+          db.createObjectStore('months');
+        }
+      },
+    });
+  }
+  return monthDBPromise;
+};
+
+export const getCachedMonth = async (monthKey) => {
+  const db = await getMonthDB();
+  return db.get('months', monthKey);
+};
+
+export const setCachedMonth = async (monthKey, events) => {
+  const db = await getMonthDB();
+  return db.put('months', events, monthKey);
+};
+
+// 🔄 Cache para lista de servicios
+let servicesDBPromise;
+
+const getServicesDB = async () => {
+  if (!servicesDBPromise) {
+    servicesDBPromise = openDB('serviceList', 1, {
+      upgrade(db) {
+        if (!db.objectStoreNames.contains('services')) {
+          db.createObjectStore('services');
+        }
+      },
+    });
+  }
+  return servicesDBPromise;
+};
+
+export const getCachedServices = async () => {
+  const db = await getServicesDB();
+  return db.get('services', 'servicesCache');
+};
+
+export const setCachedServices = async (services) => {
+  const db = await getServicesDB();
+  return db.put('services', services, 'servicesCache');
 };

@@ -39,7 +39,7 @@ import Consumption from './Consumption';
 import Actions from './Actions';
 import { UnsavedChangesProvider } from './UnsavedChangesContext';
 import { syncRequests } from './offlineHandler';
-import { saveUsers, getUsers, syncUsers, syncUsersOnStart, saveServices, saveEvents, saveTechnicians, saveInspections, syncPendingInspections } from './indexedDBHandler';
+import { saveUsers, getUsers, syncUsers, syncUsersOnStart, saveServices, saveEvents, saveTechnicians, saveInspections, syncPendingInspections, syncProductsOnStart } from './indexedDBHandler';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import './App.css';
 
@@ -106,6 +106,7 @@ function App() {
     fetchMyServices();
     fetchAllInspections(services);
     fetchTechnicians();
+    syncProductsOnStart();
   }, []);
 
   // 📌 Cargar servicios desde IndexedDB o API
