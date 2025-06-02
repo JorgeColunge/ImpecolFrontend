@@ -509,10 +509,20 @@ function ServiceList() {
         )) {
           if (aborted) return;
           freshServices.push(srv);
-          setServices((prev) => [...prev, srv]);
-          setFilteredServices((prev) => [...prev, srv]);
-          await new Promise((r) => setTimeout(r)); // micro-yield para repintar
+
+          setServices(prev => {
+            if (prev.some(p => p.id === srv.id)) return prev; // evita duplicados
+            return [srv, ...prev];                            // ← unshift
+          });
+
+          setFilteredServices(prev => {
+            if (prev.some(p => p.id === srv.id)) return prev;
+            return [srv, ...prev];
+          });
+
+          await new Promise(r => setTimeout(r)); // micro-yield
         }
+
 
         /* 3️⃣  Actualiza caché */
         await setCachedServices(freshServices);
