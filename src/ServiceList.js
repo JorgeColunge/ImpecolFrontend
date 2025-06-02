@@ -505,24 +505,23 @@ function ServiceList() {
         /* ⁂  mostramos uno a uno */
         const freshServices = [];
         for (const srv of srvRes.data.sort(
-          (a, b) => new Date(b.created_at) - new Date(a.created_at)
+          (a, b) => new Date(b.created_at) - new Date(a.created_at)   // DESC
         )) {
           if (aborted) return;
           freshServices.push(srv);
 
           setServices(prev => {
-            if (prev.some(p => p.id === srv.id)) return prev; // evita duplicados
-            return [srv, ...prev];                            // ← unshift
+            if (prev.some(p => p.id === srv.id)) return prev;
+            return [...prev, srv];     // ← lo añades al final
           });
 
           setFilteredServices(prev => {
             if (prev.some(p => p.id === srv.id)) return prev;
-            return [srv, ...prev];
+            return [...prev, srv];
           });
 
-          await new Promise(r => setTimeout(r)); // micro-yield
+          await new Promise(r => setTimeout(r));
         }
-
 
         /* 3️⃣  Actualiza caché */
         await setCachedServices(freshServices);
