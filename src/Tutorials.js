@@ -164,16 +164,20 @@ export default function Tutorials() {
                     ))}
             </Row>
 
-            {/* ---------- modal video ---------- */}
-            <Modal show={showVideo} onHide={() => setShowVideo(false)} centered size="xl" dialogClassName="m-0 p-0">
-                <Modal.Body className="p-0">
+            {/* ---------- modal video XL ---------- */}
+            <Modal
+                show={showVideo}
+                onHide={() => setShowVideo(false)}
+                size="xl"
+                centered
+                style={{ minHeight: 0, height: 'auto' }}
+            >
+                <Modal.Body className="p-0 px-5 mx-5">
                     <div className="ratio ratio-16x9">
                         {showVideo && (
                             <iframe
                                 src={videoUrl.replace("watch?v=", "embed/")}
                                 title="YouTube video"
-                                className="w-100 h-100 border-0"
-                                allow="autoplay; encrypted-media; picture-in-picture"
                                 allowFullScreen
                             />
                         )}
