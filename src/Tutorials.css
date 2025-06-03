@@ -14,3 +14,27 @@
     width: 100%;
     text-align: left;
 }
+
+/* Margen oscuro alrededor del video */
+.custom-video-modal {
+    margin: 2rem auto;
+    /* margen vertical + centrado */
+    max-width: 95vw;
+}
+
+.custom-video-backdrop {
+    background-color: rgba(0, 0, 0, 0.85);
+}
+
+.custom-video-modal .modal-content {
+    background: transparent;
+    border: none;
+    box-shadow: none;
+}
+
+@media (max-width: 768px) {
+    .custom-video-modal {
+        margin: 1rem auto;
+        max-width: 100vw;
+    }
+}

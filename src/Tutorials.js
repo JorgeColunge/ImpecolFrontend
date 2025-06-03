@@ -164,23 +164,28 @@ export default function Tutorials() {
                     ))}
             </Row>
 
-            {/* ---------- modal video XL ---------- */}
             <Modal
                 show={showVideo}
                 onHide={() => setShowVideo(false)}
                 size="xl"
                 centered
-                style={{ minHeight: 0, height: 'auto' }}
+                dialogClassName="custom-video-modal"
+                contentClassName="border-0 bg-transparent"
+                backdropClassName="custom-video-backdrop"
             >
-                <Modal.Body className="p-0 px-5 mx-5">
-                    <div className="ratio ratio-16x9">
-                        {showVideo && (
-                            <iframe
-                                src={videoUrl.replace("watch?v=", "embed/")}
-                                title="YouTube video"
-                                allowFullScreen
-                            />
-                        )}
+                <Modal.Body className="p-0 d-flex justify-content-center align-items-center">
+                    <div className="w-100" style={{ maxWidth: '900px' }}>
+                        <div className="ratio ratio-16x9">
+                            {showVideo && (
+                                <iframe
+                                    src={videoUrl.replace("watch?v=", "embed/")}
+                                    title="YouTube video"
+                                    allowFullScreen
+                                    className="w-100"
+                                    style={{ border: "none" }}
+                                />
+                            )}
+                        </div>
                     </div>
                 </Modal.Body>
             </Modal>
