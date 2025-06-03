@@ -4,6 +4,10 @@ import { Card, Button, Row, Col, Modal, Form, InputGroup } from "react-bootstrap
 import { PlusCircle, PencilSquare, Trash, Search } from "react-bootstrap-icons";
 import "./Tutorials.css"
 
+const ALLOWED_ROLES = ["Administrador", "Superadministrador", "Supervisor Técnico", "SST"];
+const userRole = JSON.parse(localStorage.getItem("user_info"))?.rol ?? "";
+const CAN_MANAGE = ALLOWED_ROLES.includes(userRole);
+
 const YT_THUMB = (url) => {
     const m = url.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=))([\w-]{11})/);
     return m ? `https://i.ytimg.com/vi/${m[1]}/hqdefault.jpg` : "";
@@ -108,17 +112,19 @@ export default function Tutorials() {
                 </Col>
 
                 {/* ---------- Botón Crear ---------- */}
-                <Col xs={12} md={3} className="text-md-end pb-2">
-                    <div className="d-flex justify-content-start justify-content-md-end">
-                        <Button
-                            variant="success"
-                            onClick={openCreate}
-                            className="w-100 w-md-auto"
-                        >
-                            <PlusCircle className="me-2" /> Crear
-                        </Button>
-                    </div>
-                </Col>
+                {ALLOWED_ROLES.includes(userRole) && (
+                    <Col xs={12} md={3} className="text-md-end pb-2">
+                        <div className="d-flex justify-content-start justify-content-md-end">
+                            <Button
+                                variant="success"
+                                onClick={openCreate}
+                                className="w-100 w-md-auto"
+                            >
+                                <PlusCircle className="me-2" /> Crear
+                            </Button>
+                        </div>
+                    </Col>
+                )}
             </Row>
             <Row xs={1} sm={2} md={3} lg={4} className="g-4" style={{ minHeight: 0, height: 'auto' }}>
                 {tutorials
@@ -136,29 +142,30 @@ export default function Tutorials() {
                                     <Card.Title>{t.title}</Card.Title>
                                     <Card.Text className="text-muted" style={{ fontSize: "0.9rem" }}>{t.description}</Card.Text>
                                 </Card.Body>
-
                                 {/* ---------- Footer acciones ---------- */}
-                                <Card.Footer
-                                    className="text-center position-relative"
-                                    style={{ background: "#f9f9f9", cursor: "pointer" }}
-                                    onClick={(e) => { e.stopPropagation(); toggleActions(t.id); }}
-                                    ref={expandedCardId === t.id ? dropdownRef : null}
-                                >
-                                    <small className="text-success">
-                                        {expandedCardId === t.id ? "Cerrar Acciones" : "Acciones"}
-                                    </small>
+                                {CAN_MANAGE && (
+                                    <Card.Footer
+                                        className="text-center position-relative"
+                                        style={{ background: "#f9f9f9", cursor: "pointer" }}
+                                        onClick={(e) => { e.stopPropagation(); toggleActions(t.id); }}
+                                        ref={expandedCardId === t.id ? dropdownRef : null}
+                                    >
+                                        <small className="text-success">
+                                            {expandedCardId === t.id ? "Cerrar Acciones" : "Acciones"}
+                                        </small>
 
-                                    {expandedCardId === t.id && (
-                                        <div className="menu-actions expand">
-                                            <button className="btn d-block" onClick={(e) => { e.stopPropagation(); openEdit(t); }}>
-                                                <PencilSquare size={18} className="me-2" /> Editar
-                                            </button>
-                                            <button className="btn d-block" onClick={(e) => { e.stopPropagation(); deleteTutorial(t.id); }}>
-                                                <Trash size={18} className="me-2" /> Eliminar
-                                            </button>
-                                        </div>
-                                    )}
-                                </Card.Footer>
+                                        {expandedCardId === t.id && (
+                                            <div className="menu-actions expand">
+                                                <button className="btn d-block" onClick={(e) => { e.stopPropagation(); openEdit(t); }}>
+                                                    <PencilSquare size={18} className="me-2" /> Editar
+                                                </button>
+                                                <button className="btn d-block" onClick={(e) => { e.stopPropagation(); deleteTutorial(t.id); }}>
+                                                    <Trash size={18} className="me-2" /> Eliminar
+                                                </button>
+                                            </div>
+                                        )}
+                                    </Card.Footer>
+                                )}
                             </Card>
                         </Col>
                     ))}
