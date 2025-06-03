@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useUnsavedChanges } from './UnsavedChangesContext';
-import { List, Person, People, Calendar3, JournalBookmarkFill, FileText, BarChart, ClipboardCheck, BoxArrowRight, Search, Megaphone, CurrencyDollar, Gear, CalendarDate, CalendarEvent, Eyedropper, PersonFillGear, GraphUp, ChatLeftDots, BoxArrowInUpRight, Film } from 'react-bootstrap-icons';
+import { List, Person, People, Calendar3, JournalBookmarkFill, FileText, BarChart, ClipboardCheck, BoxArrowRight, Search, Megaphone, CurrencyDollar, Gear, CalendarDate, CalendarEvent, Eyedropper, PersonFillGear, GraphUp, ChatLeftDots, BoxArrowInUpRight, Film, Backpack3 } from 'react-bootstrap-icons';
 import axios from 'axios';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import './SidebarMenu.css';
@@ -185,6 +185,12 @@ function SidebarMenu({ onLogout, userInfo, isSidebarVisible, onToggle }) {
       icon: <Film size={20} />,
       path: "/actions",
       roles: ["Administrador", "Superadministrador"],
+    },
+    {
+      label: "Tutoriales",
+      icon: <Backpack3 size={20} />,
+      path: "/tutoriales",
+      roles: ["Operario Hogar", "Operario", "Supervisor Técnico", "Administrador", "Superadministrador"],
     },
     {
       label: "Cerrar Sesión",

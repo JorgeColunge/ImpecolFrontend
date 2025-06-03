@@ -1,0 +1,16 @@
+.menu-actions {
+    position: absolute;
+    bottom: 100%;
+    /* aparece sobre el Footer */
+    left: 0;
+    width: 100%;
+    background: #ffffff;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, .1);
+    border-top: 1px solid #ddd;
+    z-index: 30;
+}
+
+.menu-actions button {
+    width: 100%;
+    text-align: left;
+}

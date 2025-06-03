@@ -37,6 +37,7 @@ import CompanyStations from './CompanyStations';
 import UnsavedChangesModal from './UnsavedChangesModal';
 import Consumption from './Consumption';
 import Actions from './Actions';
+import Tutorials from './Tutorials';
 import { UnsavedChangesProvider } from './UnsavedChangesContext';
 import { syncRequests } from './offlineHandler';
 import { saveUsers, getUsers, syncUsers, syncUsersOnStart, saveServices, saveEvents, saveTechnicians, saveInspections, syncPendingInspections, syncProductsOnStart } from './indexedDBHandler';
@@ -399,6 +400,7 @@ function App() {
                 <Route path="/rules" element={isAuthorized(["Supervisor Técnico", "Administrador", "Superadministrador"]) ? <Rules /> : <Navigate to="/login" />} />
                 <Route path="/consumption" element={isAuthorized(["Supervisor Técnico", "Administrador", "Superadministrador"]) ? <Consumption /> : <Navigate to="/login" />} />
                 <Route path="/actions" element={isAuthorized(["Supervisor Técnico", "Administrador", "Superadministrador"]) ? <Actions /> : <Navigate to="/login" />} />
+                <Route path="/tutoriales" element={isAuthorized(["Operario Hogar", "Operario", "Supervisor Técnico", "Administrador", "Superadministrador"]) ? <Tutorials /> : <Navigate to="/login" />} />
               </Routes>
             </div>
           </div>
