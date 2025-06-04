@@ -1529,14 +1529,8 @@ const InspectionCalendar = () => {
                         Seguir Agendando
                     </Button>
                     <Button variant="secondary" onClick={handleScheduleModalClose}>Cancelar</Button>
-                    <Button variant="success" onClick={handleScheduleService} disabled={isLoading || !!scheduleConflictMessage}>
-                        {isLoading ? (
-                            <>
-                                Guardando...
-                            </>
-                        ) : (
-                            "Guardar"
-                        )}
+                    <Button variant="success" onClick={handleScheduleService} disabled={!!scheduleConflictMessage}>
+                        "Guardar"
                     </Button>
 
                 </Modal.Footer>

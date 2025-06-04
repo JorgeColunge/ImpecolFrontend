@@ -259,6 +259,18 @@ function App() {
   };
 
   useEffect(() => {
+    const fullSync = async () => {
+      try {
+        console.log('🚀 Sincronización inicial (app arrancó online)…');
+        await syncPendingInspections();
+        await syncRequests();
+        await syncUsers();
+        //   ⬆️  cualquier otra tarea que sueles hacer en handleOnline
+      } catch (err) {
+        console.error('❌ Error en sincronización inicial:', err);
+      }
+    };
+
     const handleOnline = async () => {
       console.log('🌐 Conexión restaurada. Sincronizando inspecciones pendientes...');
 
@@ -280,6 +292,8 @@ function App() {
     };
 
     window.addEventListener('online', handleOnline);
+
+    if (navigator.onLine) fullSync();
 
     return () => {
       window.removeEventListener('online', handleOnline);
