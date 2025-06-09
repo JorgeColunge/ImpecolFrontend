@@ -1206,6 +1206,17 @@ function Inspection() {
       : '';
   };
 
+  /* ------------- tooltip reutilizable -------------- */
+  const renderTooltip = props => (
+    <Tooltip
+      {...props}
+      id="tooltip-sign-info"
+      className="text-start white-space-pre"
+    >
+      {getSignMissingMessage()}
+    </Tooltip>
+  );
+
   return (
     <div className="container mt-4">
 
@@ -2686,35 +2697,26 @@ function Inspection() {
 
               <OverlayTrigger
                 placement="top"
-                overlay={
-                  !canSign && (
-                    <Tooltip id="tooltip-sign-info" className="text-start white-space-pre">
-                      {getSignMissingMessage()}
-                    </Tooltip>
-                  )
-                }
+                overlay={renderTooltip}               // SIEMPRE un elemento
+                trigger={canSign ? [] : ['hover', 'focus', 'click']} // sin disparadores ⇒ no se muestra
               >
-                {/* Importantísimo: envolver el botón en un <span> cuando está disabled
-              porque un botón HTML deshabilitado no recibe eventos de mouse.  */}
+                {/*  El span sigue siendo el wrapper que captura el hover cuando el
+      botón está disable  */}
                 <span
                   className="d-inline-block"
-                  /* Si está bloqueado, capturamos el click para que no “se meta”
-                     al span. Con esto también logramos que al presionar se vea
-                     el mismo tooltip. */
                   onClick={e => { if (!canSign) e.preventDefault(); }}
                 >
                   <Button
                     variant="outline-success"
-                    onClick={() => setSignModalOpen(true)}
                     disabled={!canSign}
-                    /* Si está disabled anulamos los eventos *del propio botón*
-                       pero dejamos vivo el overlay en el wrapper <span>. */
+                    onClick={() => setSignModalOpen(true)}
                     style={!canSign ? { pointerEvents: 'none' } : {}}
                   >
                     Firmar
                   </Button>
                 </span>
               </OverlayTrigger>
+
 
             </div>
           )}
