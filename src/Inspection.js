@@ -618,7 +618,12 @@ function Inspection() {
         findingsByTypeProcessed[type] = findingsByType[type].map((finding) => ({
           ...finding,
           photo: finding.photoBlob ? null : finding.photoRelative, // Enviar la URL relativa si no hay nueva imagen
-          date: finding.date || inspectionData?.date, // <- asegura que se mantenga
+          date: finding.date || getFormattedDateWithSlashes(),
+          time: finding.time || new Date().toLocaleTimeString('es-CO', {
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: true,
+          }).replace(/\u00A0/g, ' '),
         }));
       });
 
@@ -753,20 +758,30 @@ function Inspection() {
     const time = now.format("HH:mm"); // Hora exacta
 
     // Actualizar los hallazgos con el nuevo elemento
-    setFindingsByType((prevFindings) => ({
-      ...prevFindings,
-      [type]: [
-        ...(prevFindings[type] || []),
-        {
-          id: newFindingId,
-          place: '',
-          description: '',
-          photo: null,
-          date,   // ✅ ahora en formato "02-05-2025"
-          time,
-        },
-      ],
-    }));
+    setFindingsByType((prevFindings) => {
+      const now = new Date();
+      const dateFinding = getFormattedDateWithSlashes();
+      const timeFinding = now.toLocaleTimeString('es-CO', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true,
+      }).replace(/\u00A0/g, ' ');
+
+      return {
+        ...prevFindings,
+        [type]: [
+          ...(prevFindings[type] || []),
+          {
+            id: newFindingId,
+            place: '',
+            description: '',
+            photo: null,
+            date: dateFinding,
+            time: timeFinding,
+          },
+        ],
+      };
+    });
 
     // Expandir el nuevo hallazgo
     setCollapseStates((prevStates) => ({
@@ -1129,6 +1144,14 @@ function Inspection() {
       </div>
     );
 
+  const getFormattedDateWithSlashes = () => {
+    const now = new Date();
+    const day = String(now.getDate()).padStart(2, '0');
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const year = String(now.getFullYear()).slice(-2);
+    return `${day}/${month}/${year}`; // formato con /
+  };
+
   const { inspection_type, inspection_sub_type, date, time, service_id, exit_time } = inspectionData;
 
   const parsedInspectionTypes = inspection_type
@@ -1137,6 +1160,22 @@ function Inspection() {
       "Observaciones Inspector",
       "Observaciones SST"]
     : ["Observaciones Cliente", "Observaciones Inspector", "Observaciones SST"];
+
+  /* ← 1. categorías originales que vienen en la ficha */
+  const originalCategories = parsedInspectionTypes;
+
+  /* ← 2. ¿existe al menos un hallazgo con descripción en cada categoría? */
+  const hasFindingsInEveryOriginalCategory = originalCategories.every(cat =>
+    (findingsByType[cat] || []).some(
+      f => f.description && f.description.trim().length > 0
+    )
+  );
+
+  /* ← 3. ¿hay observación general? */
+  const hasGeneralObs = generalObservations.trim().length > 0;
+
+  /* ← 4. bandera final */
+  const canSign = hasGeneralObs && hasFindingsInEveryOriginalCategory;
 
   return (
     <div className="container mt-4">
@@ -2615,7 +2654,11 @@ function Inspection() {
           {!techSignaturePreview ? (
             userRol !== 'Cliente' && (
               <div className="text-center">
-                <button className="btn btn-outline-success" onClick={() => setSignModalOpen(true)}>
+                <button
+                  className="btn btn-outline-success"
+                  onClick={() => setSignModalOpen(true)}
+                  disabled={!canSign}
+                >
                   Firmar
                 </button>
               </div>
