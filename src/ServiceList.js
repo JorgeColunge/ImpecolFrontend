@@ -37,6 +37,11 @@ function ServiceList() {
   const [loadingConvertToPdf, setLoadingConvertToPdf] = useState(false);
   const [isExecuting, setIsExecuting] = useState(false);
   const [actions, setActions] = useState([]);
+  const [clientData, setClientData] = useState(null);
+  const [loadingWhatsApp, setLoadingWhatsApp] = useState(false);
+  const [loadingCorreo, setLoadingCorreo] = useState(false);
+  const [showModalActions, setShowModalActions] = useState(false);
+  const [pdfUrl, setPdfUrl] = useState(null);
   const [newInspection, setNewInspection] = useState({
     inspection_type: [], // Tipos de inspección seleccionados
     service_type: "", // Tipo de servicio del servicio seleccionado
@@ -673,6 +678,8 @@ function ServiceList() {
   const handleServiceClick = (service) => {
     setSelectedService(service); // Establece el servicio seleccionado
     fetchInspections(service.id); // Pasa el `service.id` a la función para filtrar las inspecciones
+    const cli = clients.find(c => c.id === service.client_id);
+    setClientData(cli);
     fetchActions();
     fetchDocuments(service.id);
     setShowDetailsModal(true); // Abre el modal
@@ -1999,53 +2006,118 @@ function ServiceList() {
           <Modal.Title>Acciones del Documento</Modal.Title>
         </Modal.Header>
         <Modal.Body>
-          <Button
-            variant="primary"
-            className="mb-3 w-100"
-            onClick={async () => {
-              try {
-                const response = await axios.post(`${process.env.REACT_APP_API_URL}/api/PrefirmarArchivos`, { url: selectedDocument.document_url });
-                if (response.data.signedUrl) {
-                  const preSignedUrl = response.data.signedUrl;
+          {selectedDocument?.document_type === "pdf" && (
+            <Button
+              variant="primary"
+              className="mb-3 w-100"
+              onClick={async () => {
+                try {
+                  const response = await axios.post(`${process.env.REACT_APP_API_URL}/api/PrefirmarArchivosPDF`, {
+                    url: selectedDocument.document_url,
+                  });
 
-                  if (selectedDocument.document_type === "pdf") {
-                    // Abrir la URL prefirmada en una nueva pestaña si es un PDF
-                    window.open(preSignedUrl, "_blank", "noopener,noreferrer");
+                  if (response.data.signedUrl) {
+                    setPdfUrl(response.data.signedUrl);
+                    setShowModal(true);
                   } else {
-                    // Navegar a la lógica actual para otros tipos de documentos
-                    navigate(`/view-document?url=${encodeURIComponent(preSignedUrl)}`);
+                    showNotification("No se pudo obtener la URL prefirmada.");
                   }
-                } else {
-                  alert("No se pudo obtener la URL prefirmada.");
+                } catch (error) {
+                  console.error("Error al obtener la URL prefirmada:", error);
+                  showNotification("Hubo un error al procesar la solicitud.");
                 }
-              } catch (error) {
-                console.error("Error al obtener la URL prefirmada:", error);
-                alert("Hubo un error al procesar la solicitud.");
-              }
-            }}
-          >
-            Ver
-          </Button>
+              }}
+            >
+              Ver
+            </Button>
+          )}
           <Button variant="secondary" className="mb-3 w-100" onClick={handleDownload}>
             Descargar
+          </Button>
+          <Button variant="warning" className="mb-3 w-100" onClick={handleEditLocal}>
+            Actualizar
           </Button>
           <Button
             variant="success"
             className="mb-3 w-100"
-            onClick={handleEditGoogleDrive}
-            disabled={loadingGoogleDrive} // Deshabilitar el botón mientras se procesa
+            onClick={async () => {
+              try {
+                setLoadingWhatsApp(true);
+
+                console.log("Datos del Cliente: ", clientData)
+
+                const payload = {
+                  nombre: clientData?.name,
+                  telefono: `57${clientData?.phone}`,
+                  documento: selectedDocument.document_url,
+                  nombreDocumento: selectedDocument?.document_name || "Acta de servicio"
+                };
+
+                const sendResponse = await axios.post(`${process.env.REACT_APP_API_URL}/api/enviar-botix-acta`, payload);
+
+                if (sendResponse.data.success) {
+                  showNotification("Documento enviado por WhatsApp exitosamente.");
+                } else {
+                  showNotification("Error al enviar el documento por WhatsApp.");
+                }
+
+              } catch (error) {
+                console.error("Error al enviar documento por WhatsApp:", error);
+                showNotification("Hubo un error al enviar el documento.");
+              } finally {
+                setLoadingWhatsApp(false);
+              }
+            }}
           >
-            {loadingGoogleDrive ? (
+            {loadingWhatsApp ? (
               <>
-                <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-                Procesando...
+                <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true" style={{ width: "1rem", height: "1rem" }}></span>
+                Enviando...
               </>
             ) : (
-              "Editar en Google Drive"
+              "Enviar por WhatsApp"
             )}
           </Button>
-          <Button variant="warning" className="w-100" onClick={handleEditLocal}>
-            Editar Localmente
+          <Button
+            variant="info"
+            className="mb-3 w-100"
+            onClick={async () => {
+              try {
+                setLoadingCorreo(true);
+                console.log("Datos del Cliente (Correo): ", clientData);
+
+                const payload = {
+                  nombre: clientData?.name,
+                  telefono: `57${clientData?.phone}`,
+                  correo: clientData?.email,
+                  documento: selectedDocument.document_url,
+                  nombreDocumento: selectedDocument?.document_name || "Acta de servicio"
+                };
+
+                const sendResponse = await axios.post(`${process.env.REACT_APP_API_URL}/api/enviar-acta-por-correo`, payload);
+
+                if (sendResponse.data.success) {
+                  showNotification("📧 Documento enviado por correo exitosamente.");
+                } else {
+                  showNotification("❌ Error al enviar el documento por correo.");
+                }
+
+              } catch (error) {
+                console.error("❌ Error al enviar documento por correo:", error);
+                showNotification("Hubo un error al enviar el documento por correo.");
+              } finally {
+                setLoadingCorreo(false);
+              }
+            }}
+          >
+            {loadingCorreo ? (
+              <>
+                <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true" style={{ width: "1rem", height: "1rem" }}></span>
+                Enviando...
+              </>
+            ) : (
+              "Enviar por Correo"
+            )}
           </Button>
         </Modal.Body>
       </Modal>
@@ -2099,6 +2171,30 @@ function ServiceList() {
             )}
           </Button>
         </Modal.Footer>
+      </Modal>
+
+      <Modal
+        show={showModalActions}
+        onHide={() => setShowModal(false)}
+        size="xl"
+        centered
+      >
+        <Modal.Body
+          style={{
+            height: "100vh",
+            overflow: "hidden",
+            padding: 0, // opcional: elimina padding si no lo necesitas
+          }}>
+          {pdfUrl && (
+            <iframe
+              src={pdfUrl}
+              title="Vista previa PDF"
+              width="100%"
+              height="100%"
+              style={{ border: "none" }}
+            ></iframe>
+          )}
+        </Modal.Body>
       </Modal>
 
       {isExecuting && (

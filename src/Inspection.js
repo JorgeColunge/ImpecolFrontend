@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useLocation } from 'react-router-dom';
 import { useNavigate } from 'react-router-dom';
-import { Button, Table, InputGroup, FormControl, Modal, Form } from 'react-bootstrap';
+import { Button, Table, InputGroup, FormControl, Modal, Form, Tooltip, OverlayTrigger } from 'react-bootstrap';
 import api from './Api'; // Usa el archivo de API con lógica offline integrada
 import { saveRequest, isOffline } from './offlineHandler';
 import { initUsersDB, saveUsers, getUsers, getInspectionById, saveInspections, saveProducts, getProducts } from './indexedDBHandler';
@@ -1154,28 +1154,57 @@ function Inspection() {
 
   const { inspection_type, inspection_sub_type, date, time, service_id, exit_time } = inspectionData;
 
-  const parsedInspectionTypes = inspection_type
-    ? [...inspection_type.split(",").map((type) => type.trim()),
-      "Observaciones Cliente",
-      "Observaciones Inspector",
-      "Observaciones SST"]
-    : ["Observaciones Cliente", "Observaciones Inspector", "Observaciones SST"];
+  /********* 1. Categorías “reales” que llegan desde la ficha *********/
+  const originalCategories = inspection_type
+    ? inspection_type.split(',').map(t => t.trim())
+    : [];                       // ← vacío si no vino nada
 
-  /* ← 1. categorías originales que vienen en la ficha */
-  const originalCategories = parsedInspectionTypes;
+  /********* 2. Categorías auxiliares que NO deben exigir hallazgos ****/
+  const extraCategories = [
+    'Observaciones Cliente',
+    'Observaciones Inspector',
+    'Observaciones SST',
+  ];
 
-  /* ← 2. ¿existe al menos un hallazgo con descripción en cada categoría? */
+  /********* 3. Lista completa para renderizar en la UI ****************/
+  const parsedInspectionTypes = [...originalCategories, ...extraCategories];
+
+  /********* 4. ¿hay un hallazgo con descripción en cada categoría real? */
   const hasFindingsInEveryOriginalCategory = originalCategories.every(cat =>
     (findingsByType[cat] || []).some(
-      f => f.description && f.description.trim().length > 0
+      f => (f.description || '').trim().length > 0
     )
   );
 
-  /* ← 3. ¿hay observación general? */
+  /********* 5. ¿hay observación general? ********************************/
   const hasGeneralObs = generalObservations.trim().length > 0;
 
-  /* ← 4. bandera final */
+  /********* 6. Puede firmar solo si cumple ambas condiciones ************/
   const canSign = hasGeneralObs && hasFindingsInEveryOriginalCategory;
+
+  /********* 7. Texto de tooltip *****************************************/
+  const getSignMissingMessage = () => {
+    const faltantes = [];
+
+    if (!hasGeneralObs) {
+      faltantes.push('• Ingresar observación general');
+    }
+
+    const categoriasSinHallazgo = originalCategories.filter(cat =>
+      !(findingsByType[cat] || []).some(
+        f => (f.description || '').trim().length
+      )
+    );
+    if (categoriasSinHallazgo.length) {
+      faltantes.push(
+        `• Hallazgo en: ${categoriasSinHallazgo.join(', ')}`
+      );
+    }
+
+    return faltantes.length
+      ? `Para firmar necesitas:\n${faltantes.join('\n')}`
+      : '';
+  };
 
   return (
     <div className="container mt-4">
@@ -2650,23 +2679,49 @@ function Inspection() {
       <div className="card border-success mt-4">
         <div className="card-header">Firmas</div>
         <div className="card-body">
-          {/* Mostrar solo el botón si no hay firmas */}
-          {!techSignaturePreview ? (
-            userRol !== 'Cliente' && (
-              <div className="text-center">
-                <button
-                  className="btn btn-outline-success"
-                  onClick={() => setSignModalOpen(true)}
-                  disabled={!canSign}
+
+          {/* si la inspección NO está firmada aún … */}
+          {!techSignaturePreview && userRol !== 'Cliente' && (
+            <div className="text-center">
+
+              <OverlayTrigger
+                placement="top"
+                overlay={
+                  !canSign && (
+                    <Tooltip id="tooltip-sign-info" className="text-start white-space-pre">
+                      {getSignMissingMessage()}
+                    </Tooltip>
+                  )
+                }
+              >
+                {/* Importantísimo: envolver el botón en un <span> cuando está disabled
+              porque un botón HTML deshabilitado no recibe eventos de mouse.  */}
+                <span
+                  className="d-inline-block"
+                  /* Si está bloqueado, capturamos el click para que no “se meta”
+                     al span. Con esto también logramos que al presionar se vea
+                     el mismo tooltip. */
+                  onClick={e => { if (!canSign) e.preventDefault(); }}
                 >
-                  Firmar
-                </button>
-              </div>
-            )
-          ) : (
+                  <Button
+                    variant="outline-success"
+                    onClick={() => setSignModalOpen(true)}
+                    disabled={!canSign}
+                    /* Si está disabled anulamos los eventos *del propio botón*
+                       pero dejamos vivo el overlay en el wrapper <span>. */
+                    style={!canSign ? { pointerEvents: 'none' } : {}}
+                  >
+                    Firmar
+                  </Button>
+                </span>
+              </OverlayTrigger>
+
+            </div>
+          )}
+
+          {/* … si ya hay firma, sigues mostrando la pre-visualización tal como lo tienes */}
+          {techSignaturePreview && (
             <>
-              {/* Mostrar la información completa si hay firmas */}
-              {/* Firma del Técnico */}
               <div className="mb-4 text-center">
                 <h5>Firma del Operario</h5>
                 <img
@@ -2677,6 +2732,7 @@ function Inspection() {
               </div>
             </>
           )}
+
         </div>
       </div>
 
