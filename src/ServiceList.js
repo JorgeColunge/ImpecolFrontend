@@ -2018,7 +2018,7 @@ function ServiceList() {
 
                   if (response.data.signedUrl) {
                     setPdfUrl(response.data.signedUrl);
-                    setShowModal(true);
+                    setShowModalActions(true);
                   } else {
                     showNotification("No se pudo obtener la URL prefirmada.");
                   }
