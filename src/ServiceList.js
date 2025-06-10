@@ -2175,7 +2175,7 @@ function ServiceList() {
 
       <Modal
         show={showModalActions}
-        onHide={() => setShowModal(false)}
+        onHide={() => showModalActions(false)}
         size="xl"
         centered
       >
